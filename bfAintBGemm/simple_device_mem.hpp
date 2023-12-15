@@ -39,3 +39,5 @@ struct SimpleHostMem : public SimpleMem
     ~SimpleHostMem() { (void)free(p_mem_); }
 };
 
+
+
