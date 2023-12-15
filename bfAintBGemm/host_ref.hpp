@@ -4,12 +4,12 @@ static inline void gemm_rrr(
     float*  ptr_c,
     const float*  __restrict__ ptr_a,
     const float*  __restrict__ ptr_b,
-    index_t m,
-    index_t n,
-    index_t k,
-    index_t lda,
-    index_t ldb,
-    index_t ldc)
+    std::size_t m,
+    std::size_t n,
+    std::size_t k,
+    std::size_t lda,
+    std::size_t ldb,
+    std::size_t ldc)
 {
     for(auto i_m = 0 ; i_m < m; i_m++) {
         for(auto i_n = 0; i_n < n; i_n++) {

@@ -51,9 +51,6 @@ int main(int argc, char ** argv)
         ldc = atoi(argv[7]);
     }
 
-    float *host_a, *host_b, *host_c;
-    float16 *fp16_a, *fp16_b, *fp16_c, *dev_a, *dev_b, *dev_c;
-
     auto f_matrix_space_size = 
         [](std::size_t nRow, std::size_t nCol, std::size_t stride, auto layout){
             using Layout = decltype(layout);
@@ -74,9 +71,9 @@ int main(int argc, char ** argv)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
 
-    rand_vector_2d_int(a_host_buf.GetBuffer(), m, k, lda);
-    rand_vector_2d_int(b_host_buf.GetBuffer(), n, k, ldb);
-    rand_vector_2d_int(scale_host_buf.GetBuffer(), n, k, ldb);
+    rand_vector_2d_int(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
+    rand_vector_2d_int(reinterpret_cast<float*>(b_host_buf.GetBuffer()), n, k, ldb);
+    rand_vector_2d_int(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, k, ldb);
 
     
 
