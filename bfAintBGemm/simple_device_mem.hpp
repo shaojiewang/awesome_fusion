@@ -40,4 +40,3 @@ struct SimpleHostMem : public SimpleMem
 };
 
 
-

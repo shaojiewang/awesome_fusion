@@ -11,6 +11,7 @@
 #include "host_ref.hpp"
 #include "validation.hpp"
 #include "random_gen.hpp"
+#include "mem_transfer.hpp"
 
 using Row = gemm_layout::gemm::RowMajor;
 using Col = gemm_layout::gemm::ColumnMajor;
@@ -73,11 +74,32 @@ int main(int argc, char ** argv)
 
     rand_vector_2d_int(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
     rand_vector_2d_int(reinterpret_cast<float*>(b_host_buf.GetBuffer()), n, k, ldb);
-    rand_vector_2d_int(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, k, ldb);
+    rand_vector_2d_int(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
 
     SimpleHostMem a_host_buf_to_device(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleHostMem b_host_buf_to_device(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
     SimpleHostMem c_host_buf_from_device(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
 
+    mem_transfer<ADataType, float, SimpleHostMem, SimpleHostMem>(a_host_buf_to_device, a_host_buf, m * k);
+    mem_transfer<BDataType, float, SimpleHostMem, SimpleHostMem>(b_host_buf_to_device, b_host_buf, n * k);
 
+    hipMemcpy(a_device_buf.GetBuffer(), a_host_buf_to_device.GetBuffer(), m * k * sizeof(ADataType), hipMemcpyHostToDevice);
+    hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice);
+    hipMemcpy(scale_device_buf.GetBuffer(), scale_host_buf.GetBuffer(), n * 1 * sizeof(ScaleDataType), hipMemcpyHostToDevice);
+
+    if(validation)
+    {
+        gemm_rrr(reinterpret_cast<float*>(c_host_buf.GetBuffer()),
+                 reinterpret_cast<float*>(a_host_buf.GetBuffer()),
+                 reinterpret_cast<float*>(b_host_buf.GetBuffer()),
+                 reinterpret_cast<float*>(scale_host_buf.GetBuffer()),
+                 m, 
+                 n,
+                 k,
+                 k,
+                 n, 
+                 n);
+    }
+    
+    return 0;
 }
