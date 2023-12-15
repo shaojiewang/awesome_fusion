@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <hip/hip_runtime.h>
-#include <hip/hip_fp16.h>
 #include <random>
 #include <iostream>
 #include <stdlib.h>
@@ -8,17 +7,32 @@
 
 #include "simple_device_mem.hpp"
 #include "gemm_tensor_layout.hpp"
+#include "datatype.hpp"
+#include "host_ref.hpp"
+#include "validation.hpp"
+#include "random_gen.hpp"
 
 using Row = gemm_layout::gemm::RowMajor;
-using Col = gemm_layout::gemm::ColMajor;
+using Col = gemm_layout::gemm::ColumnMajor;
+
+using ALayout = Row;
+using BLayout = Row;
+using ScaleLayout = Row;
+using CLayout = Row;
+
+using ADataType = bfloat16;
+using BDataType = int8_t;
+using ScaleDataType = float;
+using CDataType = bfloat16;
+
 
 
 int main(int argc, char ** argv)
 {
     int validation = 0;
-    int m = 3840;
-    int n = 4096;
-    int k = 4096;
+    int m = 32;
+    int n = 64;
+    int k = 128;
     if(argc >= 2) {
         validation = atoi(argv[1]);
     }
@@ -28,7 +42,7 @@ int main(int argc, char ** argv)
         k = atoi(argv[4]);
     }
     int lda = k;
-    int ldb = k;
+    int ldb = n;
     int ldc = n;
 
     if(argc >= 8) {
@@ -50,5 +64,20 @@ int main(int argc, char ** argv)
             }
         };
 
-    SimpleDeviceMem a_device_buf();
+    SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
+    SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
+    SimpleDeviceMem c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    SimpleDeviceMem scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+    
+    SimpleHostMem a_host_buf(sizeof(float) * f_matrix_space_size(m, k, lda, ALayout{}));
+    SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb, BLayout{}));
+    SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+
+    rand_vector_2d_int(a_host_buf.GetBuffer(), m, k, lda);
+    rand_vector_2d_int(b_host_buf.GetBuffer(), n, k, ldb);
+    rand_vector_2d_int(scale_host_buf.GetBuffer(), n, k, ldb);
+
+    
+
 }
