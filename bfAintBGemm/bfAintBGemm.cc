@@ -54,6 +54,14 @@ int main(int argc, char ** argv)
         ldc = atoi(argv[7]);
     }
 
+    hipModule_t module;
+    hipFunction_t kernel_func;
+    hipEvent_t evt_00, evt_11;
+    GPU_CHECK_ERROR(hipSetDevice(0));
+
+    GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
+    GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, KER_NAME));
+
     auto f_matrix_space_size = 
         [](std::size_t nRow, std::size_t nCol, std::size_t stride, auto layout){
             using Layout = decltype(layout);
@@ -108,7 +116,7 @@ int main(int argc, char ** argv)
         void*  ptr_c;
         void*  ptr_a;
         void*  ptr_b;
-        void*  ptr_scale
+        void*  ptr_scale;
         unsigned int m;
         unsigned int n;
         unsigned int k;
@@ -186,7 +194,7 @@ int main(int argc, char ** argv)
                  n);
         
         GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * n * sizeof(CDataType), hipMemcpyDeviceToHost));
-        bool res = valid_vector(c_host_buf.GetBuffer(), c_host_buf_from_device.GetBuffer(),  m * n);
+        bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
         printf(",%s", res ? "valid" : "fail");
     }
     

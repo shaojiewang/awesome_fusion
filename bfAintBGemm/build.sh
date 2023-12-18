@@ -11,5 +11,5 @@ rm -rf $BUILD ; mkdir $BUILD ; cd $BUILD
 KSRC=bf16gemm_kernel_gfx90a.s
 KOUT=bf16gemm_kernel_gfx90a.hsaco
 
-/opt/rocm/llvm/bin/clang++ -x assembler -target amdgcn--amdhsa -mcpu=gfx90a $KSRC -o $KOUT
+/opt/rocm/llvm/bin/clang++ -x assembler -target amdgcn--amdhsa -mcpu=gfx90a $TOP/$KSRC -o $BUILD/$KOUT
 
