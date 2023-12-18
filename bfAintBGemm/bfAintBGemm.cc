@@ -27,6 +27,8 @@ using BDataType = int8_t;
 using ScaleDataType = float;
 using CDataType = bfloat16;
 
+#define WG_SIZE 128 // only 128 or 256
+
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
 #define KER_NAME "bf16gemm_rrr"
 
@@ -101,7 +103,7 @@ int main(int argc, char ** argv)
     int warm_ups = 10;
     int i;
 
-    int bdx = 256;
+    int bdx = WG_SIZE;
     int gdx = ((m + 31) >> 5 ) * ((n + 63) >> 6);
 
 // TODO: move this section to a header file
@@ -150,7 +152,7 @@ int main(int argc, char ** argv)
     }
 
 #ifdef ASM_PRINT
-    int max_i=256;
+    int max_i=WG_SIZE;
     GPU_CHECK_ERROR(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
     for(int i=0; i<max_i; i++){
         // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)

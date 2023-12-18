@@ -97,7 +97,15 @@ bf16gemm_rrr:
 
     v_mov_b32 v[v_tid], v0
 
+    ; A and C matrix is bf16 datatype
+    s_lshl_b32 s[s_lda], s[s_lda], 1
+    s_lshl_b32 s[s_ldc], s[s_ldc], 1
+
+    ; thread block mapping
+    
     ; load A matrix
+    ; thread vec: [k0, m, k1] = [ 2,  1,  8]
+    ; block vec:  [k0, m, k1] = [ 2, 64,  1]
     
     
 
@@ -138,7 +146,7 @@ amdhsa.kernels:
     .group_segment_fixed_size: 16384
     .private_segment_fixed_size: 0
     .wavefront_size: 64
-    .reqd_workgroup_size : [256, 1, 1]
+    .reqd_workgroup_size : [128, 1, 1]
     .max_flat_workgroup_size: 256
     .args:
     - { .name: ptr_c,           .size: 8, .offset:   0, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: false}
