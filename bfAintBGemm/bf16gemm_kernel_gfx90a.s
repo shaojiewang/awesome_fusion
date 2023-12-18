@@ -102,6 +102,10 @@ bf16gemm_rrr:
     s_lshl_b32 s[s_ldc], s[s_ldc], 1
 
     ; thread block mapping
+    ; m block id: bid x
+    ; n block id: bid y
+    s_lshl_b32 s[s_m_idx], s[s_bx], 5
+    s_lshl_b32 s[s_n_idx], s[s_by], 6
     
     ; load A matrix
     ; thread vec: [k0, m, k1] = [ 2,  1,  8]
