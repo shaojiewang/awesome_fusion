@@ -44,7 +44,7 @@ bf16gemm_rrr:
     s_mul_i32 s[s_tmp],  s[s_gdx],  256*4   ; gridDim*blockDim*4
     s_lshl_b32 s[s_stride_block],   s[s_tmp],   4   ; unroll 16, gridDim*blockDim*4*workload
 
-label_memcopy_start:
+;label_memcopy_start:
 
     s_add_u32   s[s_ptr_in],   s[s_stride_block], s[s_ptr_in]
     s_addc_u32  s[s_ptr_in+1], s[s_ptr_in+1], 0
@@ -58,7 +58,7 @@ label_memcopy_start:
     s_sub_u32 s[s_loops_per_block], s[s_loops_per_block], 1
     s_cmp_eq_u32 s[s_loops_per_block], 0
     s_waitcnt       vmcnt(0)
-    s_cbranch_scc0  label_memcopy_start
+    ;s_cbranch_scc0  label_memcopy_start
     s_endpgm
 
 .rodata
