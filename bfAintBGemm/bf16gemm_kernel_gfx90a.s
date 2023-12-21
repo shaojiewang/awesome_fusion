@@ -70,10 +70,10 @@
 .set v_laneid,          37
 .set v_lane_lo,         38
 .set v_lane_hi,         39
-.set v_offset_a0,       40
-.set v_offset_a1,       41
-.set v_offset_b0,       42
-.set v_offset_b1,       43
+.set v_offset_a_k0,     40
+.set v_offset_a,        41
+.set v_offset_b_k0,     42
+.set v_offset_b,        43
 .set v_offset_c,        44
 .set v_wave_p,          45
 .set v_wave_q,          46
@@ -107,13 +107,23 @@ bf16gemm_rrr:
     s_lshl_b32 s[s_m_idx], s[s_bx], 5
     s_lshl_b32 s[s_n_idx], s[s_by], 6
     
-    ; load A matrix
-    ; thread vec: [k0, m, k1] = [ 2,  1,  8]
-    ; block vec:  [k0, m, k1] = [ 2, 64,  1]
-    
+    ; load A/B matrix
+    ; A:
+    ; thread vec: [k0, m, k1] = [ 1,  2,  8]
+    ; block vec:  [k0, m, k1] = [ 8, 16,  1]
+    ; B:
+    ; thread vec: [k0, n, k1] = [ 1,  8,  4]
+    ; block vec:  [k0, n, k1] = [16,  8,  1]
+
+    ; A thread block offset
+    v_and_b32 v[v_offset_a_k0], v[v_tid], 7
+    v_lshrrev_b32 v[v_tmp], 3, v[v_tid]
+    v_mad_u32_u24 v[v_offset_a], v[v_tmp], s[s_lda], v[v_offset_a_k0]
+    v_lshlrev_b32 v[v_offset_a], 4, v[v_offset_a]
+    ; A grid offset
     
 
-    .print v_tid, s_print, s_bx, v_tid, v_tmp+4
+    .print v_offset_a, s_print, s_bx, v_tid, v_tmp+4
 
     
 
