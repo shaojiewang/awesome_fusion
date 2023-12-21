@@ -22,6 +22,7 @@ static inline void rand_vector_2d_int(float* v, int row, int col, int ld){
     for(r=0;r<row;r++){
         for(c=0;c<col;c++){
             v[r*ld+c] = ((float)(std::rand() % 10)) - 5;
+            // v[r*ld+c] = (float)(1);
         }
     }
 }

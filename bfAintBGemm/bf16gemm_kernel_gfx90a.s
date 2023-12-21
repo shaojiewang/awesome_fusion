@@ -5,6 +5,8 @@
     ;s_cbranch_scc0 L_endhere
     ;v_cmpx_eq_u32 0, v0
     v_lshlrev_b32 v[\v_offset], 3, v[\v_tid]
+    s_waitcnt lgkmcnt(0)
+    s_waitcnt vmcnt(0)
     global_store_dword v[\v_offset], v[\v_tid], s[\s_out:\s_out+1], offset:0x0
     global_store_dword v[\v_offset], v[\v_val], s[\s_out:\s_out+1], offset:0x0004
     ;s_mov_b64 exec, -1
@@ -32,27 +34,27 @@
 .set s_bx,              2
 .set s_by,              3
 .set s_ptr_c,           4
-.set s_ptr_a,           6
-.set s_ptr_b,           8
-.set s_ptr_scale,       10
-.set s_bs_a,            12
-.set s_bs_b,            13
-.set s_m,               16
-.set s_n,               17
-.set s_k,               18
-.set s_lda,             19
-.set s_ldb,             20
-.set s_ldc,             21
-.set s_print,           22
-.set s_m_blocks,        24
-.set s_m_idx,           25
-.set s_n_idx,           26
-.set s_wave_id,         27
-.set s_wave_p,          28
-.set s_wave_q,          29
-.set s_kitr,            30
-.set s_tmp,             32
-.set s_end,             41
+.set s_ptr_a,           8
+.set s_ptr_b,           12
+.set s_ptr_scale,       16
+.set s_m,               20
+.set s_n,               21
+.set s_k,               22
+.set s_lda,             23
+.set s_ldb,             24
+.set s_ldc,             25
+.set s_print,           26
+.set s_bs_a,            30
+.set s_bs_b,            31
+.set s_m_blocks,        32
+.set s_m_idx,           33
+.set s_n_idx,           34
+.set s_offset_a_0,      35
+.set s_wave_p,          36
+.set s_wave_q,          37
+.set s_kitr,            38
+.set s_tmp,             40
+.set s_end,             49
 
 ;vgpr
 .set v_c,               0
@@ -89,13 +91,22 @@
 bf16gemm_rrr:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
-    s_load_dwordx4 s[s_ptr_c:s_ptr_c+3], s[s_ka:s_ka+1], 0+k_ptr_c
-    s_load_dwordx4 s[s_ptr_b:s_ptr_b+3], s[s_ka:s_ka+1], 0+k_ptr_b
+    s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
+    s_load_dwordx2 s[s_ptr_a:s_ptr_a+1], s[s_ka:s_ka+1], 0+k_ptr_a
+    s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
+    s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
+
     s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
     s_load_dwordx4 s[s_ldb:s_ldb+3], s[s_ka:s_ka+1], 0+k_ldb
+    
+    v_mov_b32 v[v_tid], v0
+    s_mov_b32 s[s_ptr_a + 3], 0x27000    
+    s_mov_b32 s[s_ptr_b + 3], 0x27000    
+    s_mov_b32 s[s_ptr_c + 3], 0x27000    
+    s_mov_b32 s[s_ptr_scale + 3], 0x27000    
+
     s_waitcnt lgkmcnt(0)
 
-    v_mov_b32 v[v_tid], v0
 
     ; A and C matrix is bf16 datatype
     s_lshl_b32 s[s_lda], s[s_lda], 1
@@ -124,6 +135,12 @@ bf16gemm_rrr:
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
+    s_lshl_b32 s[s_offset_a_0], s[s_lda], 4
+    ; prefetch load A
+    s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
+    
+    buffer_load_dwordx4 v[v_p0 : v_p0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_p0 + 4 : v_p0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a_0] offen offset:0
     s_mov_b32 s[s_bs_a], 128
 
     ; B thread block offset
@@ -138,7 +155,7 @@ bf16gemm_rrr:
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     s_lshl_b32 s[s_bs_b], s[s_ldb], 6
 
-    .print v_offset_a, s_print, s_bx, v_tid, v_tmp+4
+    .print v_p0, s_print, s_bx, v_tid, v_tmp+4
 
     
 
@@ -154,7 +171,7 @@ bf16gemm_rrr:
     .amdhsa_system_sgpr_workgroup_id_y 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 64
-    .amdhsa_next_free_sgpr 42
+    .amdhsa_next_free_sgpr 50
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 64
@@ -168,7 +185,7 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rrr
     .symbol: bf16gemm_rrr.kd
-    .sgpr_count: 42
+    .sgpr_count: 50
     .vgpr_count: 64
     .kernarg_segment_align: 8
     .kernarg_segment_size: 72
