@@ -121,6 +121,11 @@ bf16gemm_rrr:
     v_mad_u32_u24 v[v_offset_a], v[v_tmp], s[s_lda], v[v_offset_a_k0]
     v_lshlrev_b32 v[v_offset_a], 4, v[v_offset_a]
     ; A grid offset
+    s_mul_b32 s[s_tmp], s[s_m_idx], s[s_lda]
+    s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
+    s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
+
+    ; B thread block offset
     
 
     .print v_offset_a, s_print, s_bx, v_tid, v_tmp+4
