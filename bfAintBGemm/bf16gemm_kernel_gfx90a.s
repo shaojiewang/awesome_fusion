@@ -49,12 +49,11 @@
 .set s_m_blocks,        32
 .set s_m_idx,           33
 .set s_n_idx,           34
-.set s_offset_a_0,      35
-.set s_wave_p,          36
-.set s_wave_q,          37
-.set s_kitr,            38
-.set s_tmp,             40
-.set s_end,             49
+.set s_offset_a,        35
+.set s_offset_b,        36
+.set s_kitr,            40
+.set s_tmp,             42
+.set s_end,             51
 
 ;vgpr
 .set v_c,               0
@@ -135,12 +134,12 @@ bf16gemm_rrr:
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
-    s_lshl_b32 s[s_offset_a_0], s[s_lda], 4
+    s_lshl_b32 s[s_offset_a], s[s_lda], 4
     ; prefetch load A
     s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
     
-    buffer_load_dwordx4 v[v_p0 : v_p0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
-    buffer_load_dwordx4 v[v_p0 + 4 : v_p0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a_0] offen offset:0
+    buffer_load_dwordx4 v[v_p0 + 0 : v_p0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_p0 + 4 : v_p0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
     s_mov_b32 s[s_bs_a], 128
 
     ; B thread block offset
@@ -154,8 +153,18 @@ bf16gemm_rrr:
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_n_idx]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     s_lshl_b32 s[s_bs_b], s[s_ldb], 6
+    s_mov_b32 s[s_offset_b], s[s_ldb]
+    s_mul_i32 s[s_offset_b + 1], s[s_ldb], 2
+    s_mul_i32 s[s_offset_b + 2], s[s_ldb], 3
+    ; prefetch load B
+    s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_ldb]
 
-    .print v_p0, s_print, s_bx, v_tid, v_tmp+4
+    buffer_load_dwordx2 v[v_q0 + 0 : v_q0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_q0 + 2 : v_q0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
+    buffer_load_dwordx2 v[v_q0 + 4 : v_q0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_q0 + 6 : v_q0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+
+    .print v_q0, s_print, s_bx, v_tid, v_tmp+4
 
     
 
@@ -171,7 +180,7 @@ bf16gemm_rrr:
     .amdhsa_system_sgpr_workgroup_id_y 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 64
-    .amdhsa_next_free_sgpr 50
+    .amdhsa_next_free_sgpr 52
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 64
@@ -185,7 +194,7 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rrr
     .symbol: bf16gemm_rrr.kd
-    .sgpr_count: 50
+    .sgpr_count: 52
     .vgpr_count: 64
     .kernarg_segment_align: 8
     .kernarg_segment_size: 72
