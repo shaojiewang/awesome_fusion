@@ -176,6 +176,18 @@ bf16gemm_rrr:
     s_lshl_b32 s[s_ptr_scale + 2], s[s_n], 2
     buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset:0
 
+    ; store C offset
+    ; vgpr to lds
+    ; vgpr_group  = 4
+    ; wave_id = tid / wave_size
+    ; lane_id = tid % wave_size
+    ; lane_in = tid % inst_n
+    ; lane_im = lane_id / inst_n
+    ; wave_n = block_n / inst_n
+    ; wave_m = block_m / inst_m
+    ; wave_in = wave_id % wave_n
+    ; wave_im = wave_id / wave_n
+
     .print v_scale, s_print, s_bx, v_tid, v_tmp+4
 
     
