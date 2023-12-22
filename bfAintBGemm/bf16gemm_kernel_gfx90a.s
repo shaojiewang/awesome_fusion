@@ -68,7 +68,7 @@
 .set v_smem_load_b,     34
 .set v_smem_store_c,    35
 .set v_smem_load_c,     36
-.set v_laneid,          37
+.set v_scale,           37
 .set v_lane_lo,         38
 .set v_lane_hi,         39
 .set v_offset_a_k0,     40
@@ -164,7 +164,19 @@ bf16gemm_rrr:
     buffer_load_dwordx2 v[v_q0 + 4 : v_q0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
     buffer_load_dwordx2 v[v_q0 + 6 : v_q0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
 
-    .print v_q0, s_print, s_bx, v_tid, v_tmp+4
+    ; load scale
+    ; Scale:
+    ; thread vec: [n]         = [ 1]
+    ; block vec:  [k0, n, k1] = [16,  8,  1]
+    v_and_b32 v[v_tmp], v[v_tid], 7
+    v_lshlrev_b32 v[v_tmp], 2, v[v_tmp]
+    s_lshl_b32 s[s_tmp], s[s_n_idx], 2
+    s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
+    s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
+    s_lshl_b32 s[s_ptr_scale + 2], s[s_n], 2
+    buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset:0
+
+    .print v_scale, s_print, s_bx, v_tid, v_tmp+4
 
     
 
