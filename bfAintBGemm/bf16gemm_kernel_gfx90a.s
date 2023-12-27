@@ -52,6 +52,7 @@
 .set s_offset_a,        35
 .set s_offset_b,        36
 .set s_kitr,            40
+.set s_wave_id,         41
 .set s_tmp,             42
 .set s_end,             51
 
@@ -69,19 +70,20 @@
 .set v_smem_store_c,    35
 .set v_smem_load_c,     36
 .set v_scale,           37
-.set v_lane_lo,         38
+.set v_lane_id,         38
 .set v_lane_hi,         39
 .set v_offset_a_k0,     40
 .set v_offset_a,        41
 .set v_offset_b_k0,     42
 .set v_offset_b,        43
 .set v_offset_c,        44
-.set v_wave_p,          45
-.set v_wave_q,          46
-.set v_lane_col,        47
-.set v_lane_row,        48
-.set v_tmp,             49
-.set v_tid,             63
+.set v_wave_id,         45
+.set v_wave_p,          46
+.set v_wave_q,          47
+.set v_lane_col,        48
+.set v_lane_row,        49
+.set v_tmp,             50
+.set v_tid,             64
 
 .text
 .global bf16gemm_rrr
@@ -203,7 +205,7 @@ bf16gemm_rrr:
     .amdhsa_system_sgpr_workgroup_id_x 1
     .amdhsa_system_sgpr_workgroup_id_y 1
     .amdhsa_system_vgpr_workitem_id 0
-    .amdhsa_next_free_vgpr 64
+    .amdhsa_next_free_vgpr 65
     .amdhsa_next_free_sgpr 52
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
@@ -219,7 +221,7 @@ amdhsa.kernels:
   - .name: bf16gemm_rrr
     .symbol: bf16gemm_rrr.kd
     .sgpr_count: 52
-    .vgpr_count: 64
+    .vgpr_count: 65
     .kernarg_segment_align: 8
     .kernarg_segment_size: 72
     .group_segment_fixed_size: 16384
