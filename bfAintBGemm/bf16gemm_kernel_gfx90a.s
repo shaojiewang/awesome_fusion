@@ -190,7 +190,12 @@ bf16gemm_rrr:
     ; wave_in = wave_id % wave_n
     ; wave_im = wave_id / wave_n
 
-    .print v_scale, s_print, s_bx, v_tid, v_tmp+4
+    ; wave id
+    v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
+    v_readfirstlane_b32 s[s_wave_id], v[v_tmp]
+    v_and_b32 v[v_lane_id], 63, v[v_tid]
+
+    .print v_tmp, s_print, s_bx, v_tid, v_tmp+4
 
     
 
