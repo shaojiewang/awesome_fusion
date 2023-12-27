@@ -80,8 +80,8 @@
 .set v_wave_id,         45
 .set v_wave_p,          46
 .set v_wave_q,          47
-.set v_lane_col,        48
-.set v_lane_row,        49
+.set v_lane_im,         48
+.set v_lane_in,         49
 .set v_tmp,             50
 .set v_tid,             64
 
@@ -183,8 +183,8 @@ bf16gemm_rrr:
     ; vgpr_group  = 4
     ; wave_id = tid / wave_size
     ; lane_id = tid % wave_size
-    ; lane_in = tid % inst_n
-    ; lane_im = lane_id / inst_n
+    ; lane_in = lane_id % inst_n = tid % inst_n
+    ; lane_im = lane_id / inst_n * vgpr_group
     ; wave_n = block_n / inst_n
     ; wave_m = block_m / inst_m
     ; wave_in = wave_id % wave_n
@@ -193,7 +193,13 @@ bf16gemm_rrr:
     ; wave id
     v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
     v_readfirstlane_b32 s[s_wave_id], v[v_tmp]
+    s_lshr_b32 s[s_wave_m], s[s_wave_id], 1
+    s_and_b32  s[s_wave_n], s[s_wave_id], 1
+
     v_and_b32 v[v_lane_id], 63, v[v_tid]
+    v_and_b32 v[v_lane_in], 31, v[v_tid] 
+    v_lshr_b32 v[v_lane_im], 5, v[v_lane_id]
+    v_lshl_b32 v[v_lane_im], 2, v[v_lane_im]
 
     .print v_tmp, s_print, s_bx, v_tid, v_tmp+4
 
