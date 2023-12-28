@@ -53,8 +53,10 @@
 .set s_offset_b,        36
 .set s_kitr,            40
 .set s_wave_id,         41
-.set s_tmp,             42
-.set s_end,             51
+.set s_wave_im,         42
+.set s_wave_in,         43
+.set s_tmp,             64
+.set s_end,             79
 
 ;vgpr
 .set v_c,               0
@@ -82,8 +84,9 @@
 .set v_wave_q,          47
 .set v_lane_im,         48
 .set v_lane_in,         49
-.set v_tmp,             50
-.set v_tid,             64
+.set v_sst_offset_c,    50
+.set v_tmp,             64
+.set v_tid,             127
 
 .text
 .global bf16gemm_rrr
@@ -193,15 +196,28 @@ bf16gemm_rrr:
     ; wave id
     v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
     v_readfirstlane_b32 s[s_wave_id], v[v_tmp]
-    s_lshr_b32 s[s_wave_m], s[s_wave_id], 1
-    s_and_b32  s[s_wave_n], s[s_wave_id], 1
+    s_lshr_b32 s[s_wave_im], s[s_wave_id], 1
+    s_and_b32  s[s_wave_in], s[s_wave_id], 1
+    s_lshl_b32 s[s_wave_im], s[s_wave_im], 5
+    s_lshl_b32 s[s_wave_in], s[s_wave_in], 5
 
+    ; lane id
     v_and_b32 v[v_lane_id], 63, v[v_tid]
     v_and_b32 v[v_lane_in], 31, v[v_tid] 
-    v_lshr_b32 v[v_lane_im], 5, v[v_lane_id]
-    v_lshl_b32 v[v_lane_im], 2, v[v_lane_im]
+    v_lshrrev_b32 v[v_lane_im], 5, v[v_lane_id]
+    v_lshlrev_b32 v[v_lane_im], 2, v[v_lane_im]
 
-    .print v_tmp, s_print, s_bx, v_tid, v_tmp+4
+    ; sst offset C
+    ; m_offset = (wave_im + lane_im) * block_n
+    ; n_offset = wave_n + lane_in
+    ; sst_c_offset = m_offset + n_offset
+    v_add_lshl_u32 v[v_offset_c], v[v_lane_im], s[s_wave_im], 6
+    v_add_u32 v[v_tmp], v[v_lane_in], s[s_wave_in]
+    v_add_lshl_u32 v[v_offset_c], v[v_tmp], v[v_offset_c], 1
+
+
+
+    .print v_offset_c, s_print, s_bx, v_tid, v_tmp+4
 
     
 
@@ -216,8 +232,8 @@ bf16gemm_rrr:
     .amdhsa_system_sgpr_workgroup_id_x 1
     .amdhsa_system_sgpr_workgroup_id_y 1
     .amdhsa_system_vgpr_workitem_id 0
-    .amdhsa_next_free_vgpr 65
-    .amdhsa_next_free_sgpr 52
+    .amdhsa_next_free_vgpr 128
+    .amdhsa_next_free_sgpr 80
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 64
@@ -231,8 +247,8 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rrr
     .symbol: bf16gemm_rrr.kd
-    .sgpr_count: 52
-    .vgpr_count: 65
+    .sgpr_count: 79
+    .vgpr_count: 128
     .kernarg_segment_align: 8
     .kernarg_segment_size: 72
     .group_segment_fixed_size: 16384
