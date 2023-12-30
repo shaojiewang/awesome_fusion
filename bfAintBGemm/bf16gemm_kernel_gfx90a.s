@@ -231,14 +231,21 @@ bf16gemm_rrr:
     v_mov_b32 v[v_tmp + 1], (64 + 1) * 8 * 2
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
+    ; store B to shared mem offset
+    ; 
+
     ; load A to shared mem offset
-    ; sld_iak0 = laneid / inst_m * block_m
+    ; sld_iak0 = laneid / inst_m * (block_m * ak1)
     ; sld_im = lane_id % inst_m + wave_im
     v_lshrrev_b32 v[v_sld_iak0], 5, v[v_lane_id]
-    v_lshlrev_b32 v[v_sld_iak0], 5, v[v_sld_iak0] ; equals to lane_id and 0xffffffd0
+    v_lshlrev_b32 v[v_sld_iak0], 8, v[v_sld_iak0] ; equals to lane_id and 0xffffffd0
     v_and_b32 v[v_sld_im], 31, v[v_lane_id]
     v_add_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im]
     v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
+
+    ; load B to shared mem offset
+    ; difficult to define
+
 
 
     .print v_sst_offset_a, s_print, s_bx, v_tid, v_tmp+4
