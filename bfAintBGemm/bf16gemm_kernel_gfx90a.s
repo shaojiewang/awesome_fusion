@@ -228,6 +228,11 @@ bf16gemm_rrr:
     v_mov_b32 v[v_tmp + 1], (64 + 1) * 8 * 2
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
+    ; load A to shared mem offset
+    ; sld_iak0 = laneid / inst_m * block_n
+    ; sld_in = lane_id % inst_m + wave_im
+    
+
     .print v_sst_offset_a, s_print, s_bx, v_tid, v_tmp+4
 
     
