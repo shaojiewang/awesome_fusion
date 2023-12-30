@@ -91,6 +91,9 @@
 .set v_in,              54
 .set v_sst_offset_a,    55
 .set v_sst_offset_b,    56
+.set v_sld_iak0,        57
+.set v_sld_im,          58
+.set v_sld_offset_a,    59
 .set v_tmp,             64
 .set v_tid,             127
 
@@ -229,9 +232,14 @@ bf16gemm_rrr:
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
     ; load A to shared mem offset
-    ; sld_iak0 = laneid / inst_m * block_n
-    ; sld_in = lane_id % inst_m + wave_im
-    
+    ; sld_iak0 = laneid / inst_m * block_m
+    ; sld_im = lane_id % inst_m + wave_im
+    v_lshrrev_b32 v[v_sld_iak0], 5, v[v_lane_id]
+    v_lshlrev_b32 v[v_sld_iak0], 5, v[v_sld_iak0] ; equals to lane_id and 0xffffffd0
+    v_and_b32 v[v_sld_im], 31, v[v_lane_id]
+    v_add_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im]
+    v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
+
 
     .print v_sst_offset_a, s_print, s_bx, v_tid, v_tmp+4
 
