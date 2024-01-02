@@ -248,7 +248,7 @@ bf16gemm_rrr:
     ; sld_iak0 = laneid / inst_m * (block_m * ak1)
     ; sld_im = lane_id % inst_m + wave_im
     v_lshrrev_b32 v[v_sld_iak0], 5, v[v_lane_id]
-    v_lshlrev_b32 v[v_sld_iak0], 8, v[v_sld_iak0] ; equals to lane_id and 0xffffffd0
+    v_lshlrev_b32 v[v_sld_iak0], 8, v[v_sld_iak0] 
     v_and_b32 v[v_sld_im], 31, v[v_lane_id]
     v_add_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im]
     v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
@@ -259,9 +259,16 @@ bf16gemm_rrr:
     ; sld_offset_b = sld_ibk0 + sld_in
     ; padding = sld_offset_b / 64 * 72
     ; sld_offset_b = padding + sld_offset_b
+    v_lshrrev_b32 v[v_sld_ibk0], 5, v[v_lane_id]
+    v_lshlrev_b32 v[v_sld_ibk0], 8, v[v_sld_ibk0]
+    v_and_b32 v[v_sld_in], 31, v[v_lane_id]
+    v_add_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in]
+    v_add_u32 v[v_sld_offset_b], v[v_sld_in], v[v_sld_ibk0]
+    v_lshrrev_b32 v[v_tmp + 1], 6, v[v_sld_offset_b]
+    v_mad_u32_u24 v[v_sld_offset_b], v[v_tmp + 1], 72, v[v_sld_offset_b]
 
 
-    .print v_sst_offset_a, s_print, s_bx, v_tid, v_tmp+4
+    .print v_sst_offset_b, s_print, s_bx, v_tid, v_tmp+4
 
     
 
