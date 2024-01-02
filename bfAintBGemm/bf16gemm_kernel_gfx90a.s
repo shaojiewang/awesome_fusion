@@ -94,6 +94,9 @@
 .set v_sld_iak0,        57
 .set v_sld_im,          58
 .set v_sld_offset_a,    59
+.set v_sld_ibk0,        60
+.set v_sld_in,          61
+.set v_sld_offset_b,    62
 .set v_tmp,             64
 .set v_tid,             127
 
@@ -235,13 +238,13 @@ bf16gemm_rrr:
     ; sst_in = v_in * bk1 * n1 = v_in * 8 * 4
     ; sst_ibk0 = v_ibk0 * block_n * bk1 = v_ibk0 * 64 * 4
     ; sst_offset_b = sst_in + sst_ibk0
-    ; padding = sst_offset_b / 64 * 72
+    ; padding = sst_offset_b / 64 * 8
     ; sst_offset_b = sst_offset_b + padding
     v_lshlrev_b32 v[v_tmp], 5, v[v_in]
     v_lshlrev_b32 v[v_tmp + 1], 8, v[v_ibk0]
     v_add_u32 v[v_sst_offset_b], v[v_tmp], v[v_tmp + 1]
-    v_lshrrev_b32 v[v_tmp + 2], 6, v[v_sst_offset_b]
-    v_mad_u32_u24 v[v_sst_offset_b], v[v_tmp + 2], 72, v[v_sst_offset_b] 
+    v_lshrrev_b32 v[v_tmp], 6, v[v_sst_offset_b]
+    v_lshl_add_u32 v[v_sst_offset_b], v[v_tmp], 3, v[v_sst_offset_b] 
     v_lshlrev_b32 v[v_sst_offset_b], 1, v[v_sst_offset_b]
 
     ; load A to shared mem offset
@@ -265,7 +268,8 @@ bf16gemm_rrr:
     v_add_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in]
     v_add_u32 v[v_sld_offset_b], v[v_sld_in], v[v_sld_ibk0]
     v_lshrrev_b32 v[v_tmp + 1], 6, v[v_sld_offset_b]
-    v_mad_u32_u24 v[v_sld_offset_b], v[v_tmp + 1], 72, v[v_sld_offset_b]
+    v_lshl_add_u32 v[v_sld_offset_b], v[v_tmp + 1], 3, v[v_sld_offset_b]
+    v_lshlrev_b32 v[v_sld_offset_b], 1, v[v_sld_offset_b]
 
 
     .print v_sst_offset_b, s_print, s_bx, v_tid, v_tmp+4
