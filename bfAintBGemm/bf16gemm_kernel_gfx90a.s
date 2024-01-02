@@ -231,7 +231,7 @@ bf16gemm_rrr:
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
     ; sst_offset_a = sst_iak0 + v_im * 8
     v_lshlrev_b32 v[v_tmp], 4, v[v_im]
-    v_mov_b32 v[v_tmp + 1], (64 + 1) * 8 * 2
+    v_mov_b32 v[v_tmp + 1], (32 + 1) * 8 * 2
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
     ; store B to shared mem offset. when B is stored to shared mem, B datatype is bf16/fp16
@@ -248,31 +248,34 @@ bf16gemm_rrr:
     v_lshlrev_b32 v[v_sst_offset_b], 1, v[v_sst_offset_b]
 
     ; load A to shared mem offset
-    ; sld_iak0 = laneid / inst_m * (block_m * ak1)
+    ; sld_iak0 = laneid / inst_m * ((block_m + pad) * ak1)
     ; sld_im = lane_id % inst_m + wave_im
+    ; sld_offset_a = sld_im * ak1 + sld_iak0
     v_lshrrev_b32 v[v_sld_iak0], 5, v[v_lane_id]
-    v_lshlrev_b32 v[v_sld_iak0], 8, v[v_sld_iak0] 
+    v_mov_b32 v[v_tmp], (32 + 1) * 8
+    v_mul_lo_u32 v[v_sld_iak0], v[v_tmp], v[v_sld_iak0] 
     v_and_b32 v[v_sld_im], 31, v[v_lane_id]
-    v_add_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im]
+    v_add_lshl_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im], 3
     v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
 
     ; load B to shared mem offset
     ; sld_ibk0 = laneid / inst_n * (block_n * bk1)
     ; sld_in = laneid % inst_n + wave_in
-    ; sld_offset_b = sld_ibk0 + sld_in
-    ; padding = sld_offset_b / 64 * 72
+    ; sld_offset_b = sld_ibk0 + sld_in * bk1
+    ; padding = sld_offset_b / 64 * 8
     ; sld_offset_b = padding + sld_offset_b
     v_lshrrev_b32 v[v_sld_ibk0], 5, v[v_lane_id]
     v_lshlrev_b32 v[v_sld_ibk0], 8, v[v_sld_ibk0]
     v_and_b32 v[v_sld_in], 31, v[v_lane_id]
-    v_add_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in]
+    v_add_lshl_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in], 2
     v_add_u32 v[v_sld_offset_b], v[v_sld_in], v[v_sld_ibk0]
     v_lshrrev_b32 v[v_tmp + 1], 6, v[v_sld_offset_b]
     v_lshl_add_u32 v[v_sld_offset_b], v[v_tmp + 1], 3, v[v_sld_offset_b]
     v_lshlrev_b32 v[v_sld_offset_b], 1, v[v_sld_offset_b]
 
+    
 
-    .print v_sst_offset_b, s_print, s_bx, v_tid, v_tmp+4
+    .print v_sld_offset_a, s_print, s_bx, v_tid, v_tmp+4
 
     
 
