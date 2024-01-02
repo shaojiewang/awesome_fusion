@@ -231,8 +231,11 @@ bf16gemm_rrr:
     v_mov_b32 v[v_tmp + 1], (64 + 1) * 8 * 2
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
-    ; store B to shared mem offset
-    ; 
+    ; store B to shared mem offset. when B is stored to shared mem, B datatype is bf16/fp16
+    ; sst_in = v_in * bk1 * n1 = v_in * 8 * 4
+    ; sst_ibk0 = v_ibk0 * block_n * bk1 = v_ibk0 * 64 * 4
+    ; sst_b = 
+    ; padding
 
     ; load A to shared mem offset
     ; sld_iak0 = laneid / inst_m * (block_m * ak1)
