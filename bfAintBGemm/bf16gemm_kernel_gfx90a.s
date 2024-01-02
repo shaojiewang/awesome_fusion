@@ -234,9 +234,9 @@ bf16gemm_rrr:
     ; store B to shared mem offset. when B is stored to shared mem, B datatype is bf16/fp16
     ; sst_in = v_in * bk1 * n1 = v_in * 8 * 4
     ; sst_ibk0 = v_ibk0 * block_n * bk1 = v_ibk0 * 64 * 4
-    ; sst_b = sst_in + sst_ibk0
-    ; padding = sst_b / 64 * 72
-    ; sst_b = sst_b + padding
+    ; sst_offset_b = sst_in + sst_ibk0
+    ; padding = sst_offset_b / 64 * 72
+    ; sst_offset_b = sst_offset_b + padding
     v_lshlrev_b32 v[v_tmp], 5, v[v_in]
     v_lshlrev_b32 v[v_tmp + 1], 8, v[v_ibk0]
     v_add_u32 v[v_sst_offset_b], v[v_tmp], v[v_tmp + 1]
@@ -254,8 +254,11 @@ bf16gemm_rrr:
     v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
 
     ; load B to shared mem offset
-    ; 
-
+    ; sld_ibk0 = laneid / inst_n * (block_n * bk1)
+    ; sld_in = laneid % inst_n + wave_in
+    ; sld_offset_b = sld_ibk0 + sld_in
+    ; padding = sld_offset_b / 64 * 72
+    ; sld_offset_b = padding + sld_offset_b
 
 
     .print v_sst_offset_a, s_print, s_bx, v_tid, v_tmp+4
