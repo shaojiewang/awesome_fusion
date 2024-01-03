@@ -60,44 +60,37 @@
 
 ;vgpr
 .set v_c,               0
-.set v_a0,              16
-.set v_b0,              20
-.set v_a1,              8
-.set v_b1,              12
-.set v_p0,              16
-.set v_q0,              24
-.set v_smem_store,      32
-.set v_smem_load_a,     33
-.set v_smem_load_b,     34
-.set v_smem_store_c,    35
-.set v_smem_load_c,     36
-.set v_scale,           37
-.set v_lane_id,         38
-.set v_lane_hi,         39
-.set v_offset_a_k0,     40
-.set v_offset_a,        41
-.set v_offset_b_k0,     42
-.set v_offset_b,        43
-.set v_offset_c,        44
-.set v_wave_id,         45
-.set v_wave_p,          46
-.set v_wave_q,          47
-.set v_lane_im,         48
-.set v_lane_in,         49
-.set v_sst_offset_c,    50
-.set v_iak0,            51
-.set v_im,              52
-.set v_ibk0,            53
-.set v_in,              54
-.set v_sst_offset_a,    55
-.set v_sst_offset_b,    56
-.set v_sld_iak0,        57
-.set v_sld_im,          58
-.set v_sld_offset_a,    59
-.set v_sld_ibk0,        60
-.set v_sld_in,          61
-.set v_sld_offset_b,    62
-.set v_tmp,             64
+.set v_sld_a0,          16
+.set v_sld_b0,          24
+.set v_sld_a1,          32
+.set v_sld_b1,          40
+.set v_gld_a0,          48
+.set v_gld_a1,          56
+.set v_gld_b0,          64
+.set v_gld_b1,          72
+.set v_scale,           73
+.set v_lane_id,         74
+.set v_offset_a_k0,     75
+.set v_offset_a,        76
+.set v_offset_b_k0,     77
+.set v_offset_b,        78
+.set v_offset_c,        79
+.set v_lane_im,         80
+.set v_lane_in,         81
+.set v_sst_offset_c,    82
+.set v_iak0,            83
+.set v_im,              84
+.set v_ibk0,            85
+.set v_in,              86
+.set v_sst_offset_a,    87
+.set v_sst_offset_b,    88
+.set v_sld_iak0,        89
+.set v_sld_im,          90
+.set v_sld_offset_a,    91
+.set v_sld_ibk0,        92
+.set v_sld_in,          93
+.set v_sld_offset_b,    94
+.set v_tmp,             120
 .set v_tid,             127
 
 .text
@@ -155,8 +148,8 @@ bf16gemm_rrr:
     ; prefetch load A
     s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
     
-    buffer_load_dwordx4 v[v_p0 + 0 : v_p0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
-    buffer_load_dwordx4 v[v_p0 + 4 : v_p0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
     s_mov_b32 s[s_bs_a], 128
 
     ; B thread block offset
@@ -176,10 +169,10 @@ bf16gemm_rrr:
     ; prefetch load B
     s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_ldb]
 
-    buffer_load_dwordx2 v[v_q0 + 0 : v_q0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
-    buffer_load_dwordx2 v[v_q0 + 2 : v_q0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
-    buffer_load_dwordx2 v[v_q0 + 4 : v_q0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
-    buffer_load_dwordx2 v[v_q0 + 6 : v_q0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 2 : v_gld_b0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 4 : v_gld_b0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 6 : v_gld_b0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
 
     ; load scale
     ; Scale:
@@ -272,6 +265,8 @@ bf16gemm_rrr:
     v_lshrrev_b32 v[v_tmp + 1], 6, v[v_sld_offset_b]
     v_lshl_add_u32 v[v_sld_offset_b], v[v_tmp + 1], 3, v[v_sld_offset_b]
     v_lshlrev_b32 v[v_sld_offset_b], 1, v[v_sld_offset_b]
+
+    s_mov_b32 s[s_kitr], 64
 
     
 
