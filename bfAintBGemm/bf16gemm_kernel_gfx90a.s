@@ -90,6 +90,10 @@
 .set v_sld_ibk0,        92
 .set v_sld_in,          93
 .set v_sld_offset_b,    94
+.set v_c_in,            95
+.set v_c_im,            96
+.set v_sld_offset_c,    97
+.set v_gst_offset_c,    98
 .set v_tmp,             120
 .set v_tid,             127
 
@@ -220,6 +224,25 @@ bf16gemm_rrr:
     v_add_u32 v[v_tmp], v[v_lane_in], s[s_wave_in]
     v_add_lshl_u32 v[v_offset_c], v[v_tmp], v[v_offset_c], 1
 
+    ; sld/gst offset C
+    ; c_in = tid % (block_n / vec_c_n)
+    ; c_im = tid / (block_n / vec_c_n)
+    ; sld_c_offset = c_in * vec_c_n + c_im * block_n
+    ; gst_c_offset = c_in * vec_c_n + c_im * ldc
+    v_and_b32 v[v_c_in], 7, v[v_tid]
+    v_lshrrev_b32 v[v_c_im], 3, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], 4, v[v_c_in]
+    v_lshl_add_u32 v[v_sld_offset_c], v[v_c_im], 7, v[v_tmp]
+    v_mul_lo_u32 v[v_tmp + 1], v[v_c_im], s[s_ldc]
+    v_add_u32 v[v_gst_offset_c], v[v_tmp + 1], v[v_tmp]
+    ; c grid pointer
+    s_mul_i32 s[s_tmp], s[s_m_idx], s[s_ldc]
+    s_add_u32 s[s_tmp + 1], s[s_n_idx], s[s_tmp]
+    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp]
+    s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
+    s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
+    
+
     ; store A to shared mem offset
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
     ; sst_offset_a = sst_iak0 + v_im * 8
@@ -268,9 +291,18 @@ bf16gemm_rrr:
 
     s_mov_b32 s[s_kitr], 64
 
+    ; clear C vgpr
+    .cnt = 0
+    .rept 64
+        v_mov_b32 v[v_c + cnt], 0
+        .cnt = .cnt + 1
+    .endr
+
+label_gemm_rrr_loop_begin:
+    ; global load n + 1
     
 
-    .print v_sld_offset_a, s_print, s_bx, v_tid, v_tmp+4
+    .print v_gst_offset_c, s_print, s_bx, v_tid, v_tmp+4
 
     
 
