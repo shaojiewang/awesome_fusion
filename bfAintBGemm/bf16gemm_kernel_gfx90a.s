@@ -155,6 +155,8 @@ bf16gemm_rrr:
     buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
     s_mov_b32 s[s_bs_a], 128
+    s_add_u32 s[s_ptr_a], s[s_ptr_a], s[s_bs_a]
+    s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0  
 
     ; B thread block offset
     v_and_b32 v[v_in], v[v_tid], 7
@@ -166,7 +168,6 @@ bf16gemm_rrr:
     ; B grid offset
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_n_idx]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
-    s_lshl_b32 s[s_bs_b], s[s_ldb], 6
     s_mov_b32 s[s_offset_b], s[s_ldb]
     s_mul_i32 s[s_offset_b + 1], s[s_ldb], 2
     s_mul_i32 s[s_offset_b + 2], s[s_ldb], 3
@@ -177,6 +178,9 @@ bf16gemm_rrr:
     buffer_load_dwordx2 v[v_gld_b0 + 2 : v_gld_b0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
     buffer_load_dwordx2 v[v_gld_b0 + 4 : v_gld_b0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
     buffer_load_dwordx2 v[v_gld_b0 + 6 : v_gld_b0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+    s_lshl_b32 s[s_bs_b], s[s_ldb], 6
+    s_add_u32 s[s_ptr_b], s[s_ptr_b], s[s_bs_b]
+    s_addc_u32 s[s_ptr_b+1], s[s_ptr_b+1], 0  
 
     ; load scale
     ; Scale:
@@ -300,6 +304,18 @@ bf16gemm_rrr:
 
 label_gemm_rrr_loop_begin:
     ; global load n + 1
+    buffer_load_dwordx4 v[v_gld_a1 + 0 : v_gld_a1 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_gld_a1 + 4 : v_gld_a1 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    s_add_u32 s[s_ptr_a], s[s_ptr_a], s[s_bs_a]
+    s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0  
+    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 2 : v_gld_b1 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 4 : v_gld_b1 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 6 : v_gld_b1 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+    s_lshl_b32 s[s_bs_b], s[s_ldb], 6
+    s_add_u32 s[s_ptr_b], s[s_ptr_b], s[s_bs_b]
+    s_addc_u32 s[s_ptr_b+1], s[s_ptr_b+1], 0  
+
     
 
     .print v_gst_offset_c, s_print, s_bx, v_tid, v_tmp+4
