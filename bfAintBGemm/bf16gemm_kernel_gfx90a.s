@@ -292,19 +292,22 @@ bf16gemm_rrr:
     v_add_lshl_u32 v[v_sld_offset_a], v[v_sld_iak0], v[v_sld_im], 1
 
     ; load B to shared mem offset
-    ; sld_ibk0 = laneid / inst_n * (block_n * bk1)
+    ; k1 = max(ak1, bk1)
+    ; sld_ibk0 = laneid / inst_n * (block_n * k1)
     ; sld_in = laneid % inst_n + wave_in
     ; sld_offset_b = sld_ibk0 + sld_in * bk1
     ; padding = sld_offset_b / 64 * 8
     ; sld_offset_b = padding + sld_offset_b
     v_lshrrev_b32 v[v_sld_ibk0], 5, v[v_lane_id]
-    v_lshlrev_b32 v[v_sld_ibk0], 8, v[v_sld_ibk0]
+    v_lshlrev_b32 v[v_sld_ibk0], 9, v[v_sld_ibk0]
     v_and_b32 v[v_sld_in], 31, v[v_lane_id]
     v_add_lshl_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in], 2
     v_add_u32 v[v_sld_offset_b], v[v_sld_in], v[v_sld_ibk0]
     v_lshrrev_b32 v[v_tmp + 1], 6, v[v_sld_offset_b]
     v_lshl_add_u32 v[v_sld_offset_b], v[v_tmp + 1], 3, v[v_sld_offset_b]
     v_lshlrev_b32 v[v_sld_offset_b], 1, v[v_sld_offset_b]
+    v_mov_b32 v[v_tmp], 4224;(32 + 1) * 8 * 8 * 2
+    v_add_u32 v[v_sld_offset_b], v[v_sld_offset_b], v[v_tmp]
 
     s_mov_b32 s[s_kitr], 64
 
@@ -490,6 +493,21 @@ label_gemm_rrr_loop_begin:
 
     ds_write_b128 v[v_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 3
 
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    ; load from lds and do mfma
+    ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a], offset: 0
+    ds_read_b64 v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_sld_offset_b], offset: 0 
+    ds_read_b64 v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_sld_offset_b], offset: 576 ; (64 * 4 / 64 * 8 + 64 * 4) * 2
+    ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2
+    s_waitcnt lgkmcnt(2)
+    v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a0 + 0 : v_sld_a0 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 0 : v_c + 15]
+    ds_read_b64 v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_sld_offset_b], offset: 1152 ; (64 * 8 / 64 * 8 + 64 * 8) * 2
+    s_waitcnt lgkmcnt(2)
+    v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a0 + 2 : v_sld_a0 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
+    
+    
 
     .print v_tmp, s_print, s_bx, v_tid, v_tmp + 7
 
