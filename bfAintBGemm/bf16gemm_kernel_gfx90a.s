@@ -309,7 +309,7 @@ bf16gemm_rrr:
     v_mov_b32 v[v_tmp], 4224;(32 + 1) * 8 * 8 * 2
     v_add_u32 v[v_sld_offset_b], v[v_sld_offset_b], v[v_tmp]
 
-    s_mov_b32 s[s_kitr], 64
+    s_mov_b32 s[s_kitr], 64 * (1 + 1) ; 1 prefetch
 
     ; clear C vgpr
     .cnt = 0
@@ -377,7 +377,7 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 2], v[v_tmp + 4], v[v_tmp + 5], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 3], v[v_tmp + 6], v[v_tmp + 7], op_sel: [1, 1]
 
-    ds_write_b128 v[v_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 0], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 2], v[v_sel_b + 2]
@@ -415,7 +415,7 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 2], v[v_tmp + 4], v[v_tmp + 5], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 3], v[v_tmp + 6], v[v_tmp + 7], op_sel: [1, 1]
 
-    ds_write_b128 v[v_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 1
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 1
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 0]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 0]
@@ -453,7 +453,7 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 2], v[v_tmp + 4], v[v_tmp + 5], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 3], v[v_tmp + 6], v[v_tmp + 7], op_sel: [1, 1]
 
-    ds_write_b128 v[v_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 2
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 2
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 2]
@@ -491,7 +491,7 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 2], v[v_tmp + 4], v[v_tmp + 5], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 3], v[v_tmp + 6], v[v_tmp + 7], op_sel: [1, 1]
 
-    ds_write_b128 v[v_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 3
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 3
 
     s_waitcnt lgkmcnt(0)
     s_barrier
@@ -531,7 +531,7 @@ label_gemm_rrr_loop_begin:
     
     
     s_nop 64
-    .print v_c, s_print, s_bx, v_tid, v_tmp + 7
+    .print v_sld_a1, s_print, s_bx, v_tid, v_tmp + 7
 
     
 
