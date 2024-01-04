@@ -94,6 +94,8 @@
 .set v_c_im,            96
 .set v_sld_offset_c,    97
 .set v_gst_offset_c,    98
+.set v_fp32_base,       99
+.set v_sel_b,           100 ; total 4
 .set v_tmp,             120
 .set v_tid,             127
 
@@ -116,7 +118,13 @@ bf16gemm_rrr:
     s_mov_b32 s[s_ptr_a + 3], 0x27000    
     s_mov_b32 s[s_ptr_b + 3], 0x27000    
     s_mov_b32 s[s_ptr_c + 3], 0x27000    
-    s_mov_b32 s[s_ptr_scale + 3], 0x27000    
+    s_mov_b32 s[s_ptr_scale + 3], 0x27000
+    
+    v_mov_b32 v[v_fp32_base], 0x4B000000
+    v_mov_b32 v[v_sel_b + 0], 0x07060500
+    v_mov_b32 v[v_sel_b + 1], 0x07060501
+    v_mov_b32 v[v_sel_b + 2], 0x07060502
+    v_mov_b32 v[v_sel_b + 3], 0x07060503
 
     s_waitcnt lgkmcnt(0)
 
@@ -131,6 +139,18 @@ bf16gemm_rrr:
     s_lshl_b32 s[s_m_idx], s[s_bx], 5
     s_lshl_b32 s[s_n_idx], s[s_by], 6
     
+    ; load scale
+    ; Scale:
+    ; thread vec: [n]         = [ 1]
+    ; block vec:  [k0, n, k1] = [16,  8,  1]
+    v_and_b32 v[v_tmp], v[v_tid], 7
+    v_lshlrev_b32 v[v_tmp], 2, v[v_tmp]
+    s_lshl_b32 s[s_tmp], s[s_n_idx], 2
+    s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
+    s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
+    s_lshl_b32 s[s_ptr_scale + 2], s[s_n], 2
+    buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset:0
+
     ; load A/B matrix
     ; A:
     ; thread vec: [k0, m, k1] = [ 1,  2,  8]
@@ -181,18 +201,6 @@ bf16gemm_rrr:
     s_lshl_b32 s[s_bs_b], s[s_ldb], 6
     s_add_u32 s[s_ptr_b], s[s_ptr_b], s[s_bs_b]
     s_addc_u32 s[s_ptr_b+1], s[s_ptr_b+1], 0  
-
-    ; load scale
-    ; Scale:
-    ; thread vec: [n]         = [ 1]
-    ; block vec:  [k0, n, k1] = [16,  8,  1]
-    v_and_b32 v[v_tmp], v[v_tid], 7
-    v_lshlrev_b32 v[v_tmp], 2, v[v_tmp]
-    s_lshl_b32 s[s_tmp], s[s_n_idx], 2
-    s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
-    s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
-    s_lshl_b32 s[s_ptr_scale + 2], s[s_n], 2
-    buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset:0
 
     ; store C offset
     ; vgpr to lds
@@ -297,8 +305,8 @@ bf16gemm_rrr:
 
     ; clear C vgpr
     .cnt = 0
-    .rept 64
-        v_mov_b32 v[v_c + cnt], 0
+    .rept 16
+        v_mov_b32 v[v_c + .cnt], 0
         .cnt = .cnt + 1
     .endr
 
@@ -316,9 +324,18 @@ label_gemm_rrr_loop_begin:
     s_add_u32 s[s_ptr_b], s[s_ptr_b], s[s_bs_b]
     s_addc_u32 s[s_ptr_b+1], s[s_ptr_b+1], 0  
 
+    ; store gld_a0 to lds
+    s_waitcnt vmcnt(11)
+    ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
+    s_waitcnt vmcnt(10)
+    ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
+
+    ; dequant gld_b0
+    s_waitcnt vmcnt(9)
+    v_perm_b32 v[v_tmp], v[v_fp32_base], v[v_gld_b0], v[v_sel_b + 0]
     
 
-    .print v_gst_offset_c, s_print, s_bx, v_tid, v_tmp+4
+    .print v_tmp, s_print, s_bx, v_tid, v_tmp+4
 
     
 
