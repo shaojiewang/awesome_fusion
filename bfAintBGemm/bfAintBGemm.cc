@@ -85,7 +85,7 @@ int main(int argc, char ** argv)
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
 
     rand_vector_2d_int(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
-    rand_vector_2d_int(reinterpret_cast<float*>(b_host_buf.GetBuffer()), n, k, ldb);
+    rand_vector_2d_int(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
     rand_vector_2d_int(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
 
     SimpleHostMem a_host_buf_to_device(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
