@@ -514,7 +514,7 @@ label_gemm_rrr_loop_begin:
     ds_read_b64 v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_sld_offset_b], offset: 2304 ; (64 * 4 * 4 / 64 * 8 + 64 * 4 * 4) * 2
     s_waitcnt lgkmcnt(2)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
-    .print v_sld_a1+2, s_print, s_bx, v_tid, v_tmp + 7
+    .print v_sld_b0+2, s_print, s_bx, v_tid, v_tmp + 7
     ds_read_b64 v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_sld_offset_a], offset: 2880 ; (64 * 4 * 5 / 64 * 8 + 64 * 4 * 5) * 2
     ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2 * 3
     s_waitcnt lgkmcnt(2)

@@ -95,9 +95,9 @@ int main(int argc, char ** argv)
     mem_transfer<ADataType, float, SimpleHostMem, SimpleHostMem>(a_host_buf_to_device, a_host_buf, m * k);
     mem_transfer<BDataType, float, SimpleHostMem, SimpleHostMem>(b_host_buf_to_device, b_host_buf, n * k);
 
-    hipMemcpy(a_device_buf.GetBuffer(), a_host_buf_to_device.GetBuffer(), m * k * sizeof(ADataType), hipMemcpyHostToDevice);
-    hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice);
-    hipMemcpy(scale_device_buf.GetBuffer(), scale_host_buf.GetBuffer(), n * 1 * sizeof(ScaleDataType), hipMemcpyHostToDevice);
+    GPU_CHECK_ERROR(hipMemcpy(a_device_buf.GetBuffer(), a_host_buf_to_device.GetBuffer(), m * k * sizeof(ADataType), hipMemcpyHostToDevice));
+    GPU_CHECK_ERROR(hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice));
+    GPU_CHECK_ERROR(hipMemcpy(scale_device_buf.GetBuffer(), scale_host_buf.GetBuffer(), n * 1 * sizeof(ScaleDataType), hipMemcpyHostToDevice));
 
     int total_loop=10;
     int warm_ups = 10;
@@ -166,20 +166,20 @@ int main(int argc, char ** argv)
     }    
 #endif
 
-    hipEventCreate(&evt_00);
-    hipEventCreate(&evt_11);
-    hipDeviceSynchronize();
-    hipEventRecord(evt_00, NULL);
+    GPU_CHECK_ERROR(hipEventCreate(&evt_00));
+    GPU_CHECK_ERROR(hipEventCreate(&evt_11));
+    GPU_CHECK_ERROR(hipDeviceSynchronize());
+    GPU_CHECK_ERROR(hipEventRecord(evt_00, NULL));
     for(i=0;i<total_loop;i++)
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,1,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
 
     float elapsed_ms;
-    hipEventRecord(evt_11, NULL);
-    hipEventSynchronize(evt_11);
-    hipDeviceSynchronize();
-    hipEventElapsedTime(&elapsed_ms, evt_00, evt_11);
-    hipEventDestroy(evt_00);
-    hipEventDestroy(evt_11);
+    GPU_CHECK_ERROR(hipEventRecord(evt_11, NULL));
+    GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
+    GPU_CHECK_ERROR(hipDeviceSynchronize());
+    GPU_CHECK_ERROR(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
+    GPU_CHECK_ERROR(hipEventDestroy(evt_00));
+    GPU_CHECK_ERROR(hipEventDestroy(evt_11));
 
     float time_per_loop = elapsed_ms/total_loop;
     float gflops = (float)2*m*n*k/time_per_loop/(1e6);
