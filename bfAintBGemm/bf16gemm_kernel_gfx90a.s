@@ -1339,6 +1339,22 @@ label_gemm_rrr_loop_last_1:
 
 label_write_out_c:
     ; rtz mode (not so accurate)
+    ; within 1 inst group
+    ; imm_offset = block_n * sizeof(datatype) * v_groups * n_per_vgpr * i_inst (64 * 2 * 4 * 2)
+    ; within 1 vgpr group
+    ; imm_offset = block_n * sizeof(datatype) * i_vgpr (64 * 2)
+    ; imm_offset = block_n * sizeof(datatype) * v_groups * n_per_vgpr * i_inst + block_n * sizeof(datatype) * i_vgpr
+
+    .v_c_inst_cnt = 0
+    .rept 4
+        ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 0], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 0
+        ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 1], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 1
+        ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 2], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 2
+        ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 3], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 3
+        .v_c_inst_cnt = .v_c_inst_cnt + 1
+    .endr
+    
+    
     
 
 
