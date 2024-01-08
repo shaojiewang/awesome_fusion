@@ -36,8 +36,8 @@ int main(int argc, char ** argv)
 {
     int validation = 0;
     int m = 32;
-    int n = 64;
-    int k = 128;
+    int n = 64 * 2;
+    int k = 256 * 2;
     if(argc >= 2) {
         validation = atoi(argv[1]);
     }
@@ -104,7 +104,8 @@ int main(int argc, char ** argv)
     int i;
 
     int bdx = WG_SIZE;
-    int gdx = ((m + 31) >> 5 ) * ((n + 63) >> 6);
+    int gdx = (m + 31) >> 5 ; // ((m + 31) >> 5 ) * ((n + 63) >> 6);
+    int gdy = (n + 63) >> 6;
 
 // TODO: move this section to a header file
 
@@ -147,7 +148,7 @@ int main(int argc, char ** argv)
                     &arg_size, HIP_LAUNCH_PARAM_END};
     
     for(i=0;i<warm_ups;i++){
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,1,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
+        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
         //std::cout<<"safe here"<<std::endl;
     }
 
@@ -171,7 +172,7 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipDeviceSynchronize());
     GPU_CHECK_ERROR(hipEventRecord(evt_00, NULL));
     for(i=0;i<total_loop;i++)
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,1,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
+        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
 
     float elapsed_ms;
     GPU_CHECK_ERROR(hipEventRecord(evt_11, NULL));

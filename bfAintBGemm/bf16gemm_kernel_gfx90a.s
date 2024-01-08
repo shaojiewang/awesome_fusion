@@ -254,8 +254,9 @@ bf16gemm_rrr:
     v_add_u32 v[v_gst_offset_c], v[v_tmp + 1], v[v_tmp]
     ; c grid pointer
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_ldc]
-    s_add_u32 s[s_tmp + 1], s[s_n_idx], s[s_tmp]
-    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp]
+    s_lshl_b32 s[s_tmp + 2], s[s_n_idx], 1
+    s_add_u32 s[s_tmp + 1], s[s_tmp + 2], s[s_tmp]
+    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp + 1]
     s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
     s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
     ; c n flag
