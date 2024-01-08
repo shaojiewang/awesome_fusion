@@ -321,11 +321,11 @@ bf16gemm_rrr:
     .endr
 
     s_mov_b32 s[s_kitr], 64 * (1 + 0) ; 1 prefetch
-    s_cmp_le_u32 s[s_kitr], s[s_k]
+    s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_1
 
     s_mov_b32 s[s_kitr], 64 * (1 + 1)
-    s_cmp_le_u32 s[s_kitr], s[s_k]
+    s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
 
 label_gemm_rrr_loop_begin:
@@ -532,6 +532,8 @@ label_gemm_rrr_loop_begin:
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 0 : v_c + 15]
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
+
+    s_barrier
     
     ; global load n + 1
     buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
@@ -736,7 +738,9 @@ label_gemm_rrr_loop_begin:
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 0 : v_c + 15]
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
-    
+   
+    s_barrier
+ 
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
     s_cmp_lt_u32 s[s_kitr], s[s_k]
     s_cbranch_scc1 label_gemm_rrr_loop_begin
@@ -951,6 +955,8 @@ label_gemm_rrr_loop_last_2:
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 0 : v_c + 15]
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
+
+    s_barrier
     
     ; store gld_a0 to lds
     s_waitcnt vmcnt(5)
@@ -1146,6 +1152,8 @@ label_gemm_rrr_loop_last_2:
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
    
+    s_barrier
+
     s_branch label_write_out_c 
     
 label_gemm_rrr_loop_last_1:
@@ -1343,7 +1351,10 @@ label_gemm_rrr_loop_last_1:
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
 
+    s_barrier
+
 label_write_out_c:
+    s_nop 15
     ; rtz mode (not so accurate)
 
     ; store to lds
@@ -1370,6 +1381,7 @@ label_write_out_c:
 
     s_mov_b32 s[s_tmp], 0
     s_waitcnt lgkmcnt(0)
+    s_barrier
 
     ; store res to global
     v_cmpx_eq_u32 vcc, 1, v[v_c_n_flag]    
