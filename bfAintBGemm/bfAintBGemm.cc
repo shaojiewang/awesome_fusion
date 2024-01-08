@@ -199,7 +199,7 @@ int main(int argc, char ** argv)
                  n, 
                  n);
         
-        GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * n * sizeof(CDataType), hipMemcpyDeviceToHost));
+        GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * m * sizeof(CDataType), hipMemcpyDeviceToHost));
         bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
         printf(",%s", res ? "valid" : "fail");
     }

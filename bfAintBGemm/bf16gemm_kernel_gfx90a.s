@@ -98,6 +98,8 @@
 .set v_sub_magic_num,   103
 .set v_scale,           104
 .set v_tmp,             112
+.set v_c_n_flag,        120
+.set v_c_cur_m,         121
 .set v_tid,             127
 
 .text
@@ -256,6 +258,10 @@ bf16gemm_rrr:
     s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp]
     s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
     s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
+    ; c n flag
+    v_lshl_add_u32 v[v_tmp], v[v_c_in], 3, s[s_n_idx]
+    v_cmp_gt_u32 vcc, s[s_n], v[v_c_in]
+    v_cndmask_b32 v[v_c_n_flag],  0, 1, vcc
     
 
     ; store A to shared mem offset
@@ -1339,12 +1345,13 @@ label_gemm_rrr_loop_last_1:
 
 label_write_out_c:
     ; rtz mode (not so accurate)
+
+    ; store to lds
     ; within 1 inst group
     ; imm_offset = block_n * sizeof(datatype) * v_groups * n_per_vgpr * i_inst (64 * 2 * 4 * 2)
     ; within 1 vgpr group
     ; imm_offset = block_n * sizeof(datatype) * i_vgpr (64 * 2)
     ; imm_offset = block_n * sizeof(datatype) * v_groups * n_per_vgpr * i_inst + block_n * sizeof(datatype) * i_vgpr
-
     .v_c_inst_cnt = 0
     .rept 4
         ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 0], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 0
@@ -1353,12 +1360,27 @@ label_write_out_c:
         ds_write_b16_d16_hi v[v_sst_offset_c], v[v_c + .v_c_inst_cnt * 4 + 3], offset: 64 * 2 * 4 * 2 * .v_c_inst_cnt + 64 * 2 * 3
         .v_c_inst_cnt = .v_c_inst_cnt + 1
     .endr
-    
-    
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    ; load from lds
+    ; imm_offset = 16 * threadim.x * i
+    ds_read_b128 v[v_c + 0 : v_c + 3], v[v_sld_offset_c], offset: 16 * 128 * 0
+    ds_read_b128 v[v_c + 4 : v_c + 7], v[v_sld_offset_c], offset: 16 * 128 * 1
+
+    s_mov_b32 s[s_tmp], 0
+    s_waitcnt lgkmcnt(0)
+
+    ; store res to global
+    v_cmpx_eq_u32 vcc, 1, v[v_c_n_flag]    
+    buffer_store_dwordx4 v[v_c + 0 : v_c + 3], v[v_gst_offset_c], s[s_ptr_c + 0 : s_ptr_c + 3], s[s_tmp] offen offset: 0
+    s_mul_i32 s[s_tmp], 16, s[s_ldc]
+    buffer_store_dwordx4 v[v_c + 4 : v_c + 7], v[v_gst_offset_c], s[s_ptr_c + 0 : s_ptr_c + 3], s[s_tmp] offen offset: 0
+    s_mov_b64 exec, -1
     
 
 
-    .print v_sst_offset_c, s_print, s_bx, v_tid, v_tmp + 7
+    .print v_c, s_print, s_bx, v_tid, v_tmp + 7
     
 
     
