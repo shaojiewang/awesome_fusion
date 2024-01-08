@@ -69,38 +69,38 @@
 .set v_gld_a1,          56
 .set v_gld_b0,          64
 .set v_gld_b1,          72
-.set v_lane_id,         74
-.set v_offset_a_k0,     75
-.set v_offset_a,        76
-.set v_offset_b_k0,     77
-.set v_offset_b,        78
-.set v_lane_im,         79
-.set v_lane_in,         80
-.set v_sst_offset_c,    81
-.set v_iak0,            82
-.set v_im,              83
-.set v_ibk0,            84
-.set v_in,              85
-.set v_sst_offset_a,    86
-.set v_sst_offset_b,    87
-.set v_sld_iak0,        88
-.set v_sld_im,          89
-.set v_sld_offset_a,    90
-.set v_sld_ibk0,        91
-.set v_sld_in,          92
-.set v_sld_offset_b,    93
-.set v_c_in,            94
-.set v_c_im,            95
-.set v_sld_offset_c,    96
-.set v_gst_offset_c,    97
-.set v_fp32_base,       98
-.set v_sel_b,           99 ; total 4
-.set v_sub_magic_num,   103
-.set v_scale,           104
-.set v_tmp,             112
-.set v_c_n_flag,        120
-.set v_c_cur_m,         121
-.set v_tid,             127
+.set v_lane_id,         80
+.set v_offset_a_k0,     81
+.set v_offset_a,        82
+.set v_offset_b_k0,     83
+.set v_offset_b,        84
+.set v_lane_im,         85
+.set v_lane_in,         86
+.set v_sst_offset_c,    87
+.set v_iak0,            88
+.set v_im,              89
+.set v_ibk0,            90
+.set v_in,              91
+.set v_sst_offset_a,    92
+.set v_sst_offset_b,    93
+.set v_sld_iak0,        94
+.set v_sld_im,          95
+.set v_sld_offset_a,    96
+.set v_sld_ibk0,        97
+.set v_sld_in,          98
+.set v_sld_offset_b,    99
+.set v_c_in,            100
+.set v_c_im,            101
+.set v_sld_offset_c,    102
+.set v_gst_offset_c,    103
+.set v_fp32_base,       104
+.set v_sel_b,           105 ; total 4
+.set v_sub_magic_num,   109
+.set v_scale,           110
+.set v_tmp,             118
+.set v_c_n_flag,        126
+.set v_c_cur_m,         127
+.set v_tid,             128
 
 .text
 .global bf16gemm_rrr
@@ -170,7 +170,7 @@ bf16gemm_rrr:
     v_and_b32 v[v_iak0], v[v_tid], 7
     v_lshrrev_b32 v[v_im], 3, v[v_tid]
     v_lshlrev_b32 v[v_tmp], 4, v[v_iak0]
-    v_mad_u32_u24 v[v_offset_a], v[v_in], s[s_lda], v[v_tmp]
+    v_mad_u32_u24 v[v_offset_a], v[v_im], s[s_lda], v[v_tmp]
     ; A grid offset
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
@@ -464,7 +464,7 @@ label_gemm_rrr_loop_begin:
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 2]
-    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 2]
+    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 3], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 2]
 
     v_sub_f32 v[v_tmp + 0], v[v_tmp + 0], v[v_sub_magic_num]
@@ -480,10 +480,10 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 0], v[v_tmp + 0], v[v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 1], v[v_tmp + 2], v[v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 0], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 2], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 6], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 3]
 
     v_sub_f32 v[v_tmp + 4], v[v_tmp + 4], v[v_sub_magic_num]
     v_sub_f32 v[v_tmp + 5], v[v_tmp + 5], v[v_sub_magic_num]
@@ -670,7 +670,7 @@ label_gemm_rrr_loop_begin:
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b1 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b1 + 3], v[v_sel_b + 2]
-    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b1 + 4], v[v_sel_b + 2]
+    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b1 + 5], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 3], v[v_fp32_base], v[v_gld_b1 + 7], v[v_sel_b + 2]
 
     v_sub_f32 v[v_tmp + 0], v[v_tmp + 0], v[v_sub_magic_num]
@@ -686,10 +686,10 @@ label_gemm_rrr_loop_begin:
     v_pack_b32_f16 v[v_tmp + 0], v[v_tmp + 0], v[v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 1], v[v_tmp + 2], v[v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b1 + 0], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b1 + 2], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b1 + 4], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b1 + 6], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b1 + 1], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b1 + 3], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b1 + 5], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b1 + 7], v[v_sel_b + 3]
 
     v_sub_f32 v[v_tmp + 4], v[v_tmp + 4], v[v_sub_magic_num]
     v_sub_f32 v[v_tmp + 5], v[v_tmp + 5], v[v_sub_magic_num]
@@ -887,7 +887,7 @@ label_gemm_rrr_loop_last_2:
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 2]
-    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 2]
+    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 3], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 2]
 
     v_sub_f32 v[v_tmp + 0], v[v_tmp + 0], v[v_sub_magic_num]
@@ -903,10 +903,10 @@ label_gemm_rrr_loop_last_2:
     v_pack_b32_f16 v[v_tmp + 0], v[v_tmp + 0], v[v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 1], v[v_tmp + 2], v[v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 0], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 2], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 6], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 3]
 
     v_sub_f32 v[v_tmp + 4], v[v_tmp + 4], v[v_sub_magic_num]
     v_sub_f32 v[v_tmp + 5], v[v_tmp + 5], v[v_sub_magic_num]
@@ -1083,7 +1083,7 @@ label_gemm_rrr_loop_last_2:
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b1 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b1 + 3], v[v_sel_b + 2]
-    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b1 + 4], v[v_sel_b + 2]
+    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b1 + 5], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 3], v[v_fp32_base], v[v_gld_b1 + 7], v[v_sel_b + 2]
 
     v_sub_f32 v[v_tmp + 0], v[v_tmp + 0], v[v_sub_magic_num]
@@ -1099,10 +1099,10 @@ label_gemm_rrr_loop_last_2:
     v_pack_b32_f16 v[v_tmp + 0], v[v_tmp + 0], v[v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 1], v[v_tmp + 2], v[v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b1 + 0], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b1 + 2], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b1 + 4], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b1 + 6], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b1 + 1], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b1 + 3], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b1 + 5], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b1 + 7], v[v_sel_b + 3]
 
     v_sub_f32 v[v_tmp + 4], v[v_tmp + 4], v[v_sub_magic_num]
     v_sub_f32 v[v_tmp + 5], v[v_tmp + 5], v[v_sub_magic_num]
@@ -1282,7 +1282,7 @@ label_gemm_rrr_loop_last_1:
     
     v_perm_b32 v[v_tmp + 0], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 1], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 2]
-    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 2]
+    v_perm_b32 v[v_tmp + 2], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 2]
     v_perm_b32 v[v_tmp + 3], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 2]
 
     v_sub_f32 v[v_tmp + 0], v[v_tmp + 0], v[v_sub_magic_num]
@@ -1298,10 +1298,10 @@ label_gemm_rrr_loop_last_1:
     v_pack_b32_f16 v[v_tmp + 0], v[v_tmp + 0], v[v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[v_tmp + 1], v[v_tmp + 2], v[v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 0], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 2], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 4], v[v_sel_b + 3]
-    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 6], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 4], v[v_fp32_base], v[v_gld_b0 + 1], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 5], v[v_fp32_base], v[v_gld_b0 + 3], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 6], v[v_fp32_base], v[v_gld_b0 + 5], v[v_sel_b + 3]
+    v_perm_b32 v[v_tmp + 7], v[v_fp32_base], v[v_gld_b0 + 7], v[v_sel_b + 3]
 
     v_sub_f32 v[v_tmp + 4], v[v_tmp + 4], v[v_sub_magic_num]
     v_sub_f32 v[v_tmp + 5], v[v_tmp + 5], v[v_sub_magic_num]
@@ -1351,10 +1351,10 @@ label_gemm_rrr_loop_last_1:
     s_waitcnt lgkmcnt(0)
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
 
-    s_barrier
 
 label_write_out_c:
     s_nop 15
+    s_barrier
     ; rtz mode (not so accurate)
 
     ; store to lds
@@ -1390,11 +1390,8 @@ label_write_out_c:
     buffer_store_dwordx4 v[v_c + 4 : v_c + 7], v[v_gst_offset_c], s[s_ptr_c + 0 : s_ptr_c + 3], s[s_tmp] offen offset: 0
     s_mov_b64 exec, -1
     
-
-
-    .print v_c, s_print, s_bx, v_tid, v_tmp + 7
     
-
+    ; .print v_offset_a, s_print, s_bx, v_tid, v_tmp + 7
     
 
     s_endpgm
@@ -1408,7 +1405,7 @@ label_write_out_c:
     .amdhsa_system_sgpr_workgroup_id_x 1
     .amdhsa_system_sgpr_workgroup_id_y 1
     .amdhsa_system_vgpr_workitem_id 0
-    .amdhsa_next_free_vgpr 128
+    .amdhsa_next_free_vgpr 129
     .amdhsa_next_free_sgpr 80
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
@@ -1424,7 +1421,7 @@ amdhsa.kernels:
   - .name: bf16gemm_rrr
     .symbol: bf16gemm_rrr.kd
     .sgpr_count: 79
-    .vgpr_count: 128
+    .vgpr_count: 129
     .kernarg_segment_align: 8
     .kernarg_segment_size: 72
     .group_segment_fixed_size: 16384

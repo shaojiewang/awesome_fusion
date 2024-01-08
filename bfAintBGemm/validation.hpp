@@ -34,8 +34,9 @@ static inline bool valid_vector( const float* ref, const T* pred, int n, float n
         }
 #endif
     }
-    // int i_num = i_end - i_start;
-    // printf("pp_crr:%d, pp_err:%d, crr_ratio:%.3f, nrms:%lf, s0:%lf, s1:%lf\n",i_num-pp_err, pp_err, (float)(i_num-pp_err)/(float)i_num, sqrt(s0/s1),s0,s1);
+    int i_num = i_end - i_start;
+    printf("pp_crr:%d, pp_err:%d, crr_ratio:%.3f, nrms:%lf, s0:%lf, s1:%lf\n",i_num-pp_err, pp_err, (float)(i_num-pp_err)/(float)i_num, (float)sqrt((float)(s0/s1)),s0,s1);
+    printf("sqrt 0 = %f\n", sqrt(0.f));
 
     return (sqrt(s0 / s1) < nrms)
 #ifdef PER_PIXEL_CHECK
