@@ -182,9 +182,16 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipEventDestroy(evt_00));
     GPU_CHECK_ERROR(hipEventDestroy(evt_11));
 
-    float time_per_loop = elapsed_ms/total_loop;
-    float gflops = (float)2*m*n*k/time_per_loop/(1e6);
-    printf("m:%d,n:%d,k:%d,gflops:%.3f\n",m,n,k,gflops);
+    float time_per_loop = elapsed_ms / total_loop;
+    float tflops = (float)2 * m * n * k / time_per_loop / (1024 * 1024 * 1024);
+    float bw_gbs = (float)(2 * (m * k + m * n) + n * k) / time_per_loop / (1024 * 1024);
+    printf("m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+            m,
+            n,
+            k,
+            time_per_loop,
+            tflops,
+            bw_gbs);
     printf("\n");
 
     if(validation)
