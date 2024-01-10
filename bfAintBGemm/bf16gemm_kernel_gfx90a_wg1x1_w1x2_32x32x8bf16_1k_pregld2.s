@@ -1,3 +1,4 @@
+
 .macro .print v_val, s_out, s_bx, v_tid, v_offset
     ;s_mov_b64 exec, -1
     s_nop 64
@@ -15,6 +16,8 @@
 .endm
 
 .macro .dequant_int8_4x1 v_tmp, v_base, v_gld_b, v_sel_b, v_sub_magic_num, v_scale
+;.endm
+;.macro fake
     v_perm_b32 v[\v_tmp + 0], v[\v_base], v[\v_gld_b + 0], v[\v_sel_b]
     v_perm_b32 v[\v_tmp + 1], v[\v_base], v[\v_gld_b + 2], v[\v_sel_b]
     v_perm_b32 v[\v_tmp + 2], v[\v_base], v[\v_gld_b + 4], v[\v_sel_b]
@@ -54,6 +57,8 @@
 .endm
 
 .macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+;.endm
+;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
     ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 0 
     ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 576 ; (64 * 4 * 1 / 64 * 8 + 64 * 4 * 1) * 2
@@ -143,8 +148,10 @@
 .set v_sld_b1,          28
 .set v_gld_a0,          28
 .set v_gld_a1,          36
-.set v_gld_b0,          44
-.set v_gld_b1,          52
+.set v_gld_a2,          44
+.set v_gld_b0,          52
+.set v_gld_b1,          60
+.set v_gld_b2,          68
 .set v_lane_id,         80
 .set v_offset_a_k0,     81
 .set v_offset_a,        82
@@ -179,10 +186,10 @@
 .set v_tid,             128
 
 .text
-.global bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1
+.global bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2
 .p2align 8
-.type bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1,@function
-bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
+.type bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2,@function
+bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -401,11 +408,6 @@ bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
     s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_1
 
-    s_mov_b32 s[s_kitr], 64 * (1 + 1)
-    s_cmp_le_u32 s[s_k], s[s_kitr]
-    s_cbranch_scc1 label_gemm_rrr_loop_last_2
-
-label_gemm_rrr_loop_begin:
     ; global load n + 1
     buffer_load_dwordx4 v[v_gld_a1 + 0 : v_gld_a1 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     buffer_load_dwordx4 v[v_gld_a1 + 4 : v_gld_a1 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
@@ -416,14 +418,33 @@ label_gemm_rrr_loop_begin:
     buffer_load_dwordx2 v[v_gld_b1 + 6 : v_gld_b1 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
+    s_mov_b32 s[s_kitr], 64 * 2
+    s_cmp_le_u32 s[s_k], s[s_kitr]
+    s_cbranch_scc1 label_gemm_rrr_loop_last_2
+
+    s_mov_b32 s[s_kitr], 64 * 3
+    s_cmp_le_u32 s[s_k], s[s_kitr]
+    s_cbranch_scc1 label_gemm_rrr_loop_last_3
+
+label_gemm_rrr_loop_begin:
+    ; global load n + 2
+    buffer_load_dwordx4 v[v_gld_a2 + 0 : v_gld_a2 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_gld_a2 + 4 : v_gld_a2 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    buffer_load_dwordx2 v[v_gld_b2 + 0 : v_gld_b2 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b2 + 2 : v_gld_b2 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b2 + 4 : v_gld_b2 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b2 + 6 : v_gld_b2 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
+    
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(11)
+    s_waitcnt vmcnt(17)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
-    s_waitcnt vmcnt(10)
+    s_waitcnt vmcnt(16)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(6)
+    s_waitcnt vmcnt(12)
 
     .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
@@ -444,7 +465,7 @@ label_gemm_rrr_loop_begin:
     .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
-    ; global load n + 2
+    ; global load n + 3
     buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
@@ -455,13 +476,13 @@ label_gemm_rrr_loop_begin:
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a1 to lds
-    s_waitcnt vmcnt(11)
+    s_waitcnt vmcnt(17)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 0: v_gld_a1 + 3], offset: 0
-    s_waitcnt vmcnt(10)
+    s_waitcnt vmcnt(16)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 4 : v_gld_a1 + 7], offset: 256
 
     ; dequant gld_b1
-    s_waitcnt vmcnt(6)
+    s_waitcnt vmcnt(12)
 
     .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b1 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
@@ -482,16 +503,59 @@ label_gemm_rrr_loop_begin:
     .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
-    s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
+    ; global load n + 4
+    buffer_load_dwordx4 v[v_gld_a1 + 0 : v_gld_a1 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[v_gld_a1 + 4 : v_gld_a1 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 2 : v_gld_b1 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 4 : v_gld_b1 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 6 : v_gld_b1 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
+    
+    ; store gld_a1 to lds
+    s_waitcnt vmcnt(17)
+    ds_write_b128 v[v_sst_offset_a], v[v_gld_a2 + 0 : v_gld_a2 + 3], offset: 0
+    s_waitcnt vmcnt(16)
+    ds_write_b128 v[v_sst_offset_a], v[v_gld_a2 + 4 : v_gld_a2 + 7], offset: 256
+
+    ; dequant gld_b1
+    s_waitcnt vmcnt(12)
+
+    .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b2 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
+    
+    .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b2 + 0, v_sel_b + 2, v_sub_magic_num, v_scale + 2
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 1
+    
+    .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b2 + 1, v_sel_b + 0, v_sub_magic_num, v_scale + 4
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 2
+    
+    .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b2 + 1, v_sel_b + 2, v_sub_magic_num, v_scale + 6
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 3
+    
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    ; load from lds and do mfma
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    s_barrier
+ 
+    s_add_u32 s[s_kitr], 192, s[s_kitr] ; 2 prefetch
     s_cmp_lt_u32 s[s_kitr], s[s_k]
     s_cbranch_scc1 label_gemm_rrr_loop_begin
 
     s_sub_u32 s[s_kitr], s[s_kitr], 64
     s_cmp_lt_u32 s[s_kitr], s[s_k]
+    s_cbranch_scc1 label_gemm_rrr_loop_last_3
+    
+    s_sub_u32 s[s_kitr], s[s_kitr], 128
+    s_cmp_lt_u32 s[s_kitr], s[s_k]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
     
     s_branch label_gemm_rrr_loop_last_1
 
+label_gemm_rrr_loop_last_3:
 label_gemm_rrr_loop_last_2:
     ; global load n + 1
     buffer_load_dwordx4 v[v_gld_a1 + 0 : v_gld_a1 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
@@ -635,7 +699,7 @@ label_write_out_c:
 
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1
+.amdhsa_kernel bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2
     .amdhsa_group_segment_fixed_size 16384
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
@@ -655,8 +719,8 @@ label_write_out_c:
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1
-    .symbol: bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1.kd
+  - .name: bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2
+    .symbol: bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2.kd
     .sgpr_count: 79
     .vgpr_count: 129
     .kernarg_segment_align: 8
