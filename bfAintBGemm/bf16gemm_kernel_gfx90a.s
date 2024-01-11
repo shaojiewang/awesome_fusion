@@ -251,18 +251,18 @@ bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
-    s_lshl_b32 s[s_offset_a], s[s_lda], 4
+    ;s_lshl_b32 s[s_offset_a], s[s_lda], 4
     ; prefetch load A
     s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
     
     buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
-    buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    ;buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
     s_mov_b32 s[s_bs_a], 128
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
 
     ; B thread block offset
-    v_and_b32 v[v_in], v[v_tid], 7
-    v_lshrrev_b32 v[v_ibk0], 3, v[v_tid]
+    v_and_b32 v[v_in], v[v_tid], 15
+    v_lshrrev_b32 v[v_ibk0], 4, v[v_tid]
     v_lshlrev_b32 v[v_tmp], 3, v[v_in]
     ; k0 offset = t_k1 * ldb
     s_lshl_b32 s[s_tmp], s[s_ldb], 2
@@ -298,8 +298,8 @@ bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
     ; wave id
     v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
     v_readfirstlane_b32 s[s_wave_id], v[v_tmp]
-    s_lshr_b32 s[s_wave_im], s[s_wave_id], 1
-    s_and_b32  s[s_wave_in], s[s_wave_id], 1
+    s_lshr_b32 s[s_wave_im], s[s_wave_id], 2
+    s_and_b32  s[s_wave_in], s[s_wave_id], 3
     s_lshl_b32 s[s_wave_im], s[s_wave_im], 5
     s_lshl_b32 s[s_wave_in], s[s_wave_in], 5
 
