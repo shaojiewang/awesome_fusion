@@ -15,6 +15,8 @@
 .endm
 
 .macro .dequant_int8_4x1 v_tmp, v_base, v_gld_b, v_sel_b, v_sub_magic_num, v_scale
+;.endm
+;.macro default
     v_perm_b32 v[\v_tmp + 0], v[\v_base], v[\v_gld_b + 0], v[\v_sel_b]
     v_perm_b32 v[\v_tmp + 1], v[\v_base], v[\v_gld_b + 2], v[\v_sel_b]
     v_perm_b32 v[\v_tmp + 2], v[\v_base], v[\v_gld_b + 4], v[\v_sel_b]
@@ -54,6 +56,8 @@
 .endm
 
 .macro .mfma_wg1x1_w1x4_32x32x8bf16_1k_ak1_8_bk1_4_unrollk_64 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+;.endm
+;.macro hi
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
     ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 0 
     ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: (128 * 4 * 1 / 64 * 8 + 128 * 4 * 1) * 2
