@@ -27,10 +27,11 @@ using BDataType = int8_t;
 using ScaleDataType = float;
 using CDataType = bfloat16;
 
-#define WG_SIZE 128 // only 128 or 256
+#define WG_SIZE 256 // only 128 or 256
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
-#define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
+#define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
+// #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2"
 
 int main(int argc, char ** argv)
@@ -106,7 +107,8 @@ int main(int argc, char ** argv)
 
     int bdx = WG_SIZE;
     int gdx = (m + 31) >> 5 ; // ((m + 31) >> 5 ) * ((n + 63) >> 6);
-    int gdy = (n + 63) >> 6;
+    // int gdy = (n + 63) >> 6;
+    int gdy = (n + 127) >> 7;
 
 // TODO: move this section to a header file
 
