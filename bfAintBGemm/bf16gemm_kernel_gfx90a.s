@@ -144,10 +144,10 @@
 .set s_n_idx,           34
 .set s_offset_a,        35
 .set s_offset_b,        36
-.set s_kitr,            40
-.set s_wave_id,         41
-.set s_wave_im,         42
-.set s_wave_in,         43
+.set s_kitr,            43
+.set s_wave_id,         44
+.set s_wave_im,         45
+.set s_wave_in,         46
 .set s_tmp,             64
 .set s_end,             79
 
@@ -431,13 +431,13 @@ label_gemm_rrr_loop_begin:
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(9)
+    s_waitcnt vmcnt(17)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
     ; s_waitcnt vmcnt(8)
     ; ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(5)
+    s_waitcnt vmcnt(9)
 
     .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
@@ -466,13 +466,13 @@ label_gemm_rrr_loop_begin:
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a1 to lds
-    s_waitcnt vmcnt(9)
+    s_waitcnt vmcnt(17)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 0: v_gld_a1 + 3], offset: 0
     ; s_waitcnt vmcnt(10)
     ; ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 4 : v_gld_a1 + 7], offset: 256
 
     ; dequant gld_b1
-    s_waitcnt vmcnt(5)
+    s_waitcnt vmcnt(9)
 
     .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b1 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
@@ -512,13 +512,13 @@ label_gemm_rrr_loop_last_2:
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(9)
+    s_waitcnt vmcnt(17)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
     ; s_waitcnt vmcnt(10)
     ; ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(5)
+    s_waitcnt vmcnt(9)
 
     .dequant_int8_4x1 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: (32 + 1) * 8 * 8 * 2 + 16 * 0
@@ -540,7 +540,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
     
     ; store gld_a1 to lds
-    s_waitcnt vmcnt(4)
+    s_waitcnt vmcnt(8)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 0: v_gld_a1 + 3], offset: 0
     ; s_waitcnt vmcnt(4)
     ; ds_write_b128 v[v_sst_offset_a], v[v_gld_a1 + 4 : v_gld_a1 + 7], offset: 256
@@ -571,7 +571,7 @@ label_gemm_rrr_loop_last_2:
     
 label_gemm_rrr_loop_last_1:
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(4)
+    s_waitcnt vmcnt(8)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
     ; s_waitcnt vmcnt(4)
     ; ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
