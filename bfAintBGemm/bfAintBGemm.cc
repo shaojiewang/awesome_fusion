@@ -30,7 +30,8 @@ using CDataType = bfloat16;
 #define WG_SIZE 256 // only 128 or 256
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
-#define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
+#define KER_NAME "bf16gemm_rrr_wg256_32x256x64_wg1x2_w1x4_32x32x8bf16_1k_pregld1"
+// #define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2"
 
