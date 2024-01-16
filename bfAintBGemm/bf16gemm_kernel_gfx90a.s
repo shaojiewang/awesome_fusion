@@ -188,7 +188,8 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
     v_mov_b32 v[v_sel_b + 2], 0x07060502
     v_mov_b32 v[v_sel_b + 3], 0x07060503
 
-    v_cvt_f32_i32 v[v_sub_magic_num], 8388736
+    v_cvt_f32_i32 v[v_sub_magic_num + 0], -8388736
+    v_cvt_f32_i32 v[v_sub_magic_num + 1], -8388736
 
     s_waitcnt lgkmcnt(0)
 
@@ -331,12 +332,12 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
     v_mad_u32_u24 v[v_sst_offset_a], v[v_iak0], v[v_tmp + 1], v[v_tmp]
 
     ; store B to shared mem offset. when B is stored to shared mem, B datatype is bf16/fp16
-    ; sst_in = v_in * bk1 * n1 = v_in * 8 * 8
+    ; sst_in = v_in * bk1 * n1 = v_in * 8 * 1
     ; sst_ibk0 = v_ibk0 * block_n * bk1 = v_ibk0 * 64 * 8
     ; sst_offset_b = sst_in + sst_ibk0
     ; padding = sst_offset_b / 64 * 8
     ; sst_offset_b = sst_offset_b + padding
-    v_lshlrev_b32 v[v_tmp], 6, v[v_in]
+    v_lshlrev_b32 v[v_tmp], 3, v[v_in]
     v_lshlrev_b32 v[v_tmp + 1], 9, v[v_ibk0]
     v_add_u32 v[v_sst_offset_b], v[v_tmp], v[v_tmp + 1]
     ; v_lshrrev_b32 v[v_tmp], 6, v[v_sst_offset_b]
@@ -373,6 +374,10 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
     v_lshlrev_b32 v[v_sld_offset_b], 1, v[v_sld_offset_b]
     v_mov_b32 v[v_tmp], 4224;(32 + 1) * 8 * 8 * 2
     v_add_u32 v[v_sld_offset_b], v[v_sld_offset_b], v[v_tmp]
+
+    ; double scale 
+    s_waitcnt vmcnt(6)
+    v_mov_b32 v[v_scale + 1], v[v_scale + 0]
 
     ; clear C vgpr
     .cnt = 0

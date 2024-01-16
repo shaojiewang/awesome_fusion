@@ -7,27 +7,46 @@ template <typename Y,
           typename X,
           typename YLocation,
           typename XLocation>
-void mem_transfer(YLocation& dst, XLocation& src, std::size_t size);
+void mem_transfer(YLocation& dst, XLocation& src, std::size_t col, std::size_t row, std::size_t packed);
 
 template<>
-void mem_transfer<bfloat16, float, SimpleHostMem, SimpleHostMem>(SimpleHostMem& dst, SimpleHostMem& src, std::size_t size)
+void mem_transfer<bfloat16, float, SimpleHostMem, SimpleHostMem>(
+    SimpleHostMem& dst, 
+    SimpleHostMem& src, 
+    std::size_t col, 
+    std::size_t row, 
+    std::size_t packed)
 {
     bfloat16* p_dst = (bfloat16*)(dst.GetBuffer());
     float* p_src = (float*)(src.GetBuffer());
-    for(std::size_t i = 0; i < size; i++)
+    for(std::size_t i = 0; i < col; i++)
     {
-        p_dst[i] = type_convert<bfloat16, float>(p_src[i]);
+        for(std::size_t j = 0; j < row; j++)
+        {
+            p_dst[i * row + j] = type_convert<bfloat16, float>(p_src[i * row + j]);
+        }
     }
 }
 
 template<>
-void mem_transfer<int8_t, float, SimpleHostMem, SimpleHostMem>(SimpleHostMem& dst, SimpleHostMem& src, std::size_t size)
+void mem_transfer<int8_t, float, SimpleHostMem, SimpleHostMem>(
+    SimpleHostMem& dst, 
+    SimpleHostMem& src, 
+    std::size_t col, 
+    std::size_t row, 
+    std::size_t packed)
 {
     int8_t* p_dst = (int8_t*)(dst.GetBuffer());
     float* p_src = (float*)(src.GetBuffer());
-    for(std::size_t i = 0; i < size; i++)
+    for(std::size_t i = 0; i < col / packed; i++)
     {
-        p_dst[i] = type_convert<int8_t, float>(p_src[i]) + 128;
+        for(std::size_t j = 0; j < row; j++)
+        {
+            for(std::size_t k = 0; k < packed; k++)
+            {
+                p_dst[i * row * packed + j * packed + k] = type_convert<int8_t, float>(p_src[(i * packed + k) * row + j]) + 128;
+            }
+        }
     }
 }
 

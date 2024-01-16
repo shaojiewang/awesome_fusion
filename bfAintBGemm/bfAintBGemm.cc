@@ -29,7 +29,8 @@ using CDataType = bfloat16;
 
 #define WG_SIZE 128 // only 128 or 256
 #define WG_TILE_N 64 
-#define WG_TILE_M 32 
+#define WG_TILE_M 32
+#define B_PACKED_K 8 
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
 #define KER_NAME "bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
@@ -54,6 +55,7 @@ int main(int argc, char ** argv)
     }
     int lda = k;
     int ldb = n;
+    int ldb_packed = n * B_PACKED_K;
     int ldc = n;
 
     if(argc >= 8) {
@@ -98,8 +100,8 @@ int main(int argc, char ** argv)
     SimpleHostMem b_host_buf_to_device(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
     SimpleHostMem c_host_buf_from_device(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
 
-    mem_transfer<ADataType, float, SimpleHostMem, SimpleHostMem>(a_host_buf_to_device, a_host_buf, m * k);
-    mem_transfer<BDataType, float, SimpleHostMem, SimpleHostMem>(b_host_buf_to_device, b_host_buf, n * k);
+    mem_transfer<ADataType, float, SimpleHostMem, SimpleHostMem>(a_host_buf_to_device, a_host_buf, m, k, 1);
+    mem_transfer<BDataType, float, SimpleHostMem, SimpleHostMem>(b_host_buf_to_device, b_host_buf, k, n, B_PACKED_K);
 
     GPU_CHECK_ERROR(hipMemcpy(a_device_buf.GetBuffer(), a_host_buf_to_device.GetBuffer(), m * k * sizeof(ADataType), hipMemcpyHostToDevice));
     GPU_CHECK_ERROR(hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice));
@@ -145,7 +147,7 @@ int main(int argc, char ** argv)
     args.n      = n;
     args.k      = k;
     args.lda    = lda;
-    args.ldb    = ldb;
+    args.ldb    = ldb_packed;
     args.ldc    = ldc;
     #ifdef ASM_PRINT
     args.print  = (void*)print;
