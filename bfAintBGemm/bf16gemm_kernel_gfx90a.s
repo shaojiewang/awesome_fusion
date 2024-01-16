@@ -1,4 +1,5 @@
 
+
 .macro .print v_val, s_out, s_bx, v_tid, v_offset
     ;s_mov_b64 exec, -1
     s_nop 64
@@ -48,7 +49,7 @@
 
 .endm
 
-.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 ;.endm
 ;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
@@ -130,10 +131,8 @@
 .set v_sld_b1,          28
 .set v_gld_a0,          32
 .set v_gld_a1,          40
-.set v_gld_a2,          48
-.set v_gld_b0,          56
-.set v_gld_b1,          64
-.set v_gld_b2,          72
+.set v_gld_b0,          48
+.set v_gld_b1,          56
 .set v_lane_id,         80
 .set v_offset_a_k0,     81
 .set v_offset_a,        82
@@ -168,10 +167,10 @@
 .set v_tid,             128
 
 .text
-.global bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
+.global bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
 .p2align 8
-.type bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2,@function
-bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
+.type bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1,@function
+bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -214,7 +213,7 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
     ; TODO: to avoid cache line waste
     ; Scale:
     ; thread vec: [n]         = [  1]
-    ; block vec:  [k0, n, k1] = [  2, 64,  1]
+    ; block vec:  [k0, n, k1] = [  8, 64,  1]
     v_and_b32 v[v_tmp], v[v_tid], 63
     v_lshlrev_b32 v[v_tmp], 2, v[v_tmp]
     s_lshl_b32 s[s_tmp], s[s_n_idx], 2
@@ -225,27 +224,25 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
 
     ; load A/B matrix
     ; A:
-    ; thread vec: [ak0, m, ak1] = [  1,  2,  8]
-    ; block vec:  [ak0, m, ak1] = [  8, 16,  1]
+    ; thread vec: [ak0, m, ak1] = [  1,  1,  4]
+    ; block vec:  [ak0, m, ak1] = [ 16, 32,  1]
     ; B:
-    ; thread vec: [bk0, n, bk1] = [  4,  1,  8]
-    ; block vec:  [bk0, n, bk1] = [  2, 64,  1]
+    ; thread vec: [bk0, n, bk1] = [  1,  1,  8]
+    ; block vec:  [bk0, n, bk1] = [  8, 64,  1]
 
     ; A thread block offset
-    v_and_b32 v[v_iak0], v[v_tid], 7
-    v_lshrrev_b32 v[v_im], 3, v[v_tid]
-    v_lshlrev_b32 v[v_tmp], 4, v[v_iak0]
+    v_and_b32 v[v_iak0], v[v_tid], 15
+    v_lshrrev_b32 v[v_im], 4, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], 3, v[v_iak0]
     v_mad_u32_u24 v[v_offset_a], v[v_im], s[s_lda], v[v_tmp]
     ; A grid offset
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
-    s_lshl_b32 s[s_offset_a], s[s_lda], 4
     ; prefetch load A
     s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
     
-    buffer_load_dwordx4 v[v_gld_a0 + 0 : v_gld_a0 + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
-    buffer_load_dwordx4 v[v_gld_a0 + 4 : v_gld_a0 + 7], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], s[s_offset_a] offen offset:0
+    buffer_load_dwordx2 v[v_gld_a0 + 0 : v_gld_a0 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     s_mov_b32 s[s_bs_a], 128
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
 
@@ -254,22 +251,15 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
     v_lshrrev_b32 v[v_ibk0], 6, v[v_tid]
     v_lshlrev_b32 v[v_tmp], 3, v[v_in]
     ; k0 offset = ldb
-    s_lshl_b32 s[s_tmp], s[s_ldb], 0
-    v_mad_u32_u24 v[v_offset_b], v[v_ibk0], s[s_tmp], v[v_tmp]
+    v_mad_u32_u24 v[v_offset_b], v[v_ibk0], s[s_ldb], v[v_tmp]
     ; B grid offset
     s_lshl_b32 s[s_tmp], s[s_n_idx], 3
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
-    s_mul_i32 s[s_offset_b + 0], s[s_ldb], 2
-    s_mul_i32 s[s_offset_b + 1], s[s_ldb], 4
-    s_mul_i32 s[s_offset_b + 2], s[s_ldb], 6
     ; prefetch load B
     s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_ldb]
 
     buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
-    buffer_load_dwordx2 v[v_gld_b0 + 2 : v_gld_b0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
-    buffer_load_dwordx2 v[v_gld_b0 + 4 : v_gld_b0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
-    buffer_load_dwordx2 v[v_gld_b0 + 6 : v_gld_b0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
     s_lshl_b32 s[s_bs_b], s[s_ldb], 3
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 
@@ -439,7 +429,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; global load n + 2
@@ -479,7 +469,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
@@ -530,7 +520,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; store gld_a1 to lds
@@ -560,7 +550,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
 
     s_branch label_write_out_c 
@@ -593,7 +583,7 @@ label_gemm_rrr_loop_last_1:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 
 label_write_out_c:
     s_nop 15
@@ -641,7 +631,7 @@ label_write_out_c:
 
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
+.amdhsa_kernel bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
     .amdhsa_group_segment_fixed_size 16384
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
@@ -661,8 +651,8 @@ label_write_out_c:
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
-    .symbol: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2.kd
+  - .name: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
+    .symbol: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1.kd
     .sgpr_count: 79
     .vgpr_count: 129
     .kernarg_segment_align: 8
@@ -670,8 +660,8 @@ amdhsa.kernels:
     .group_segment_fixed_size: 16384
     .private_segment_fixed_size: 0
     .wavefront_size: 64
-    .reqd_workgroup_size : [128, 1, 1]
-    .max_flat_workgroup_size: 256
+    .reqd_workgroup_size : [512, 1, 1]
+    .max_flat_workgroup_size: 512
     .args:
     - { .name: ptr_c,           .size: 8, .offset:   0, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: false}
     - { .name: ptr_a,           .size: 8, .offset:   8, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: true }
