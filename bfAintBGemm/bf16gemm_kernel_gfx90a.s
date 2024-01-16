@@ -30,10 +30,10 @@
     v_pack_b32_f16 v[\v_tmp + 0], v[\v_tmp + 0], v[\v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[\v_tmp + 1], v[\v_tmp + 2], v[\v_tmp + 3], op_sel: [1, 1]
 
-    v_perm_b32 v[\v_tmp + 4], v[\v_base], v[\v_gld_b + 0], v[\v_sel_b + 1]
-    v_perm_b32 v[\v_tmp + 5], v[\v_base], v[\v_gld_b + 2], v[\v_sel_b + 1]
-    v_perm_b32 v[\v_tmp + 6], v[\v_base], v[\v_gld_b + 4], v[\v_sel_b + 1]
-    v_perm_b32 v[\v_tmp + 7], v[\v_base], v[\v_gld_b + 6], v[\v_sel_b + 1]
+    v_perm_b32 v[\v_tmp + 4], v[\v_base], v[\v_gld_b + 1], v[\v_sel_b + 0]
+    v_perm_b32 v[\v_tmp + 5], v[\v_base], v[\v_gld_b + 1], v[\v_sel_b + 1]
+    v_perm_b32 v[\v_tmp + 6], v[\v_base], v[\v_gld_b + 1], v[\v_sel_b + 2]
+    v_perm_b32 v[\v_tmp + 7], v[\v_base], v[\v_gld_b + 1], v[\v_sel_b + 3]
 
     v_pk_add_f32 v[\v_tmp + 4 : \v_tmp + 5], v[\v_tmp + 4 : \v_tmp + 5], v[\v_sub_magic_num + 0 : \v_sub_magic_num + 1]
     v_pk_add_f32 v[\v_tmp + 6 : \v_tmp + 7], v[\v_tmp + 6 : \v_tmp + 7], v[\v_sub_magic_num + 0 : \v_sub_magic_num + 1]
@@ -501,7 +501,7 @@ label_gemm_rrr_loop_last_2:
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 3], offset: 0
     s_waitcnt vmcnt(10)
     ds_write_b128 v[v_sst_offset_a], v[v_gld_a0 + 4 : v_gld_a0 + 7], offset: 256
-
+    
     ; dequant gld_b0
     s_waitcnt vmcnt(9)
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
@@ -523,7 +523,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; store gld_a1 to lds
@@ -553,7 +553,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
 
     s_branch label_write_out_c 
