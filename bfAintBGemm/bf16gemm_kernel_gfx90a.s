@@ -48,7 +48,7 @@
 
 .endm
 
-.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 ;.endm
 ;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
@@ -130,8 +130,10 @@
 .set v_sld_b1,          28
 .set v_gld_a0,          32
 .set v_gld_a1,          40
-.set v_gld_b0,          48
-.set v_gld_b1,          56
+.set v_gld_a2,          48
+.set v_gld_b0,          56
+.set v_gld_b1,          64
+.set v_gld_b2,          72
 .set v_lane_id,         80
 .set v_offset_a_k0,     81
 .set v_offset_a,        82
@@ -166,10 +168,10 @@
 .set v_tid,             128
 
 .text
-.global bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1
+.global bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
 .p2align 8
-.type bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1,@function
-bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
+.type bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2,@function
+bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -437,7 +439,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; global load n + 2
@@ -477,7 +479,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
@@ -528,7 +530,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; store gld_a1 to lds
@@ -558,7 +560,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
 
     s_branch label_write_out_c 
@@ -591,7 +593,7 @@ label_gemm_rrr_loop_last_1:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 
 label_write_out_c:
     s_nop 15
@@ -639,7 +641,7 @@ label_write_out_c:
 
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1
+.amdhsa_kernel bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
     .amdhsa_group_segment_fixed_size 16384
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
@@ -659,8 +661,8 @@ label_write_out_c:
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1
-    .symbol: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1.kd
+  - .name: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2
+    .symbol: bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld2.kd
     .sgpr_count: 79
     .vgpr_count: 129
     .kernarg_segment_align: 8
