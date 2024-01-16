@@ -48,7 +48,7 @@ static inline void rand_vector_2d_int_scale(float* v, int row, int col, int ld){
     for(r=0;r<row;r++){
         for(c=0;c<col;c++){
             v[r*ld+c] = ((float)(std::rand() % 4)) - 2;
-            v[r*ld+c] = (float)(c % 3 + 1);
+            // v[r*ld+c] = (float)(c % 3 + 1);
         }
     }
 }

@@ -16,6 +16,8 @@
 .endm
 
 .macro .dequant_int8_1x8 v_tmp, v_base, v_gld_b, v_sel_b, v_sub_magic_num, v_scale
+;.endm
+;.macro fake0
     v_perm_b32 v[\v_tmp + 0], v[\v_base], v[\v_gld_b], v[\v_sel_b + 0]
     v_perm_b32 v[\v_tmp + 1], v[\v_base], v[\v_gld_b], v[\v_sel_b + 1]
     v_perm_b32 v[\v_tmp + 2], v[\v_base], v[\v_gld_b], v[\v_sel_b + 2]
@@ -47,6 +49,8 @@
 .endm
 
 .macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+;.endm
+;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
     ds_read_b128 v[\v_sld_b0 + 0 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 0 
     ds_read_b128 v[\v_sld_b1 + 0 : \v_sld_b1 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 1
@@ -251,7 +255,8 @@ bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1:
     s_lshl_b32 s[s_tmp], s[s_ldb], 0
     v_mad_u32_u24 v[v_offset_b], v[v_ibk0], s[s_tmp], v[v_tmp]
     ; B grid offset
-    s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_n_idx]
+    s_lshl_b32 s[s_tmp], s[s_n_idx], 3
+    s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     s_mul_i32 s[s_offset_b + 0], s[s_ldb], 2
     s_mul_i32 s[s_offset_b + 1], s[s_ldb], 4
@@ -432,7 +437,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; global load n + 2
@@ -472,7 +477,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
@@ -586,7 +591,7 @@ label_gemm_rrr_loop_last_1:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 
 label_write_out_c:
     s_nop 15
