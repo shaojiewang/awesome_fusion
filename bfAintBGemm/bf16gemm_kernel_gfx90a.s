@@ -46,43 +46,33 @@
 
 .endm
 
-.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_offset_a, v_sld_offset_b, v_c
+.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
-    ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 0 
-    ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 576 ; (64 * 4 * 1 / 64 * 8 + 64 * 4 * 1) * 2
+    ds_read_b128 v[\v_sld_b0 + 0 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 0 
+    ds_read_b128 v[\v_sld_b1 + 0 : \v_sld_b1 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 1
     ds_read_b128 v[\v_sld_a1 + 0 : \v_sld_a1 + 3], v[\v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2 * 1
 
     s_waitcnt lgkmcnt(2)
     v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a0 + 0 : \v_sld_a0 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 2304 ; (64 * 4 * 4 / 64 * 8 + 64 * 4 * 4) * 2
-
-    s_waitcnt lgkmcnt(2)
     v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a0 + 2 : \v_sld_a0 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 2880 ; (64 * 4 * 5 / 64 * 8 + 64 * 4 * 5) * 2
+
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2 * 2
+    ds_read_b128 v[\v_sld_b0 + 0 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 2
 
     s_waitcnt lgkmcnt(2)
-    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 4608 ; (64 * 4 * 8 / 64 * 8 + 64 * 4 * 8) * 2
+    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b1 + 0 : \v_sld_b1 + 1], v[\v_c + 0 : \v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b1 + 2 : \v_sld_b1 + 3], v[\v_c + 0 : \v_c + 15]
 
-    s_waitcnt lgkmcnt(2)
-    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 5184 ; (64 * 4 * 9 / 64 * 8 + 64 * 4 * 9) * 2
     ds_read_b128 v[\v_sld_a1 + 0 : \v_sld_a1 + 3], v[\v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2 * 3
+    ds_read_b128 v[\v_sld_b1 + 0 : \v_sld_b1 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 3
 
     s_waitcnt lgkmcnt(2)
     v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a0 + 0 : \v_sld_a0 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_sld_offset_b], offset: 6912 ; (64 * 4 * 12 / 64 * 8 + 64 * 4 * 12) * 2
-
-    s_waitcnt lgkmcnt(2)
     v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a0 + 2 : \v_sld_a0 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 15]
-    ds_read_b64 v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 7488 ; (64 * 4 * 13 / 64 * 8 + 64 * 4 * 13) * 2
-
-    s_waitcnt lgkmcnt(1)
-    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 15]
 
     s_waitcnt lgkmcnt(0)
-    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b1 + 0 : \v_sld_b1 + 1], v[\v_c + 0 : \v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\v_c + 0 : \v_c + 15], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b1 + 2 : \v_sld_b1 + 3], v[\v_c + 0 : \v_c + 15]
 .endm
 
 ;kernel arguments OFFSET, shift in 1 byte
@@ -134,10 +124,10 @@
 .set v_sld_b0,          20
 .set v_sld_a1,          24
 .set v_sld_b1,          28
-.set v_gld_a0,          28
-.set v_gld_a1,          36
-.set v_gld_b0,          44
-.set v_gld_b1,          52
+.set v_gld_a0,          32
+.set v_gld_a1,          40
+.set v_gld_b0,          48
+.set v_gld_b1,          56
 .set v_lane_id,         80
 .set v_offset_a_k0,     81
 .set v_offset_a,        82
