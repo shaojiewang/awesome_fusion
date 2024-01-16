@@ -54,8 +54,8 @@
 ;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
     ds_read_b128 v[\v_sld_b0 + 0 : \v_sld_b0 + 3], v[\v_sld_offset_b], offset: 0 
-    ds_read_b128 v[\v_sld_b1 + 0 : \v_sld_b1 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 1
-    ds_read_b128 v[\v_sld_a1 + 0 : \v_sld_a1 + 3], v[\v_sld_offset_a], offset: (32 + 1) * 8 * 2 * 2 * 1
+    ds_read_b128 v[\v_sld_b1 + 0 : \v_sld_b1 + 3], v[\v_sld_offset_b], offset: 64 * 8 * 4 * 2 * 1
+    ds_read_b128 v[\v_sld_a1 + 0 : \v_sld_a1 + 3], v[\v_sld_offset_a], offset: (32 + 1) * 8 * 4 * 2 * 1
 
     s_waitcnt lgkmcnt(2)
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a0 + 0 : \v_sld_a0 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 3]
