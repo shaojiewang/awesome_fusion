@@ -278,15 +278,15 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     ; wave id
     v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
     v_readfirstlane_b32 s[s_wave_id], v[v_tmp]
-    s_lshr_b32 s[s_wave_im], s[s_wave_id], 1
-    s_and_b32  s[s_wave_in], s[s_wave_id], 1
-    s_lshl_b32 s[s_wave_im], s[s_wave_im], 5
-    s_lshl_b32 s[s_wave_in], s[s_wave_in], 5
+    s_lshr_b32 s[s_wave_im], s[s_wave_id], 2
+    s_and_b32  s[s_wave_in], s[s_wave_id], 3
+    s_lshl_b32 s[s_wave_im], s[s_wave_im], 4
+    s_lshl_b32 s[s_wave_in], s[s_wave_in], 4
 
     ; lane id
     v_and_b32 v[v_lane_id], 63, v[v_tid]
-    v_and_b32 v[v_lane_in], 31, v[v_tid] 
-    v_lshrrev_b32 v[v_lane_im], 5, v[v_lane_id]
+    v_and_b32 v[v_lane_in], 15, v[v_tid] 
+    v_lshrrev_b32 v[v_lane_im], 4, v[v_lane_id]
     v_lshlrev_b32 v[v_lane_im], 2, v[v_lane_im]
 
     ; sst offset C
@@ -302,9 +302,9 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     ; c_im = tid / (block_n / vec_c_n)
     ; sld_c_offset = c_in * vec_c_n + c_im * block_n
     ; gst_c_offset = c_in * vec_c_n + c_im * ldc
-    v_and_b32 v[v_c_in], 7, v[v_tid]
-    v_lshrrev_b32 v[v_c_im], 3, v[v_tid]
-    v_lshlrev_b32 v[v_tmp], 4, v[v_c_in]
+    v_and_b32 v[v_c_in], 15, v[v_tid]
+    v_lshrrev_b32 v[v_c_im], 4, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], 3, v[v_c_in]
     v_lshl_add_u32 v[v_sld_offset_c], v[v_c_im], 7, v[v_tmp]
     v_mul_lo_u32 v[v_tmp + 1], v[v_c_im], s[s_ldc]
     v_add_u32 v[v_gst_offset_c], v[v_tmp + 1], v[v_tmp]
@@ -320,6 +320,7 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     v_cmp_gt_u32 vcc, s[s_n], v[v_c_in]
     v_cndmask_b32 v[v_c_n_flag],  0, 1, vcc
     
+    .print v_gst_offset_c, s_print, s_bx, v_tid, v_tmp + 7
 
     ; store A to shared mem offset
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
