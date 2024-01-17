@@ -59,9 +59,11 @@
     s_waitcnt lgkmcnt(0)
 
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a0 + 0 : \v_sld_a0 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 3]
+    s_setprio 0
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a0 + 2 : \v_sld_a0 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 3]
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b1 + 0 : \v_sld_b1 + 1], v[\v_c + 0 : \v_c + 3]
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b1 + 2 : \v_sld_b1 + 3], v[\v_c + 0 : \v_c + 3]
+    s_setprio 1
 .endm
 
 ;kernel arguments OFFSET, shift in 1 byte
@@ -373,24 +375,27 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_1
 
+    buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+
     s_mov_b32 s[s_kitr], 64 * (1 + 1)
     s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
 
 label_gemm_rrr_loop_begin:
     ; global load n + 1
-    buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
-    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
     s_waitcnt vmcnt(3)
     ds_write_b64 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 1], offset: 0
+    buffer_load_dwordx2 v[v_gld_a0 + 0 : v_gld_a0 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(2)
+    s_waitcnt vmcnt(3)
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
+    buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: 64 * 16 * 2 * 0
     
     s_waitcnt lgkmcnt(0)
@@ -401,18 +406,18 @@ label_gemm_rrr_loop_begin:
     s_barrier
     
     ; global load n + 2
-    buffer_load_dwordx2 v[v_gld_a0 + 0 : v_gld_a0 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
-    buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
     s_waitcnt vmcnt(3)
     ds_write_b64 v[v_sst_offset_a], v[v_gld_a1 : v_gld_a1 + 1], offset: 0
+    buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
 
     ; dequant gld_b0
     s_waitcnt vmcnt(2)
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b1 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
+    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: 64 * 16 * 2 * 0
     
     s_waitcnt lgkmcnt(0)
@@ -434,10 +439,10 @@ label_gemm_rrr_loop_begin:
 
 label_gemm_rrr_loop_last_2:
     ; global load n + 1
-    buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
-    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
-    buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
-    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
+    ;buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    ;v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    ;buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    ;v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
     s_waitcnt vmcnt(3)
