@@ -111,14 +111,16 @@
 
 ;vgpr
 .set v_c,               0
-.set v_sld_a0,          16
-.set v_sld_b0,          20
-.set v_sld_a1,          24
-.set v_sld_b1,          28
-.set v_gld_a0,          32
-.set v_gld_a1,          40
-.set v_gld_b0,          48
-.set v_gld_b1,          56
+.set v_sld_a0,          4
+.set v_sld_b0,          8
+.set v_sld_a1,          12
+.set v_sld_b1,          16
+.set v_gld_a0,          20
+.set v_gld_a1,          22
+.set v_gld_a2,          24
+.set v_gld_b0,          26
+.set v_gld_b1,          28
+.set v_gld_b2,          30
 .set v_lane_id,         80
 .set v_offset_a_k0,     81
 .set v_offset_a,        82
@@ -153,10 +155,10 @@
 .set v_tid,             114
 
 .text
-.global bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
+.global bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2
 .p2align 8
-.type bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1,@function
-bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
+.type bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2,@function
+bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -206,6 +208,7 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
     s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
     s_lshl_b32 s[s_ptr_scale + 2], s[s_n], 2
+    s_sub_i32 s[s_ptr_scale + 2], s[s_ptr_scale + 2], s[s_tmp]
     buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset: 0
 
     ; load A/B matrix
@@ -227,6 +230,7 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
     ; prefetch load A
     s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
+    s_sub_i32 s[s_ptr_a + 2], s[s_ptr_a + 2], s[s_tmp]
     
     buffer_load_dwordx2 v[v_gld_a0 + 0 : v_gld_a0 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     s_mov_b32 s[s_bs_a], 128
@@ -243,7 +247,9 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     ; prefetch load B
-    s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_ldb]
+    s_lshr_b32 s[s_tmp + 1], s[s_ldb], 3
+    s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_tmp + 1]
+    s_sub_i32 s[s_ptr_b + 2], s[s_ptr_b + 2], s[s_tmp]
 
     buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     s_lshl_b32 s[s_bs_b], s[s_ldb], 3
@@ -301,6 +307,7 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp + 1]
     s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
     s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
+    s_sub_i32 s[s_ptr_c + 2], s[s_ptr_c + 2], s[s_tmp]
     ; c n flag
     v_lshl_add_u32 v[v_tmp], v[v_c_in], 3, s[s_n_idx]
     v_cmp_gt_u32 vcc, s[s_n], v[v_c_in]
@@ -380,20 +387,24 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 
-    s_mov_b32 s[s_kitr], 64 * (1 + 1)
+    s_mov_b32 s[s_kitr], 64 * 3 * 1
     s_cmp_le_u32 s[s_k], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
 
+    buffer_load_dwordx2 v[v_gld_a2 + 0 : v_gld_a2 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b2 + 0 : v_gld_b2 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 label_gemm_rrr_loop_begin:
     ; global load n + 1
     
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(3)
+    s_waitcnt vmcnt(5)
     ds_write_b64 v[v_sst_offset_a], v[v_gld_a0 : v_gld_a0 + 1], offset: 0
     buffer_load_dwordx2 v[v_gld_a0 + 0 : v_gld_a0 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(3)
+    s_waitcnt vmcnt(5)
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b0 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: 64 * 16 * 2 * 0
@@ -410,12 +421,12 @@ label_gemm_rrr_loop_begin:
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
-    s_waitcnt vmcnt(3)
+    s_waitcnt vmcnt(5)
     ds_write_b64 v[v_sst_offset_a], v[v_gld_a1 : v_gld_a1 + 1], offset: 0
     buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
 
     ; dequant gld_b0
-    s_waitcnt vmcnt(3)
+    s_waitcnt vmcnt(5)
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b1 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
     buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: 64 * 16 * 2 * 0
@@ -430,7 +441,28 @@ label_gemm_rrr_loop_begin:
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 
-    s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
+    ; store gld_a0 to lds
+    s_waitcnt vmcnt(5)
+    ds_write_b64 v[v_sst_offset_a], v[v_gld_a2 : v_gld_a2 + 1], offset: 0
+    buffer_load_dwordx2 v[v_gld_a2 + 0 : v_gld_a2 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+
+    ; dequant gld_b0
+    s_waitcnt vmcnt(5)
+    .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b2 + 0, v_sel_b + 0, v_sub_magic_num, v_scale
+    buffer_load_dwordx2 v[v_gld_b2 + 0 : v_gld_b2 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    ds_write_b128 v[v_sst_offset_b], v[v_tmp : v_tmp + 3], offset: 64 * 16 * 2 * 0
+    
+    s_waitcnt lgkmcnt(0)
+    s_barrier
+
+    ; load from lds and do mfma
+    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    s_barrier
+ 
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
+
+    s_add_u32 s[s_kitr], 192, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
     s_cmp_lt_u32 s[s_kitr], s[s_k]
     s_cbranch_scc1 label_gemm_rrr_loop_begin
 
@@ -540,7 +572,7 @@ label_write_out_c:
 
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
+.amdhsa_kernel bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2
     .amdhsa_group_segment_fixed_size 16384
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
@@ -560,8 +592,8 @@ label_write_out_c:
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1
-    .symbol: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1.kd
+  - .name: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2
+    .symbol: bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2.kd
     .sgpr_count: 79
     .vgpr_count: 128
     .kernarg_segment_align: 8

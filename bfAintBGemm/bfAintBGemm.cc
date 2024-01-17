@@ -33,7 +33,8 @@ using CDataType = bfloat16;
 #define B_PACKED_K 8 
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
-#define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1"
+#define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2"
+// #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg256_32x256x64_wg1x2_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
@@ -115,6 +116,8 @@ int main(int argc, char ** argv)
     int bdx = WG_SIZE;
     int gdx = (m + WG_TILE_M - 1) / WG_TILE_M; 
     int gdy = (n + WG_TILE_N - 1) / WG_TILE_N;
+
+    printf("grid=[%d, %d], block=[%d]\n", gdx, gdy, bdx);
 
 // TODO: move this section to a header file
 
