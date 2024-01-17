@@ -59,11 +59,11 @@
     s_waitcnt lgkmcnt(0)
 
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a0 + 0 : \v_sld_a0 + 1], v[\v_sld_b0 + 0 : \v_sld_b0 + 1], v[\v_c + 0 : \v_c + 3]
-    s_setprio 0
+    s_setprio 1
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a0 + 2 : \v_sld_a0 + 3], v[\v_sld_b0 + 2 : \v_sld_b0 + 3], v[\v_c + 0 : \v_c + 3]
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a1 + 0 : \v_sld_a1 + 1], v[\v_sld_b1 + 0 : \v_sld_b1 + 1], v[\v_c + 0 : \v_c + 3]
     v_mfma_f32_16x16x16bf16_1k v[\v_c + 0 : \v_c + 3], v[\v_sld_a1 + 2 : \v_sld_a1 + 3], v[\v_sld_b1 + 2 : \v_sld_b1 + 3], v[\v_c + 0 : \v_c + 3]
-    s_setprio 1
+    s_setprio 0
 .endm
 
 ;kernel arguments OFFSET, shift in 1 byte
@@ -377,6 +377,8 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
 
     buffer_load_dwordx2 v[v_gld_a1 + 0 : v_gld_a1 + 1], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
     buffer_load_dwordx2 v[v_gld_b1 + 0 : v_gld_b1 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 
     s_mov_b32 s[s_kitr], 64 * (1 + 1)
     s_cmp_le_u32 s[s_k], s[s_kitr]
@@ -384,8 +386,6 @@ bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1:
 
 label_gemm_rrr_loop_begin:
     ; global load n + 1
-    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
-    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
     
     ; store gld_a0 to lds
     s_waitcnt vmcnt(3)
@@ -427,6 +427,9 @@ label_gemm_rrr_loop_begin:
     .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+    v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
+
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
     s_cmp_lt_u32 s[s_kitr], s[s_k]
     s_cbranch_scc1 label_gemm_rrr_loop_begin
