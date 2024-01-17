@@ -49,7 +49,7 @@
 
 .endm
 
-.macro .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+.macro .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 ;.endm
 ;.macro fake1
     ds_read_b128 v[\v_sld_a0 + 0 : \v_sld_a0 + 3], v[\v_sld_offset_a], offset: 0
@@ -402,7 +402,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; global load n + 2
@@ -424,7 +424,7 @@ label_gemm_rrr_loop_begin:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
  
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
@@ -460,7 +460,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
     
     ; store gld_a1 to lds
@@ -476,7 +476,7 @@ label_gemm_rrr_loop_last_2:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
     s_barrier
 
     s_branch label_write_out_c 
@@ -495,7 +495,7 @@ label_gemm_rrr_loop_last_1:
     s_barrier
 
     ; load from lds and do mfma
-    .mfma_wg1x1_w1x2_32x32x8bf16_1k_ak1_8_bk1_4 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+    .mfma_wg1x1_w2x4_16x16x16bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 
 label_write_out_c:
     s_nop 15
