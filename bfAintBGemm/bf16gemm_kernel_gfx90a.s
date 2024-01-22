@@ -264,8 +264,8 @@ bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
 
     buffer_load_dwordx2 v[v_gld_b0 + 0 : v_gld_b0 + 1], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     buffer_load_dwordx2 v[v_gld_b0 + 2 : v_gld_b0 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b] offen offset:0
-    buffer_load_dwordx2 v[v_gld_b0 + 4 : v_gld_b0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
-    buffer_load_dwordx2 v[v_gld_b0 + 6 : v_gld_b0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 4 : v_gld_b0 + 5], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 1] offen offset:0
+    buffer_load_dwordx2 v[v_gld_b0 + 6 : v_gld_b0 + 7], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], s[s_offset_b + 2] offen offset:0
     s_lshl_b32 s[s_bs_b], s[s_ldb], 3
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 
@@ -286,20 +286,20 @@ bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
     v_readfirstlane_b32 s[s_wave_id], v[v_wave_id]
     s_lshr_b32 s[s_wave_im], s[s_wave_id], 2
     s_and_b32  s[s_wave_in], s[s_wave_id], 3
-    s_lshl_b32 s[s_wave_im], s[s_wave_im], 4
-    s_lshl_b32 s[s_wave_in], s[s_wave_in], 4
+    s_lshl_b32 s[s_wave_im], s[s_wave_im], 5
+    s_lshl_b32 s[s_wave_in], s[s_wave_in], 5
 
     ; lane id
     v_and_b32 v[v_lane_id], 63, v[v_tid]
-    v_and_b32 v[v_lane_in], 15, v[v_tid] 
-    v_lshrrev_b32 v[v_lane_im], 4, v[v_lane_id]
+    v_and_b32 v[v_lane_in], 13, v[v_tid] 
+    v_lshrrev_b32 v[v_lane_im], 5, v[v_lane_id]
     v_lshlrev_b32 v[v_lane_im], 2, v[v_lane_im]
 
     ; sst offset C
     ; m_offset = (wave_im + lane_im) * block_n
     ; n_offset = wave_n + lane_in
     ; sst_c_offset = m_offset + n_offset
-    v_add_lshl_u32 v[v_sst_offset_c], v[v_lane_im], s[s_wave_im], 6
+    v_add_lshl_u32 v[v_sst_offset_c], v[v_lane_im], s[s_wave_im], 7
     v_add_u32 v[v_tmp], v[v_lane_in], s[s_wave_in]
     v_add_lshl_u32 v[v_sst_offset_c], v[v_tmp], v[v_sst_offset_c], 1
 
@@ -310,8 +310,8 @@ bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
     ; gst_c_offset = c_in * vec_c_n + c_im * ldc
     v_and_b32 v[v_c_in], 15, v[v_tid]
     v_lshrrev_b32 v[v_c_im], 4, v[v_tid]
-    v_lshlrev_b32 v[v_tmp], 3, v[v_c_in]
-    v_lshl_add_u32 v[v_sld_offset_c], v[v_c_im], 7, v[v_tmp]
+    v_lshlrev_b32 v[v_tmp], 4, v[v_c_in]
+    v_lshl_add_u32 v[v_sld_offset_c], v[v_c_im], 8, v[v_tmp]
     v_mul_lo_u32 v[v_tmp + 1], v[v_c_im], s[s_ldc]
     v_add_u32 v[v_gst_offset_c], v[v_tmp + 1], v[v_tmp]
     ; c grid pointer
