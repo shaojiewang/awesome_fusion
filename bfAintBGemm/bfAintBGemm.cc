@@ -30,6 +30,7 @@ using CDataType = bfloat16;
 #define WG_SIZE 256 // only 128 or 256
 #define WG_TILE_N 128 
 #define WG_TILE_M 32
+#define WG_TILE_K 64
 #define B_PACKED_K 16 
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
@@ -88,6 +89,7 @@ int main(int argc, char ** argv)
         };
 
     int sk_blocks = 2;
+    int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + WG_TILE_K - 1) / WG_TILE_K * WG_TILE_K;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -146,12 +148,13 @@ int main(int argc, char ** argv)
         unsigned int lda;
         unsigned int ldb;
         unsigned int ldc;
+        unsigned int k_per_cta;
         #ifdef ASM_PRINT
         void*  print;
         #endif
     } args;
     size_t arg_size = sizeof(args);
-    args.ptr_c  = sk_blocks == 1 ? c_device_buf.GetBuffer() : c_device_buf.GetBuffer();
+    args.ptr_c  = sk_blocks == 1 ? c_device_buf.GetBuffer() : c_workspace_device_buf.GetBuffer();
     args.ptr_a  = a_device_buf.GetBuffer();
     args.ptr_b  = b_device_buf.GetBuffer();
     args.ptr_scale  = scale_device_buf.GetBuffer();
@@ -161,6 +164,7 @@ int main(int argc, char ** argv)
     args.lda    = lda;
     args.ldb    = ldb_packed;
     args.ldc    = ldc;
+    args.k_per_cta = k_per_cta;
     #ifdef ASM_PRINT
     args.print  = (void*)print;
     #endif

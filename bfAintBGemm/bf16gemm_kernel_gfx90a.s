@@ -102,8 +102,9 @@
 .set k_lda,             44
 .set k_ldb,             48
 .set k_ldc,             52
-.set k_print,           56
-.set k_end,             64
+.set k_k_per_cta,       56
+.set k_print,           60
+.set k_end,             68
 
 ;sgpr
 .set s_ka,              0
@@ -120,7 +121,8 @@
 .set s_lda,             27
 .set s_ldb,             28
 .set s_ldc,             29
-.set s_print,           30
+.set s_k_per_cta,       30
+.set s_print,           32
 .set s_bs_a,            34
 .set s_bs_b,            35
 .set s_m_blocks,        36
@@ -132,6 +134,7 @@
 .set s_wave_id,         45
 .set s_wave_im,         46
 .set s_wave_in,         47
+.set s_k_idx,           48
 .set s_tmp,             64
 .set s_end,             79
 
@@ -194,9 +197,11 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     s_load_dwordx2 s[s_ptr_a:s_ptr_a+1], s[s_ka:s_ka+1], 0+k_ptr_a
     s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
     s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
+    s_load_dwordx2 s[s_print:s_print+1], s[s_ka:s_ka+1], 0+k_print
 
     s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
-    s_load_dwordx4 s[s_ldb:s_ldb+3], s[s_ka:s_ka+1], 0+k_ldb
+    s_load_dwordx2 s[s_ldb:s_ldb+1], s[s_ka:s_ka+1], 0+k_ldb
+    s_load_dword s[s_k_per_cta], s[s_ka:s_ka+1], 0+k_k_per_cta
     
     v_mov_b32 v[v_tid], v0
     s_mov_b32 s[s_ptr_a + 3], 0x27000    
@@ -215,7 +220,6 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
 
     s_waitcnt lgkmcnt(0)
 
-
     ; A and C matrix is bf16 datatype
     s_lshl_b32 s[s_lda], s[s_lda], 1
     s_lshl_b32 s[s_ldc], s[s_ldc], 1
@@ -223,8 +227,10 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     ; thread block mapping
     ; m block id: bid x
     ; n block id: bid y
+    ; k block id: bid z
     s_lshl_b32 s[s_m_idx], s[s_bx], 5
     s_lshl_b32 s[s_n_idx], s[s_by], 7
+    s_mul_i32 s[s_k_idx], s[s_bz], s[s_k_per_cta]
     
     ; load scale
     ; TODO: to avoid cache line waste
@@ -256,6 +262,8 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     v_mad_u32_u24 v[v_offset_a], v[v_im], s[s_lda], v[v_tmp]
     ; A grid offset
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
+    s_lshl_b32 s[s_tmp + 1], s[s_k_idx], 1
+    s_add_i32 s[s_tmp], s[s_tmp], s[s_tmp + 1]
     s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
     s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
     ; prefetch load A
@@ -274,11 +282,13 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     ; k0 offset = ldb
     v_mad_u32_u24 v[v_offset_b], v[v_ibk0], s[s_ldb], v[v_tmp]
     ; B grid offset
+    s_lshr_b32 s[s_tmp + 1], s[s_ldb], 4
     s_lshl_b32 s[s_tmp], s[s_n_idx], 4
+    s_mul_i32 s[s_tmp + 2], s[s_tmp + 1], s[s_k_per_cta]
+    s_add_u32 s[s_tmp], s[s_tmp], s[s_tmp + 1]
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     ; prefetch load B
-    s_lshr_b32 s[s_tmp + 1], s[s_ldb], 4
     s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_tmp + 1]
     s_sub_i32 s[s_ptr_b + 2], s[s_ptr_b + 2], s[s_tmp]
 
@@ -338,6 +348,9 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     s_mul_i32 s[s_tmp], s[s_m_idx], s[s_ldc]
     s_lshl_b32 s[s_tmp + 2], s[s_n_idx], 1
     s_add_u32 s[s_tmp + 1], s[s_tmp + 2], s[s_tmp]
+    s_mul_i32 s[s_tmp], s[s_m], s[s_ldc]
+    s_mul_i32 s[s_tmp], s[s_tmp], s[s_bz]
+    s_add_i32 s[s_tmp + 1], s[s_tmp + 1], s[s_tmp]
     s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp + 1]
     s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
     s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
@@ -727,7 +740,8 @@ amdhsa.kernels:
     - { .name: lda,             .size: 4, .offset:  44, .value_kind: by_value, .value_type: i32}
     - { .name: ldb,             .size: 4, .offset:  48, .value_kind: by_value, .value_type: i32}
     - { .name: ldc,             .size: 4, .offset:  52, .value_kind: by_value, .value_type: i32}
-    - { .name: print,           .size: 8, .offset:  56, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false}
+    - { .name: k_per_cta,       .size: 4, .offset:  56, .value_kind: by_value, .value_type: i32}
+    - { .name: print,           .size: 8, .offset:  60, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false}
 ...
 .end_amdgpu_metadata
 
