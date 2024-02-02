@@ -284,8 +284,8 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     ; B grid offset
     s_lshr_b32 s[s_tmp + 1], s[s_ldb], 4
     s_lshl_b32 s[s_tmp], s[s_n_idx], 4
-    s_mul_i32 s[s_tmp + 2], s[s_tmp + 1], s[s_k_per_cta]
-    s_add_u32 s[s_tmp], s[s_tmp], s[s_tmp + 1]
+    s_mul_i32 s[s_tmp + 2], s[s_tmp + 1], s[s_k_idx]
+    s_add_u32 s[s_tmp], s[s_tmp], s[s_tmp + 2]
     s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
     s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
     ; prefetch load B
@@ -470,11 +470,11 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     s_barrier
    
     s_mov_b32 s[s_kitr], 64 * (1 + 0) ; 1 prefetch
-    s_cmp_le_u32 s[s_k], s[s_kitr]
+    s_cmp_le_u32 s[s_k_per_cta], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_1
 
     s_mov_b32 s[s_kitr], 64 * (1 + 1)
-    s_cmp_le_u32 s[s_k], s[s_kitr]
+    s_cmp_le_u32 s[s_k_per_cta], s[s_kitr]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
 
     ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a0], offset: 0
@@ -605,11 +605,11 @@ label_gemm_rrr_loop_begin:
     ; dequant gld_b0
    
     s_add_u32 s[s_kitr], 128, s[s_kitr] ; 64 * (1 + 1) 1 prefetch
-    s_cmp_lt_u32 s[s_kitr], s[s_k]
+    s_cmp_lt_u32 s[s_kitr], s[s_k_per_cta]
     s_cbranch_scc1 label_gemm_rrr_loop_begin
 
     s_sub_u32 s[s_kitr], s[s_kitr], 64
-    s_cmp_lt_u32 s[s_kitr], s[s_k]
+    s_cmp_lt_u32 s[s_kitr], s[s_k_per_cta]
     s_cbranch_scc1 label_gemm_rrr_loop_last_2
     
     s_branch label_gemm_rrr_loop_last_1
