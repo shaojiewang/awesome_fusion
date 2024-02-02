@@ -350,8 +350,9 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     s_add_u32 s[s_tmp + 1], s[s_tmp + 2], s[s_tmp]
     s_mul_i32 s[s_tmp], s[s_m], s[s_ldc]
     s_mul_i32 s[s_tmp], s[s_tmp], s[s_bz]
-    s_add_i32 s[s_tmp + 1], s[s_tmp + 1], s[s_tmp]
     s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp + 1]
+    s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
+    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp]
     s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
     s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
     s_sub_i32 s[s_ptr_c + 2], s[s_ptr_c + 2], s[s_tmp + 1]

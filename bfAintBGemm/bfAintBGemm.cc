@@ -13,6 +13,7 @@
 #include "random_gen.hpp"
 #include "mem_transfer.hpp"
 #include "gpu_utils.hpp"
+#include "tensor_reduction.hpp"
 
 using Row = gemm_layout::gemm::RowMajor;
 using Col = gemm_layout::gemm::ColumnMajor;
@@ -170,11 +171,16 @@ int main(int argc, char ** argv)
     #endif
     void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
                     &arg_size, HIP_LAUNCH_PARAM_END};
-    
+   
+    CDataType* workspace_ptr = reinterpret_cast<CDataType*>(c_workspace_device_buf.GetBuffer());
+    CDataType* c_ptr = reinterpret_cast<CDataType*>(c_device_buf.GetBuffer());
+ 
     hipStream_t c_stream;
     GPU_CHECK_ERROR(hipStreamCreate(&c_stream));
     for(i=0;i<warm_ups;i++){
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
+        if (sk_blocks > 1)     
+            tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
         //std::cout<<"safe here"<<std::endl;
     }
 
@@ -199,6 +205,8 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
     for (i=0;i<total_loop;i++) {
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config));
+        if (sk_blocks > 1)     
+            tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
     }
     float elapsed_ms;
     GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
