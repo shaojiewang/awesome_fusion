@@ -109,28 +109,29 @@
 .set s_ka,              0
 .set s_bx,              2
 .set s_by,              3
-.set s_ptr_c,           4
-.set s_ptr_a,           8
-.set s_ptr_b,           12
-.set s_ptr_scale,       16
-.set s_m,               20
-.set s_n,               21
-.set s_k,               22
-.set s_lda,             23
-.set s_ldb,             24
-.set s_ldc,             25
-.set s_print,           26
-.set s_bs_a,            30
-.set s_bs_b,            31
-.set s_m_blocks,        32
-.set s_m_idx,           33
-.set s_n_idx,           34
-.set s_offset_a,        35
-.set s_offset_b,        36
-.set s_kitr,            40
-.set s_wave_id,         41
-.set s_wave_im,         42
-.set s_wave_in,         43
+.set s_bz,              4
+.set s_ptr_c,           8
+.set s_ptr_a,           12
+.set s_ptr_b,           16
+.set s_ptr_scale,       20
+.set s_m,               24
+.set s_n,               25
+.set s_k,               26
+.set s_lda,             27
+.set s_ldb,             28
+.set s_ldc,             29
+.set s_print,           30
+.set s_bs_a,            34
+.set s_bs_b,            35
+.set s_m_blocks,        36
+.set s_m_idx,           37
+.set s_n_idx,           38
+.set s_offset_a,        39
+.set s_offset_b,        40
+.set s_kitr,            44
+.set s_wave_id,         45
+.set s_wave_im,         46
+.set s_wave_in,         47
 .set s_tmp,             64
 .set s_end,             79
 
@@ -183,10 +184,10 @@
 .set v_tmp,             104
 
 .text
-.global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1
+.global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
 .p2align 8
-.type bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1,@function
-bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1:
+.type bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk,@function
+bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk:
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -683,12 +684,13 @@ label_write_out_c:
 
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1
+.amdhsa_kernel bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
     .amdhsa_group_segment_fixed_size 65536
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
     .amdhsa_system_sgpr_workgroup_id_x 1
     .amdhsa_system_sgpr_workgroup_id_y 1
+    .amdhsa_system_sgpr_workgroup_id_z 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 128
     .amdhsa_next_free_sgpr 80
@@ -703,8 +705,8 @@ label_write_out_c:
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1
-    .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1.kd
+  - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk
+    .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk.kd
     .sgpr_count: 80
     .vgpr_count: 128
     .kernarg_segment_align: 8

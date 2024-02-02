@@ -34,7 +34,8 @@ using CDataType = bfloat16;
 
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
 // #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2"
-#define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
+#define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
+// #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
@@ -86,9 +87,12 @@ int main(int argc, char ** argv)
             }
         };
 
+    int sk_blocks = 2;
+    
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
     SimpleDeviceMem c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * sk_blocks, n, ldc, CLayout{}));
     SimpleDeviceMem scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
     SimpleHostMem a_host_buf(sizeof(float) * f_matrix_space_size(m, k, lda, ALayout{}));
@@ -119,7 +123,9 @@ int main(int argc, char ** argv)
     int gdx = (m + WG_TILE_M - 1) / WG_TILE_M; 
     int gdy = (n + WG_TILE_N - 1) / WG_TILE_N;
 
-    printf("grid=[%d, %d], block=[%d]\n", gdx, gdy, bdx);
+    int gdz = sk_blocks;
+
+    printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
 
 // TODO: move this section to a header file
 
@@ -145,7 +151,7 @@ int main(int argc, char ** argv)
         #endif
     } args;
     size_t arg_size = sizeof(args);
-    args.ptr_c  = c_device_buf.GetBuffer();
+    args.ptr_c  = sk_blocks == 1 ? c_device_buf.GetBuffer() : c_device_buf.GetBuffer();
     args.ptr_a  = a_device_buf.GetBuffer();
     args.ptr_b  = b_device_buf.GetBuffer();
     args.ptr_scale  = scale_device_buf.GetBuffer();
@@ -161,8 +167,10 @@ int main(int argc, char ** argv)
     void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
                     &arg_size, HIP_LAUNCH_PARAM_END};
     
+    hipStream_t c_stream;
+    GPU_CHECK_ERROR(hipStreamCreate(&c_stream));
     for(i=0;i<warm_ups;i++){
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
+        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
         //std::cout<<"safe here"<<std::endl;
     }
 
@@ -184,12 +192,12 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipEventCreate(&evt_00));
     GPU_CHECK_ERROR(hipEventCreate(&evt_11));
     GPU_CHECK_ERROR(hipDeviceSynchronize());
-    GPU_CHECK_ERROR(hipEventRecord(evt_00, NULL));
-    for(i=0;i<total_loop;i++)
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,1, bdx,1,1,  0, 0, NULL, (void**)&config ));
-
+    GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
+    for (i=0;i<total_loop;i++) {
+        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config));
+    }
     float elapsed_ms;
-    GPU_CHECK_ERROR(hipEventRecord(evt_11, NULL));
+    GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
     GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
     GPU_CHECK_ERROR(hipDeviceSynchronize());
     GPU_CHECK_ERROR(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
