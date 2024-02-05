@@ -1,4 +1,9 @@
 import argparse
+import gemm_kerel_rr16r
+
+
+def write_kernels():
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

@@ -30,10 +30,11 @@ class GemmKernelTraits:
     a_interleave : int
     b_interleave : int
     c_interleave : int
-    splitk : int
     a_datatype : str
     b_datatype : str
     c_datatype : str
     scale_datatype : str
+    splitk : int
+    tile : GemmTileSize
     pipeline : str
 
