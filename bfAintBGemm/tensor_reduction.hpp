@@ -31,7 +31,7 @@ __global__ void tensor_reduce_kernel(T* in, T* out, int reduce_dim, int remain_d
 
 template <typename T>
 void tensor_reduce(T* in, T* out, int reduce_dim, int remain_dim, hipStream_t stream) {
-    constexpr int cta_size = 64;
+    constexpr int cta_size = 128;
     int gdx = (remain_dim + cta_size - 1) / cta_size;
     dim3 grd(gdx);
     dim3 bld(cta_size);
