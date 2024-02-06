@@ -24,9 +24,14 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                               splitk,
                                               gemm_tile,
                                               pipeline)
+        self.kernel_body = ""
 
     def write_kernel(self):
         # macros
+        kernel_str = ""
         m_print = common_macro.PrintMacro("print")
-        print(m_print.macro_body)
+        m_dequant = common_macro.DequantMacro("dequant")
+        kernel_str += m_print.macro_body
+        kernel_str += m_dequant.macro_body
+        print(kernel_str)
  
