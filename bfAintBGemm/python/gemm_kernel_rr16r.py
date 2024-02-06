@@ -31,7 +31,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str = ""
         m_print = common_macro.PrintMacro("print")
         m_dequant = common_macro.DequantMacro("dequant")
+        m_mfma = common_macro.MfmaMacro("mfma")
         kernel_str += m_print.macro_body
         kernel_str += m_dequant.macro_body
+        kernel_str += m_mfma.macro_body
         print(kernel_str)
  
