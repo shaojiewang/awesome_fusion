@@ -32,6 +32,7 @@ def write_kernels():
                                           tile,
                                           "v1")
     print(k.a_layout)
+    k.write_kernel()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

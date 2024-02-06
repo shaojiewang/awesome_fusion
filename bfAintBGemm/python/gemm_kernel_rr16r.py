@@ -1,6 +1,6 @@
 import gemm_kernel_traits
 from dataclasses import dataclass
-
+import common_macro
 @dataclass
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -24,4 +24,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                               splitk,
                                               gemm_tile,
                                               pipeline)
-        
+
+    def write_kernel(self):
+        # macros
+        m_print = common_macro.PrintMacro("print")
+        print(m_print.macro_body)
+ 
