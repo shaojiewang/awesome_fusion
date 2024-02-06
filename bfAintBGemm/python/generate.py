@@ -31,7 +31,7 @@ def write_kernels():
                                           1,
                                           tile,
                                           "v1")
-    print(gemm_kernel_rr16r.a_layout)
+    print(k.a_layout)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
