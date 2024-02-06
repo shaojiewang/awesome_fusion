@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 
 @dataclass
 class GemmTileSize:
@@ -5,7 +6,7 @@ class GemmTileSize:
     cta_m : int
     cta_n : int
     cta_k : int
-    global_bk0 : int
+    global_bk1 : int
     warp_m : int
     warp_n : int
     inst_m : int
@@ -15,7 +16,7 @@ class GemmTileSize:
     gmem_vec_a : int
     gmem_vec_b : int
     gmem_vec_c : int
-    gmem_vect_scale : int
+    gmem_vec_scale : int
     smem_vec_a : int
     smem_vec_b : int
     smem_vec_c : int

@@ -1,9 +1,37 @@
 import argparse
-import gemm_kerel_rr16r
+import gemm_kernel_traits
+import gemm_kernel_rr16r
 
 
 def write_kernels():
-    
+    tile = gemm_kernel_traits.GemmTileSize(cta_size=256,
+                                           cta_m=32,
+                                           cta_n=128,
+                                           cta_k=64,
+                                           global_bk1=16,
+                                           warp_m=32,
+                                           warp_n=128,
+                                           inst_m=32,
+                                           inst_n=32,
+                                           inst_k=8,
+                                           inst_blocks=1,
+                                           gmem_vec_a=8,
+                                           gmem_vec_b=16,
+                                           gmem_vec_c=8,
+                                           gmem_vec_scale=1,
+                                           smem_vec_a=8,
+                                           smem_vec_b=8,
+                                           smem_vec_c=8,
+                                           smem_a_k1=8,
+                                           smem_b_k1=8)
+    k = gemm_kernel_rr16r.GemmKernelRR16R("bfloat16",
+                                          "int8",
+                                          "bfloat16",
+                                          "float32",
+                                          1,
+                                          tile,
+                                          "v1")
+    print(gemm_kernel_rr16r.a_layout)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -29,3 +57,4 @@ if __name__ == "__main__":
 
     print(f"ouput dir={args.output_dir}, list={args.list_blobs}")
 
+    write_kernels()
