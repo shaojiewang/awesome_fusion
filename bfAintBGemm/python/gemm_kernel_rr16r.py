@@ -1,11 +1,9 @@
 import gemm_kernel_traits
-from dataclasses import dataclass
 import common_macro
 import kernel_args
 import sgprs 
 import vgprs 
 
-@dataclass
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
                  a_datatype, 
@@ -43,18 +41,18 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
         # kernel args
         dict_kernel_args = {
-            "k_ptr_c" : 2,
-            "k_ptr_a" : 2,
-            "k_ptr_b" : 2,
-            "k_ptr_scale" : 2,
-            "k_m" : 1,
-            "k_n" : 1,
-            "k_k" : 1,
-            "k_lda" : 1,
-            "k_ldb" : 1,
-            "k_ldc" : 1,
-            "k_k_per_cta" : 1,
-            "k_print" : 2
+            "k_ptr_c" : kernel_args.KernelArgTraits(8, 'global_buffer', 'f16', 'global', False),
+            "k_ptr_a" : kernel_args.KernelArgTraits(8, 'global_buffer', 'f16', 'global', True),
+            "k_ptr_b" : kernel_args.KernelArgTraits(8, 'global_buffer', 'f16', 'global', True),
+            "k_ptr_scale" : kernel_args.KernelArgTraits(8, 'global_buffer', 'f32', 'global', True),
+            "k_m" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_n" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_k" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_lda" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_ldb" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_ldc" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_k_per_cta" : kernel_args.KernelArgTraits(4, 'by_value', 'i32', '', True),
+            "k_print" : kernel_args.KernelArgTraits(8, 'global_buffer', 'f32', 'global', False),
         }
         k_args = kernel_args.KernelArgs(**dict_kernel_args)
         kernel_str += k_args.kargs_body
