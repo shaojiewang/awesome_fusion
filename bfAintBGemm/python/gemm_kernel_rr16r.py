@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import common_macro
 import kernel_args
 import sgprs 
+import vgprs 
 
 @dataclass
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
@@ -94,4 +95,59 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         }
         k_sgprs = sgprs.Sgprs(**dict_sgprs)
         kernel_str += k_sgprs.sgprs_body
+        # print(kernel_str)
+
+        # vgprs
+        dict_vgprs = {
+            "v_c" : 16,
+            "v_sld_a0" : 4,
+            "v_sld_b0" : 4,
+            "v_sld_a1" : 4,
+            "v_sld_b1" : 4,
+            "v_gld_a0" : 4,
+            "v_gld_a1" : 4,
+            "v_gld_b0" : 8,
+            "v_gld_b1" : 8,
+            "v_lane_id" : 1,
+            "v_offset_a_k0" : 1,
+            "v_offset_a" : 1,
+            "v_offset_b_k0" : 1,
+            "v_offset_b" : 1,
+            "v_lane_im" : 1,
+            "v_lane_in" : 1,
+            "v_sst_offset_c" : 1,
+            "v_iak0" : 1,
+            "v_im" : 1,
+            "v_ibk0" : 1,
+            "v_in" : 1,
+            "v_sst_offset_a0" : 1,
+            "v_sst_offset_a1" : 1,
+            "v_sst_offset_b0" : 1,
+            "v_sst_offset_b1" : 1,
+            "v_sld_iak0" : 1,
+            "v_sld_im" : 1,
+            "v_sld_offset_a0" : 1,
+            "v_sld_offset_a1" : 1,
+            "v_sld_ibk0" : 1,
+            "v_sld_in" : 1,
+            "v_sld_offset_b0" : 1,
+            "v_sld_offset_b1" : 1,
+            "v_c_in" : 1,
+            "v_c_im" : 1,
+            "v_sld_offset_c" : 1,
+            "v_gst_offset_c" : 1,
+            "v_fp32_base" : 1,
+            "v_sel_b" : 4,
+            "v_sub_magic_num" : 2,
+            "v_scale" : 2,
+            "v_c_n_flag" : 1,
+            "v_c_cur_m" : 1,
+            "v_tid" : 1,
+            "v_wave_id" : 1,
+            "v_tmp" : 8,
+        }
+        k_vgprs = vgprs.Vgprs(**dict_vgprs)
+        kernel_str += k_vgprs.vgprs_body
         print(kernel_str)
+
+
