@@ -3,6 +3,7 @@ import common_macro
 import kernel_args
 import sgprs 
 import vgprs 
+import amdgpu_metadata
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -147,5 +148,20 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         k_vgprs = vgprs.Vgprs(**dict_vgprs)
         kernel_str += k_vgprs.vgprs_body
         print(kernel_str)
+
+        # metadata
+        md = amdgpu_metadata.AmdgpuMetadata(
+            [1, 0],
+            bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk,
+            k_sgprs.sgpr_offset,
+            k_vgprs.vgpr_offset,
+            8,
+            k_args.kargs.offset,
+            65536,
+            0,
+            64,
+            [256, 1, 1],
+            256,
+            dict_kernel_args)
 
 
