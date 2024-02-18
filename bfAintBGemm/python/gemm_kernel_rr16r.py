@@ -1,4 +1,7 @@
 import math
+import os
+import subprocess
+
 import gemm_kernel_traits
 import common_macro
 import kernel_args
@@ -40,6 +43,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
     def get_kernel_name(self) -> str:
         return "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
+
+    def get_asm_file_name(self) -> str:
+        return self.get_kernel_name() + ".s"
+
+    def get_hsaco_name(self) -> str:
+        return self.get_kernel_name() + ".hsaco"
 
     def gen_kernel_label(self) -> str:
         return self.get_kernel_name() + ": \n" + \
@@ -111,7 +120,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         cta_map_str = CTA_MAP.format(self.tile.cta_m, self.tile.cta_n)
         return cta_map_str
 
-    def write_kernel(self):
+    def gen_kernel(self):
         # traits
         lds_size = self.get_lds_size()
         warp_size = self.get_warp_size()
@@ -296,4 +305,28 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str += p_end_str
 
         print(kernel_str)
+        return kernel_str
+
+    def write_kernel(self, output_dir):
+        if os.path.exists(output_dir):
+            pass
+        else:
+            os.mkdirs(output_dir)
+
+        kernel_str = self.gen_kernel()
+        asm_name = self.get_asm_file_name()
+        asm_file_name = os.path.join(output_dir, asm_name)
+        with open(asm_file_name, "w") as asm_f:
+            asm_f.write(kernel_str)
+
+    def compile_kernel(self, output_dir):
+        asm_name = self.get_asm_file_name()
+        asm_file_name = os.path.join(output_dir, asm_name)
+        hasco_name = self.
+        if os.path.exists(asm_file_name):
+            
+        else:
+            assert false, "{} file is not generated yet".format(asm_file_name)
+
+    
 

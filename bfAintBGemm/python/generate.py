@@ -4,7 +4,7 @@ import gemm_kernel_rr16r
 import datatype
 
 
-def write_kernels():
+def write_kernels(output_dir):
     tile = gemm_kernel_traits.GemmTileSize(cta_size=256,
                                            cta_m=32,
                                            cta_n=128,
@@ -32,8 +32,8 @@ def write_kernels():
                                           1,
                                           tile,
                                           "v1")
-    print(k.a_layout)
-    k.write_kernel()
+    #print(k.a_layout)
+    k.write_kernel(output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--output_dir",
-        required=False,
+        required=True,
         help="write kernels into a directory",
     )
 
@@ -59,4 +59,4 @@ if __name__ == "__main__":
 
     print(f"ouput dir={args.output_dir}, list={args.list_blobs}")
 
-    write_kernels()
+    write_kernels(args.output_dir)
