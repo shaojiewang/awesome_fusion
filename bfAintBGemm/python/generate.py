@@ -34,6 +34,7 @@ def write_kernels(output_dir):
                                           "v1")
     #print(k.a_layout)
     k.write_kernel(output_dir)
+    k.compile_kernel(output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

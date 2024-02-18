@@ -321,12 +321,24 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
     def compile_kernel(self, output_dir):
         asm_name = self.get_asm_file_name()
-        asm_file_name = os.path.join(output_dir, asm_name)
-        hasco_name = self.
-        if os.path.exists(asm_file_name):
-            
+        asm_path = os.path.join(output_dir, asm_name)
+
+        hsaco_name = self.get_hsaco_name()
+        hsaco_path = os.path.join(output_dir, hsaco_name)
+
+        if os.path.exists(asm_path):
+            compile_cmd = ['/opt/rocm/llvm/bin/clang++']
+            compile_cmd.append('-x')
+            compile_cmd.append('assembler')
+            compile_cmd.append('-target')
+            compile_cmd.append('amdgcn--amdhsa')
+            compile_cmd.append('-mcpu=gfx90a')
+            compile_cmd.append(asm_path)
+            compile_cmd.append('-o')
+            compile_cmd.append(hsaco_path)
+            subprocess.run(compile_cmd, stdout=subprocess.PIPE)
         else:
-            assert false, "{} file is not generated yet".format(asm_file_name)
+            assert false, "{} file is not generated yet".format(asm_path)
 
     
 
