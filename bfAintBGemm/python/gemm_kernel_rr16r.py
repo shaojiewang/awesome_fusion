@@ -152,11 +152,11 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # metadata
         md = amdgpu_metadata.AmdgpuMetadata(
             [1, 0],
-            bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk,
+            "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk",
             k_sgprs.sgpr_offset,
             k_vgprs.vgpr_offset,
             8,
-            k_args.kargs.offset,
+            k_args.kargs_offset,
             65536,
             0,
             64,
@@ -164,4 +164,4 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             256,
             dict_kernel_args)
 
-
+        print(md.gen_args())

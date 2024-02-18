@@ -19,14 +19,15 @@ class AmdgpuMetadata(object):
         args_str = ".args: \n"
         offset = 0
         for key in self.args.keys():
-            ka_trait = self.agrs[key]
-            ele_str = "- \{ .name {}, .size: {}, .offset: {}, .value_kind: {}, .value_type: {}".format(
+            ka_trait = self.args[key]
+            ele_str = "- {{ .name {}, .size: {}, .offset: {}, .value_kind: {}, .value_type: {}".format(
                       key,
                       ka_trait.size,
                       offset,
-                      ka_trait.value_kind)
+                      ka_trait.value_kind,
+                      ka_trait.value_type)
             offset += ka_trait.size
-            if ka_trait.address_space == global_buffer : 
+            if ka_trait.address_space == 'global' : 
                 ele_str += ", .address_space: {}, .is_const: {}".format(
                            ka_trait.address_space,
                            "true" if ka_trait.is_const else "false")
