@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import datatype
 
 @dataclass
 class GemmTileSize:
@@ -31,10 +32,10 @@ class GemmKernelTraits:
     a_interleave : int
     b_interleave : int
     c_interleave : int
-    a_datatype : str
-    b_datatype : str
-    c_datatype : str
-    scale_datatype : str
+    a_datatype : datatype.DataType
+    b_datatype : datatype.DataType
+    c_datatype : datatype.DataType
+    scale_datatype : datatype.DataType
     splitk : int
     tile : GemmTileSize
     pipeline : str

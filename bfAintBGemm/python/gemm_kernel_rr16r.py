@@ -1,3 +1,4 @@
+import math
 import gemm_kernel_traits
 import common_macro
 import kernel_args
@@ -80,6 +81,21 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     s_waitcnt lgkmcnt(0)
 """
         return kargs_load_str
+
+    def gen_ld_a_b_c(self):
+        ldabc_str = ""
+        if self.a_datatype.data_size != 1:
+            log2_data_size = int(math.log2(self.a_datatype.data_size))
+            ldabc_str += "    s_lshl_b32 s[s_lda], s[s_lda], {}\n".format(log2_data_size)
+        
+        if self.b_datatype.data_size != 1:
+            log2_data_size = int(math.log2(self.b_datatype.data_size))
+            ldabc_str += "    s_lshl_b32 s[s_ldb], s[s_ldb], {}\n".format(log2_data_size)
+
+        if self.c_datatype.data_size != 1:
+            log2_data_size = int(math.log2(self.c_datatype.data_size))
+            ldabc_str += "    s_lshl_b32 s[s_ldc], s[s_ldc], {}\n".format(log2_data_size)
+        return ldabc_str
 
     def write_kernel(self):
         # traits
@@ -252,6 +268,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # kernel args load
         kargs_load_inst = self.gen_kargs_load()
         kernel_str += kargs_load_inst 
+
+        # ld a/b/c
+        ldabc_str = self.gen_ld_a_b_c()
+        kernel_str += ldabc_str
         print(kernel_str)
 
         # program end

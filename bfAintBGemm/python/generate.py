@@ -1,6 +1,7 @@
 import argparse
 import gemm_kernel_traits
 import gemm_kernel_rr16r
+import datatype
 
 
 def write_kernels():
@@ -24,10 +25,10 @@ def write_kernels():
                                            smem_vec_c=8,
                                            smem_a_k1=8,
                                            smem_b_k1=8)
-    k = gemm_kernel_rr16r.GemmKernelRR16R("bfloat16",
-                                          "int8",
-                                          "bfloat16",
-                                          "float32",
+    k = gemm_kernel_rr16r.GemmKernelRR16R(datatype.BF16,
+                                          datatype.I8,
+                                          datatype.BF16,
+                                          datatype.F32,
                                           1,
                                           tile,
                                           "v1")
