@@ -83,7 +83,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         return kargs_load_str
 
     def gen_ld_a_b_c(self):
-        ldabc_str = ""
+        ldabc_str = "\n    ; adjust lda/b/c according to the datatypes\n"
         if self.a_datatype.data_size != 1:
             log2_data_size = int(math.log2(self.a_datatype.data_size))
             ldabc_str += "    s_lshl_b32 s[s_lda], s[s_lda], {}\n".format(log2_data_size)
@@ -96,6 +96,20 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             log2_data_size = int(math.log2(self.c_datatype.data_size))
             ldabc_str += "    s_lshl_b32 s[s_ldc], s[s_ldc], {}\n".format(log2_data_size)
         return ldabc_str
+
+    def gen_cta_mapping(self):
+        CTA_MAP = """
+    ; thread block mapping
+    ; m block id: bid x
+    ; n block id: bid y
+    ; k block id: bid z
+    s_mul_i32 s[s_m_idx], s[s_bx], {}
+    s_mul_i32 s[s_n_idx], s[s_by], {}
+    s_mul_i32 s[s_k_idx], s[s_bz], s[s_k_per_cta]
+
+"""
+        cta_map_str = CTA_MAP.format(self.tile.cta_m, self.tile.cta_n)
+        return cta_map_str
 
     def write_kernel(self):
         # traits
@@ -272,10 +286,14 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # ld a/b/c
         ldabc_str = self.gen_ld_a_b_c()
         kernel_str += ldabc_str
-        print(kernel_str)
+
+        # cta mapping
+        cta_map_str = self.gen_cta_mapping()
+        kernel_str += cta_map_str
 
         # program end
         p_end_str = self.gen_program_end() 
-        print(p_end_str)
         kernel_str += p_end_str
+
+        print(kernel_str)
 
