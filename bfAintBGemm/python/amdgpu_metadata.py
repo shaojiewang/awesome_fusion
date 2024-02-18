@@ -18,14 +18,27 @@ class AmdgpuMetadata(object):
     def __post_init__(self):
         args_str = self.gen_args()
         k_metadata_body = self.write_metadata()
-        self.metadata_body = k_metadata_body.format()
+        self.metadata_body = k_metadata_body.format(
+            self.hsa_version[0], self.hsa_version[1],
+            self.name,
+            self.name,
+            self.sgpr_count,
+            self.vgpr_count,
+            self.kernarg_segment_align,
+            self.kernarg_segment_size,
+            self.group_segment_fixed_size,
+            self.private_segment_fixed_size,
+            self.wavefront_size,
+            self.reqd_workgroup_size[0], self.reqd_workgroup_size[1], self.reqd_workgroup_size[2],
+            self.max_flat_workgroup_size,
+            args_str)
 
     def gen_args(self):
         args_str = "\n"
         offset = 0
         for key in self.args.keys():
             ka_trait = self.args[key]
-            ele_str = "- {{ .name {}, .size: {}, .offset: {}, .value_kind: {}, .value_type: {}".format(
+            ele_str = "      - {{ .name {}, .size: {}, .offset: {}, .value_kind: {}, .value_type: {}".format(
                       key,
                       ka_trait.size,
                       offset,
@@ -62,5 +75,5 @@ amdhsa.kernels:
 ...
 .end_amdgpu_metadata
 """ 
-
+        return METADATA
         

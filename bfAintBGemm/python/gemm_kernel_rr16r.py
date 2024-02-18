@@ -164,4 +164,4 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             256,
             dict_kernel_args)
 
-        print(md.gen_args())
+        print(md.metadata_body)
