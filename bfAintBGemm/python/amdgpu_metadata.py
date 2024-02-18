@@ -15,8 +15,13 @@ class AmdgpuMetadata(object):
     max_flat_workgroup_size : int
     args : dict
 
+    def __post_init__(self):
+        args_str = self.gen_args()
+        k_metadata_body = self.write_metadata()
+        self.metadata_body = k_metadata_body.format()
+
     def gen_args(self):
-        args_str = ".args: \n"
+        args_str = "\n"
         offset = 0
         for key in self.args.keys():
             ka_trait = self.args[key]
@@ -51,21 +56,11 @@ amdhsa.kernels:
     .group_segment_fixed_size: {}
     .private_segment_fixed_size: {}
     .wavefront_size: {}
-    .reqd_workgroup_size : [{}, {}, {}]
+    .reqd_workgroup_size: [{}, {}, {}]
     .max_flat_workgroup_size: {}
-    .args:
-    - { .name: ptr_c,           .size: 8, .offset:   0, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: false}
-    - { .name: ptr_a,           .size: 8, .offset:   8, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: true }
-    - { .name: ptr_b,           .size: 8, .offset:  16, .value_kind: global_buffer, .value_type: f16, .address_space: global, .is_const: true }
-    - { .name: ptr_scale,       .size: 8, .offset:  24, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: true}
-    - { .name: m,               .size: 4, .offset:  32, .value_kind: by_value, .value_type: i32}
-    - { .name: n,               .size: 4, .offset:  36, .value_kind: by_value, .value_type: i32}
-    - { .name: k,               .size: 4, .offset:  40, .value_kind: by_value, .value_type: i32}
-    - { .name: lda,             .size: 4, .offset:  44, .value_kind: by_value, .value_type: i32}
-    - { .name: ldb,             .size: 4, .offset:  48, .value_kind: by_value, .value_type: i32}
-    - { .name: ldc,             .size: 4, .offset:  52, .value_kind: by_value, .value_type: i32}
-    - { .name: k_per_cta,       .size: 4, .offset:  56, .value_kind: by_value, .value_type: i32}
-    - { .name: print,           .size: 8, .offset:  60, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false}
+    .args: {}
 ...
 .end_amdgpu_metadata
 """ 
+
+        
