@@ -55,3 +55,4 @@ class Rodata(object):
 .end_amdhsa_kernel
 """
         return RODATA
+

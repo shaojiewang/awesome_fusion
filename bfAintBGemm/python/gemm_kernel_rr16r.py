@@ -5,6 +5,7 @@ import sgprs
 import vgprs 
 import amdgpu_metadata
 import rodata
+import text_seg
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -36,10 +37,49 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def get_warp_size(self) -> int:
         return 64
 
+    def get_kernel_name(self) -> str:
+        return "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
+
+    def gen_kernel_label(self) -> str:
+        return self.get_kernel_name() + ": \n" + \
+            "    ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm\n"
+
+    def gen_kargs_load(self) -> str:
+        kargs_load_str = """
+    s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
+    s_load_dwordx2 s[s_ptr_a:s_ptr_a+1], s[s_ka:s_ka+1], 0+k_ptr_a
+    s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
+    s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
+    s_load_dwordx2 s[s_print:s_print+1], s[s_ka:s_ka+1], 0+k_print
+
+    s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
+    s_load_dwordx2 s[s_ldb:s_ldb+1], s[s_ka:s_ka+1], 0+k_ldb
+    s_load_dword s[s_k_per_cta], s[s_ka:s_ka+1], 0+k_k_per_cta
+    
+    v_mov_b32 v[v_tid], v0
+    s_mov_b32 s[s_ptr_a + 3], 0x27000    
+    s_mov_b32 s[s_ptr_b + 3], 0x27000    
+    s_mov_b32 s[s_ptr_c + 3], 0x27000    
+    s_mov_b32 s[s_ptr_scale + 3], 0x27000
+    
+    v_mov_b32 v[v_fp32_base], 0x4B000000
+    v_mov_b32 v[v_sel_b + 0], 0x07060500
+    v_mov_b32 v[v_sel_b + 1], 0x07060501
+    v_mov_b32 v[v_sel_b + 2], 0x07060502
+    v_mov_b32 v[v_sel_b + 3], 0x07060503
+
+    v_cvt_f32_i32 v[v_sub_magic_num + 0], -8388736
+    v_cvt_f32_i32 v[v_sub_magic_num + 1], -8388736
+
+    s_waitcnt lgkmcnt(0)
+"""
+        return kargs_load_str
+
     def write_kernel(self):
         # traits
         lds_size = self.get_lds_size()
         warp_size = self.get_warp_size()
+        kernel_name = self.get_kernel_name()
 
         # macros
         kernel_str = ""
@@ -162,7 +202,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
         # rodata
         rod = rodata.Rodata(
-            "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk",
+            kernel_name,
             lds_size,
             0,
             1,
@@ -176,12 +216,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             0,
             k_vgprs.vgpr_offset)
         k_rodata = rod.rodata_str
-        print(k_rodata)
+        #print(k_rodata)
 
         # metadata
         md = amdgpu_metadata.AmdgpuMetadata(
             [1, 0],
-            "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk",
+            kernel_name, 
             k_sgprs.sgpr_offset,
             k_vgprs.vgpr_offset,
             8,
@@ -195,4 +235,18 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         k_amdgpu_metadata = md.metadata_body
         #print(md.metadata_body)
 
+        # text segment
+        txt_str = text_seg.TextSeg(kernel_name, 8)
+        kernel_str += txt_str.text_seg_str
+
+        # kernel label
+        k_label = self.gen_kernel_label()
+        kernel_str += k_label
+
+        # kernel args load
+        kargs_load_inst = self.gen_kargs_load()
+        kernel_str += kargs_load_inst 
+        print(kernel_str)
+
+        # 
 
