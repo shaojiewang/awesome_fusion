@@ -44,6 +44,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         return self.get_kernel_name() + ": \n" + \
             "    ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm\n"
 
+    def gen_program_end(self) -> str:
+        end_p_str = "l_end_" + self.get_kernel_name() + ": \n"
+        end_p_str += "    ; .print v_offset_a, s_print, s_bx, v_tid, v_tmp + 7\n"
+        end_p_str += "    s_endpgm"
+        return end_p_str
+
     def gen_kargs_load(self) -> str:
         kargs_load_str = """
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -248,5 +254,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str += kargs_load_inst 
         print(kernel_str)
 
-        # 
+        # program end
+        p_end_str = self.gen_program_end() 
+        print(p_end_str)
+        kernel_str += p_end_str
 
