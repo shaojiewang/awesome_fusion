@@ -4,6 +4,7 @@ import kernel_args
 import sgprs 
 import vgprs 
 import amdgpu_metadata
+import rodata
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -29,7 +30,17 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                               pipeline)
         self.kernel_body = ""
 
+    def get_lds_size(self) -> int:
+        return 65536
+
+    def get_warp_size(self) -> int:
+        return 64
+
     def write_kernel(self):
+        # traits
+        lds_size = self.get_lds_size()
+        warp_size = self.get_warp_size()
+
         # macros
         kernel_str = ""
         m_print = common_macro.PrintMacro("print")
@@ -147,7 +158,25 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         }
         k_vgprs = vgprs.Vgprs(**dict_vgprs)
         kernel_str += k_vgprs.vgprs_body
-        print(kernel_str)
+        #print(kernel_str)
+
+        # rodata
+        rod = rodata.Rodata(
+            "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk",
+            lds_size,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            k_vgprs.vgpr_offset,
+            k_sgprs.sgpr_offset,
+            0,
+            0,
+            k_vgprs.vgpr_offset)
+        k_rodata = rod.rodata_str
+        print(k_rodata)
 
         # metadata
         md = amdgpu_metadata.AmdgpuMetadata(
@@ -157,11 +186,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             k_vgprs.vgpr_offset,
             8,
             k_args.kargs_offset,
-            65536,
+            lds_size,
             0,
-            64,
+            warp_size,
             [256, 1, 1],
             256,
             dict_kernel_args)
+        k_amdgpu_metadata = md.metadata_body
+        #print(md.metadata_body)
 
-        print(md.metadata_body)
+
