@@ -236,15 +236,15 @@ int main(int argc, char ** argv)
         if(validation)
         {
             gemm_rrr(reinterpret_cast<float*>(c_host_buf.GetBuffer()),
-                 reinterpret_cast<float*>(a_host_buf.GetBuffer()),
-                 reinterpret_cast<float*>(b_host_buf.GetBuffer()),
-                 reinterpret_cast<float*>(scale_host_buf.GetBuffer()),
-                 m, 
-                 n,
-                 k,
-                 k,
-                 n, 
-                 n);
+                reinterpret_cast<float*>(a_host_buf.GetBuffer()),
+                reinterpret_cast<float*>(b_host_buf.GetBuffer()),
+                reinterpret_cast<float*>(scale_host_buf.GetBuffer()),
+                m, 
+                n,
+                k,
+                k,
+                n, 
+                n);
         
             GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * m * sizeof(CDataType), hipMemcpyDeviceToHost));
             bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
