@@ -164,78 +164,78 @@ int main(int argc, char ** argv)
 
     for(auto &ker : k_list) {
         std::string kernel_name = ker.kernel_name;
-    GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
-    GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
+        GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
+        GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
 
-    int bdx = ker.wg_size;
-    int gdx = (m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
-    int gdy = (n + ker.wg_tile_n - 1) / ker.wg_tile_n;
+        int bdx = ker.wg_size;
+        int gdx = (m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
+        int gdy = (n + ker.wg_tile_n - 1) / ker.wg_tile_n;
 
-    int gdz = sk_blocks;
+        int gdz = sk_blocks;
 
-    printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
+        printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
 
-    int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
-    args.k_per_cta = k_per_cta;
-    int ldb_packed = n * ker.b_packed_k;
-    args.ldb    = ldb_packed;
-    void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
-                    &arg_size, HIP_LAUNCH_PARAM_END};
+        int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
+        args.k_per_cta = k_per_cta;
+        int ldb_packed = n * ker.b_packed_k;
+        args.ldb    = ldb_packed;
+        void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
+            &arg_size, HIP_LAUNCH_PARAM_END};
    
-    for(i=0;i<warm_ups;i++){
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
-        if (sk_blocks > 1)     
-            tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
-        //std::cout<<"safe here"<<std::endl;
-    }
+        for(i = 0; i < warm_ups; i++){
+            GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
+            if (sk_blocks > 1)     
+                tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
+            //std::cout<<"safe here"<<std::endl;
+        }
 
 #ifdef ASM_PRINT
-    int max_i = ker.wg_size;
-    GPU_CHECK_ERROR(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
-    for(int i=0; i<max_i; i++){
-        // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
-        float fp32_val = ((float*)host_print)[2*i+1];
-        uint32_t fp32_val_bit = __builtin_bit_cast(uint32_t, fp32_val);
-        float bf16_lo = __builtin_bit_cast(float, (fp32_val_bit << 16));
-        float bf16_hi = __builtin_bit_cast(float, (fp32_val_bit & 0xffff0000));
-        printf("Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n",((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
-        //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
-        //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
-    }    
+        int max_i = ker.wg_size;
+        GPU_CHECK_ERROR(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
+        for(int i = 0; i < max_i; i++){
+            // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
+            float fp32_val = ((float*)host_print)[2*i+1];
+            uint32_t fp32_val_bit = __builtin_bit_cast(uint32_t, fp32_val);
+            float bf16_lo = __builtin_bit_cast(float, (fp32_val_bit << 16));
+            float bf16_hi = __builtin_bit_cast(float, (fp32_val_bit & 0xffff0000));
+            printf("Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n",((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
+            //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
+            //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
+        }    
 #endif
 
-    GPU_CHECK_ERROR(hipEventCreate(&evt_00));
-    GPU_CHECK_ERROR(hipEventCreate(&evt_11));
-    GPU_CHECK_ERROR(hipDeviceSynchronize());
-    GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
-    for (i=0;i<total_loop;i++) {
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config));
-        if (sk_blocks > 1)     
-            tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
-    }
-    float elapsed_ms;
-    GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
-    GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
-    GPU_CHECK_ERROR(hipDeviceSynchronize());
-    GPU_CHECK_ERROR(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
-    GPU_CHECK_ERROR(hipEventDestroy(evt_00));
-    GPU_CHECK_ERROR(hipEventDestroy(evt_11));
+        GPU_CHECK_ERROR(hipEventCreate(&evt_00));
+        GPU_CHECK_ERROR(hipEventCreate(&evt_11));
+        GPU_CHECK_ERROR(hipDeviceSynchronize());
+        GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
+        for(i = 0; i < total_loop; i++) {
+            GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config));
+            if (sk_blocks > 1)     
+                tensor_reduce(workspace_ptr, c_ptr, sk_blocks, m * n, c_stream);
+        }
+        float elapsed_ms;
+        GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
+        GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
+        GPU_CHECK_ERROR(hipDeviceSynchronize());
+        GPU_CHECK_ERROR(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
+        GPU_CHECK_ERROR(hipEventDestroy(evt_00));
+        GPU_CHECK_ERROR(hipEventDestroy(evt_11));
 
-    float time_per_loop = elapsed_ms / total_loop;
-    float tflops = (float)2 * m * n * k / time_per_loop / (1024 * 1024 * 1024);
-    float bw_gbs = (float)(2 * (m * k + m * n) + n * k) / time_per_loop / (1024 * 1024);
-    printf("m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+        float time_per_loop = elapsed_ms / total_loop;
+        float tflops = (float)2 * m * n * k / time_per_loop / (1024 * 1024 * 1024);
+        float bw_gbs = (float)(2 * (m * k + m * n) + n * k) / time_per_loop / (1024 * 1024);
+        printf("m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
             m,
             n,
             k,
             time_per_loop,
             tflops,
             bw_gbs);
-    printf("\n");
+        printf("\n");
 
-    if(validation)
-    {
-        gemm_rrr(reinterpret_cast<float*>(c_host_buf.GetBuffer()),
+        if(validation)
+        {
+            gemm_rrr(reinterpret_cast<float*>(c_host_buf.GetBuffer()),
                  reinterpret_cast<float*>(a_host_buf.GetBuffer()),
                  reinterpret_cast<float*>(b_host_buf.GetBuffer()),
                  reinterpret_cast<float*>(scale_host_buf.GetBuffer()),
@@ -246,10 +246,10 @@ int main(int argc, char ** argv)
                  n, 
                  n);
         
-        GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * m * sizeof(CDataType), hipMemcpyDeviceToHost));
-        bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
-        printf(",%s \n", res ? "valid" : "fail");
-    }
+            GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * m * sizeof(CDataType), hipMemcpyDeviceToHost));
+            bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
+            printf(",%s \n", res ? "valid" : "fail");
+        }
     }
     
     return 0;
