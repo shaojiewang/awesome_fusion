@@ -15,6 +15,8 @@
 #include "gpu_utils.hpp"
 #include "tensor_reduction.hpp"
 
+#include "kernel_list.hpp"
+
 using Row = gemm_layout::gemm::RowMajor;
 using Col = gemm_layout::gemm::ColumnMajor;
 
@@ -45,6 +47,7 @@ using CDataType = bfloat16;
 // #define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2"
+
 
 int main(int argc, char ** argv)
 {
