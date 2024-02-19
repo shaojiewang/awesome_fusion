@@ -30,15 +30,9 @@ using BDataType = int8_t;
 using ScaleDataType = float;
 using CDataType = bfloat16;
 
-#define WG_SIZE 256 // only 128 or 256
-#define WG_TILE_N 128 
-#define WG_TILE_M 32
-#define WG_TILE_K 64
-#define B_PACKED_K 16 
-
 #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
 // #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2"
-#define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
+// #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
 // #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
 // #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1"
@@ -65,7 +59,6 @@ int main(int argc, char ** argv)
     }
     int lda = k;
     int ldb = n;
-    int ldb_packed = n * B_PACKED_K;
     int ldc = n;
 
     if(argc >= 8) {
@@ -74,13 +67,13 @@ int main(int argc, char ** argv)
         ldc = atoi(argv[7]);
     }
 
+    // get kernel list
+    std::vector<kernel_tunable> k_list = get_kernel_list();
+
     hipModule_t module;
     hipFunction_t kernel_func;
     hipEvent_t evt_00, evt_11;
     GPU_CHECK_ERROR(hipSetDevice(0));
-
-    GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
-    GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, KER_NAME));
 
     auto f_matrix_space_size = 
         [](std::size_t nRow, std::size_t nCol, std::size_t stride, auto layout){
@@ -93,7 +86,6 @@ int main(int argc, char ** argv)
         };
 
     int sk_blocks = 2;
-    int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + WG_TILE_K - 1) / WG_TILE_K * WG_TILE_K;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -125,21 +117,13 @@ int main(int argc, char ** argv)
     int warm_ups = 10;
     int i;
 
-    int bdx = WG_SIZE;
-    int gdx = (m + WG_TILE_M - 1) / WG_TILE_M; 
-    int gdy = (n + WG_TILE_N - 1) / WG_TILE_N;
-
-    int gdz = sk_blocks;
-
-    printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
-
 // TODO: move this section to a header file
 
 #ifdef ASM_PRINT
     //debug pointer
     float *host_print, *print;
-    host_print = (float*)malloc(bdx*8);
-    GPU_CHECK_ERROR(hipMalloc(&print, bdx*8));
+    host_print = (float*)malloc(1024*8);
+    GPU_CHECK_ERROR(hipMalloc(&print, 1024*8));
 #endif
     struct __attribute__((packed)) {
         void*  ptr_c;
@@ -166,20 +150,38 @@ int main(int argc, char ** argv)
     args.n      = n;
     args.k      = k;
     args.lda    = lda;
-    args.ldb    = ldb_packed;
+    // args.ldb    = ldb_packed;
     args.ldc    = ldc;
-    args.k_per_cta = k_per_cta;
+    // args.k_per_cta = k_per_cta;
     #ifdef ASM_PRINT
     args.print  = (void*)print;
     #endif
-    void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
-                    &arg_size, HIP_LAUNCH_PARAM_END};
-   
     CDataType* workspace_ptr = reinterpret_cast<CDataType*>(c_workspace_device_buf.GetBuffer());
     CDataType* c_ptr = reinterpret_cast<CDataType*>(c_device_buf.GetBuffer());
  
     hipStream_t c_stream;
     GPU_CHECK_ERROR(hipStreamCreate(&c_stream));
+
+    for(auto &ker : k_list) {
+        std::string kernel_name = ker.kernel_name;
+    GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
+    GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
+
+    int bdx = ker.wg_size;
+    int gdx = (m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
+    int gdy = (n + ker.wg_tile_n - 1) / ker.wg_tile_n;
+
+    int gdz = sk_blocks;
+
+    printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
+
+    int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
+    args.k_per_cta = k_per_cta;
+    int ldb_packed = n * ker.b_packed_k;
+    args.ldb    = ldb_packed;
+    void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
+                    &arg_size, HIP_LAUNCH_PARAM_END};
+   
     for(i=0;i<warm_ups;i++){
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
         if (sk_blocks > 1)     
@@ -188,7 +190,7 @@ int main(int argc, char ** argv)
     }
 
 #ifdef ASM_PRINT
-    int max_i=WG_SIZE;
+    int max_i = ker.wg_size;
     GPU_CHECK_ERROR(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
     for(int i=0; i<max_i; i++){
         // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
@@ -247,6 +249,7 @@ int main(int argc, char ** argv)
         GPU_CHECK_ERROR(hipMemcpy(c_host_buf_from_device.GetBuffer(), c_device_buf.GetBuffer(), ldc * m * sizeof(CDataType), hipMemcpyDeviceToHost));
         bool res = valid_vector<CDataType>(reinterpret_cast<const float*>(c_host_buf.GetBuffer()), reinterpret_cast<const CDataType*>(c_host_buf_from_device.GetBuffer()),  m * n);
         printf(",%s \n", res ? "valid" : "fail");
+    }
     }
     
     return 0;
