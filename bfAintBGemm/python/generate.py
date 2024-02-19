@@ -18,8 +18,8 @@ def gen_list_blobs(kernel_list, list_blobs_path):
     k_list_header = kernel_list_header.KernelListHeader(kernel_list)
     k_list_header.write_header(list_blobs_path)
     
-def host_compile(host_code_path, exe_path):
-    host_side_obj = host_side_compile.HostSideCompile(host_code_path, exe_path)
+def host_compile(host_code_path, exe_path, tmp_path):
+    host_side_obj = host_side_compile.HostSideCompile(host_code_path, exe_path, tmp_path)
     host_side_obj.compile_host()
 
 
@@ -64,5 +64,5 @@ if __name__ == "__main__":
     host_code = 'bfAintBGemm.cc'
     exe_name = 'bfAintBGemm.exe'
     exe_path = os.path.join(args.output_dir, exe_name)
-    host_compile(host_code, exe_path)
+    host_compile(host_code, exe_path, args.output_dir)
 
