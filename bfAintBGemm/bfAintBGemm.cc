@@ -15,7 +15,7 @@
 #include "gpu_utils.hpp"
 #include "tensor_reduction.hpp"
 
-#include "kernel_list.hpp"
+#include "build/kernel_list.hpp"
 
 using Row = gemm_layout::gemm::RowMajor;
 using Col = gemm_layout::gemm::ColumnMajor;
@@ -164,7 +164,8 @@ int main(int argc, char ** argv)
 
     for(auto &ker : k_list) {
         std::string kernel_name = ker.kernel_name;
-        GPU_CHECK_ERROR(hipModuleLoad(&module, HSACO));
+        std::string hsaco_name = ker.kernel_name + ".hsaco";
+        GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
         GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
 
         int bdx = ker.wg_size;

@@ -303,6 +303,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # program end
         p_end_str = self.gen_program_end() 
         kernel_str += p_end_str
+        kernel_str += k_rodata
+        kernel_str += k_amdgpu_metadata
+
 
         print(kernel_str)
         return kernel_str
