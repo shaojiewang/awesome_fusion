@@ -19,7 +19,7 @@ class HostSideCompile(object):
             # compile_cmd.append('-save-temps={}'.format(self.tmp_path)) # TODO: let temp file stored in the right path
             compile_cmd.append('-o')
             compile_cmd.append(self.exe_path)
-            print(compile_cmd)
+            # print(compile_cmd)
             subprocess.run(compile_cmd, stdout=subprocess.PIPE)
         else:
             assert false, "{} file is not generated yet".format(self.host_main_code_path)

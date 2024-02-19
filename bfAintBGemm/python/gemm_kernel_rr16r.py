@@ -34,6 +34,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                               gemm_tile,
                                               pipeline)
         self.kernel_body = ""
+        self.thread_vec_scale = [1,   1, 1]
+        self.block_vec_scale  = [2, 128, 1]
+
+        self.thread_vec_a = [1,   1,  8]
+        self.block_vec_a  = [8,  32,  1]
+        self.thread_vec_b = [2,   1, 16]
+        self.block_vec_b  = [2, 128,  1]
 
     def get_lds_size(self) -> int:
         return 65536
@@ -119,6 +126,25 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 """
         cta_map_str = CTA_MAP.format(self.tile.cta_m, self.tile.cta_n)
         return cta_map_str
+
+    def gen_scale_load(self):
+        ADDRCALC = """
+    ; load scale
+    ; TODO: to avoid cache line waste
+    ; Scale:
+    ; thread vec: [n]         = [{F_t_n}]
+    ; block vec:  [k0, n, k1] = [{F_b_k0},{F_b_n},{F_b_k1}]
+    v_mov_b32 v[v_tmp], {F_b_n - 1}
+    v_and_b32 v[v_tmp], v[v_tid], v[v_tmp]
+    v_lshlrev_b32 v[v_tmp], {F_sizeof_type}, v[v_tmp]
+    s_lshl_b32 s[s_tmp], s[s_n_idx], {F_b_n}
+    s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
+    s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
+    s_lshl_b32 s[s_ptr_scale + 2], s[s_n], {F_sizeof_type}
+    s_sub_i32 s[s_ptr_scale + 2], s[s_ptr_scale + 2], s[s_tmp]
+"""
+        
+        t_n = self
 
     def gen_kernel(self):
         # traits
@@ -300,14 +326,14 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         cta_map_str = self.gen_cta_mapping()
         kernel_str += cta_map_str
 
+        print(kernel_str)
+
         # program end
         p_end_str = self.gen_program_end() 
         kernel_str += p_end_str
         kernel_str += k_rodata
         kernel_str += k_amdgpu_metadata
 
-
-        print(kernel_str)
         return kernel_str
 
     def write_kernel(self, output_dir):
