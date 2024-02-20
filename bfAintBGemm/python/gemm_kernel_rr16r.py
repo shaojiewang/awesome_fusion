@@ -134,17 +134,27 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; Scale:
     ; thread vec: [n]         = [{F_t_n}]
     ; block vec:  [k0, n, k1] = [{F_b_k0},{F_b_n},{F_b_k1}]
-    v_mov_b32 v[v_tmp], {F_b_n - 1}
+    v_mov_b32 v[v_tmp], {F_b_n_minus_1}
     v_and_b32 v[v_tmp], v[v_tid], v[v_tmp]
     v_lshlrev_b32 v[v_tmp], {F_sizeof_type}, v[v_tmp]
-    s_lshl_b32 s[s_tmp], s[s_n_idx], {F_b_n}
+    s_lshl_b32 s[s_tmp], s[s_n_idx], {F_sizeof_type}
     s_add_u32  s[s_ptr_scale], s[s_ptr_scale], s[s_tmp]
     s_addc_u32 s[s_ptr_scale + 1], s[s_ptr_scale + 1], 0
     s_lshl_b32 s[s_ptr_scale + 2], s[s_n], {F_sizeof_type}
     s_sub_i32 s[s_ptr_scale + 2], s[s_ptr_scale + 2], s[s_tmp]
 """
-        
-        t_n = self
+        GLDDWORD = """
+    buffer_load_dword v[v_scale], v[v_tmp], s[s_ptr_scale : s_ptr_scale + 3], 0 offen offset: {F_offset}
+"""
+        t_n = self.thread_vec_scale[1]
+        b_k0 = self.block_vec_scale[0]
+        b_n = self.block_vec_scale[1]
+        log_sizeof_scale = int(math.log2(self.scale_datatype.data_size))
+        k_src = ""
+        k_src += ADDRCALC.format(F_t_n=t_n, F_b_k0=b_k0, F_b_k1=1, F_b_n=b_n, F_b_n_minus_1=b_n - 1, F_sizeof_type=log_sizeof_scale)
+        if t_n == 1:
+            k_src += GLDDWORD.format(F_offset=0)
+        return k_src
 
     def gen_kernel(self):
         # traits
@@ -325,6 +335,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # cta mapping
         cta_map_str = self.gen_cta_mapping()
         kernel_str += cta_map_str
+
+        # scale load
+        scale_load_str = self.gen_scale_load()
+        kernel_str += scale_load_str
 
         print(kernel_str)
 
