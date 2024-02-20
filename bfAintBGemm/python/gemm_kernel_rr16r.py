@@ -156,6 +156,77 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             k_src += GLDDWORD.format(F_offset=0)
         return k_src
 
+    def gen_a_matrix_gld_addr(self):
+        ADDRCALC = """
+    ; load A matrix
+    ; A:
+    ; thread vec: [ak0, m, ak1] = [{F_t_ak0}, {F_t_m}, {F_t_ak1}]
+    ; block vec:  [ak0, m, ak1] = [{F_b_ak0}, {F_b_m}, {F_b_ak1}]
+
+    ; A thread block offset
+    v_and_b32 v[v_iak0], v[v_tid], {F_b_ak0_minus_1}
+    v_lshrrev_b32 v[v_im], {F_log2_b_ak0}, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], {F_log2_t_ak1}, v[v_iak0]
+    v_mad_u32_u24 v[v_offset_a], v[v_im], s[s_lda], v[v_tmp]
+    ; A grid offset
+    s_mul_i32 s[s_tmp], s[s_m_idx], s[s_lda]
+    s_lshl_b32 s[s_tmp + 1], s[s_k_idx], {F_log2_sizeof_type}
+    s_add_i32 s[s_tmp], s[s_tmp], s[s_tmp + 1]
+    s_add_u32  s[s_ptr_a], s[s_ptr_a], s[s_tmp]
+    s_addc_u32 s[s_ptr_a + 1], s[s_ptr_a + 1], 0
+    ; prefetch load A
+    s_mul_i32 s[s_ptr_a + 2], s[s_m], s[s_lda]
+    s_sub_i32 s[s_ptr_a + 2], s[s_ptr_a + 2], s[s_tmp]
+
+    s_mov_b32 s[s_bs_a], {F_move_step}
+"""
+        t_ak0, t_m, t_ak1 = self.thread_vec_a[0], self.thread_vec_a[1], self.thread_vec_a[2]
+        b_ak0, b_m, b_ak1 = self.block_vec_a[0], self.block_vec_a[1], self.block_vec_a[2]
+        log2_b_ak0 = int(math.log2(b_ak0))
+        log2_t_ak1 = int(math.log2(t_ak1 * self.a_datatype.data_size))
+        log2_sizeof_dt = int(math.log2(self.a_datatype.data_size))
+        move_step = self.tile.cta_k * self.a_datatype.data_size
+        a_addr_calc = ADDRCALC.format(F_t_ak0=t_ak0, F_t_m=t_m, F_t_ak1=t_ak1, 
+                                      F_b_ak0=b_ak0, F_b_m=b_m, F_b_ak1=b_ak1, 
+                                      F_b_ak0_minus_1=b_ak0 - 1, F_log2_b_ak0=log2_b_ak0, 
+                                      F_log2_t_ak1=log2_t_ak1, F_log2_sizeof_type=log2_sizeof_dt,
+                                      F_move_step=move_step)
+        return a_addr_calc
+
+    def gen_a_matrix_gld_inst(self, v_gld_a):
+        GLDDWORDX4 = """
+    buffer_load_dwordx4 v[{F_v_gld_a} + 0 : {F_v_gld_a} + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+"""
+        a_gld_src = GLDDWORDX4.format(F_v_gld_a=v_gld_a)
+        return a_gld_src
+
+    def gen_b_matrix_gld_addr(self):
+        ADDRCALC = """
+    ; load A/B matrix
+    ; B:
+    ; thread vec: [bk0, n, bk1] = [  2,  1, 16]
+    ; block vec:  [bk0, n, bk1] = [  2,128,  1]
+    ; B thread block offset
+    v_mov_b32 v[v_tmp], 127
+    v_and_b32 v[v_in], v[v_tid], v[v_tmp]
+    v_lshrrev_b32 v[v_ibk0], 7, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], 4, v[v_in]
+    ; k0 offset = ldb
+    v_mad_u32_u24 v[v_offset_b], v[v_ibk0], s[s_ldb], v[v_tmp]
+    ; B grid offset
+    s_lshr_b32 s[s_tmp + 1], s[s_ldb], 4
+    s_lshl_b32 s[s_tmp], s[s_n_idx], 4
+    s_mul_i32 s[s_tmp + 2], s[s_tmp + 1], s[s_k_idx]
+    s_add_u32 s[s_tmp], s[s_tmp], s[s_tmp + 2]
+    s_add_u32  s[s_ptr_b], s[s_ptr_b], s[s_tmp]
+    s_addc_u32 s[s_ptr_b + 1], s[s_ptr_b + 1], 0
+    ; prefetch load B
+    s_mul_i32 s[s_ptr_b + 2], s[s_k], s[s_tmp + 1]
+    s_sub_i32 s[s_ptr_b + 2], s[s_ptr_b + 2], s[s_tmp]
+"""
+        
+
     def gen_kernel(self):
         # traits
         lds_size = self.get_lds_size()
@@ -340,6 +411,18 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         scale_load_str = self.gen_scale_load()
         kernel_str += scale_load_str
 
+        # A gld address
+        a_gld_addr_str = self.gen_a_matrix_gld_addr()
+        kernel_str += a_gld_addr_str
+
+        # A global prefetch
+        a_gld_load_str = self.gen_a_matrix_gld_inst("v_gld_a0")
+        kernel_str += a_gld_load_str
+
+        # B gld address
+    
+        # B global prefetch
+        
         print(kernel_str)
 
         # program end
