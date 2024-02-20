@@ -262,6 +262,31 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
         return gld_src
         
+    def gen_c_gst_addr(self):
+        COMMENT = """
+    ; store C offset
+    ; vgpr to lds
+    ; vgpr_group  = 4
+    ; wave_id = tid / wave_size
+    ; lane_id = tid % wave_size
+    ; lane_in = lane_id % inst_n = tid % inst_n
+    ; lane_im = lane_id / inst_n * vgpr_group
+    ; wave_n = block_n / inst_n
+    ; wave_m = block_m / inst_m
+    ; wave_in = wave_id % wave_n
+    ; wave_im = wave_id / wave_n
+""" 
+
+        WAVEID = """
+    ; wave id
+    v_lshrrev_b32 v[v_wave_id], 6, v[v_tid]
+    v_readfirstlane_b32 s[s_wave_id], v[v_wave_id]
+    s_lshr_b32 s[s_wave_im], s[s_wave_id], {F_log2_wave_n}
+    s_and_b32  s[s_wave_in], s[s_wave_id], {}
+    s_lshl_b32 s[s_wave_im], s[s_wave_im], {}
+    s_lshl_b32 s[s_wave_in], s[s_wave_in], {}
+"""
+
         
 
     def gen_kernel(self):
