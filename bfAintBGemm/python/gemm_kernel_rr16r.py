@@ -10,6 +10,7 @@ import vgprs
 import amdgpu_metadata
 import rodata
 import text_seg
+import datatype
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -41,6 +42,14 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         self.block_vec_a  = [8,  32,  1]
         self.thread_vec_b = [2,   1, 16]
         self.block_vec_b  = [2, 128,  1]
+
+        self.num_warp_n = self.tile.warp_n // self.tile.inst_n
+        self.num_warp_m = self.tile.warp_m // self.tile.inst_m
+
+        self.acc_gpr_group = 4
+        self.acc_datatype = datatype.F32
+
+        self.b_cn = self.tile.cta_n // self.tile.gmem_vec_c
 
     def get_lds_size(self) -> int:
         return 65536
@@ -281,13 +290,88 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; wave id
     v_lshrrev_b32 v[v_wave_id], 6, v[v_tid]
     v_readfirstlane_b32 s[s_wave_id], v[v_wave_id]
-    s_lshr_b32 s[s_wave_im], s[s_wave_id], {F_log2_wave_n}
-    s_and_b32  s[s_wave_in], s[s_wave_id], {}
-    s_lshl_b32 s[s_wave_im], s[s_wave_im], {}
-    s_lshl_b32 s[s_wave_in], s[s_wave_in], {}
+    s_lshr_b32 s[s_wave_im], s[s_wave_id], {F_log2_num_wave_n}
+    s_and_b32  s[s_wave_in], s[s_wave_id], {F_num_wave_n_minus_1}
+    s_lshl_b32 s[s_wave_im], s[s_wave_im], {F_log2_inst_m}
+    s_lshl_b32 s[s_wave_in], s[s_wave_in], {F_log2_inst_n}
+"""
+        log2_num_wave_n = int(math.log2(self.num_warp_n))
+        num_wave_n_minus_1 = self.num_warp_n - 1
+        log2_inst_m = int(math.log2(self.tile.inst_m))
+        log2_inst_n = int(math.log2(self.tile.inst_n))
+
+        wave_id_src = WAVEID.format(F_log2_num_wave_n=log2_num_wave_n, F_num_wave_n_minus_1=num_wave_n_minus_1, F_log2_inst_m=log2_inst_m, F_log2_inst_n=log2_inst_n)
+
+        LANEID = """
+    ; lane id
+    v_and_b32 v[v_lane_id], 63, v[v_tid]
+    v_and_b32 v[v_lane_in], {F_inst_n_minus_1}, v[v_tid] 
+    v_lshrrev_b32 v[v_lane_im], {F_log2_inst_n}, v[v_lane_id]
+    v_lshlrev_b32 v[v_lane_im], {F_log2_vgpr_group}, v[v_lane_im]
+"""
+        inst_n_minus_1 = self.tile.inst_n - 1
+        log2_vgpr_group = int(math.log2(self.acc_gpr_group))
+        
+        lane_id_str = LANEID.format(F_inst_n_minus_1=inst_n_minus_1, F_log2_inst_n=log2_inst_n, F_log2_vgpr_group=log2_vgpr_group)
+
+        SST_C_OFFSET = """
+    ; sst offset C
+    ; m_offset = (wave_im + lane_im) * block_n
+    ; n_offset = wave_n + lane_in
+    ; sst_c_offset = m_offset + n_offset
+    v_add_lshl_u32 v[v_sst_offset_c], v[v_lane_im], s[s_wave_im], {F_log2_inst_m_size}
+    v_add_u32 v[v_tmp], v[v_lane_in], s[s_wave_in]
+    v_add_lshl_u32 v[v_sst_offset_c], v[v_tmp], v[v_sst_offset_c], {F_log2_sizeof_dt}
 """
 
-        
+        log2_inst_m_size = int(math.log2(self.tile.inst_m * self.acc_datatype.data_size))
+        log2_sizeof_dt = int(math.log2(self.c_datatype.data_size))
+        sst_c_offset_src = SST_C_OFFSET.format(F_log2_inst_m_size=log2_inst_m_size, F_log2_sizeof_dt=log2_sizeof_dt)
+
+        SLD_GST_C_OFFSET = """
+    ; sld/gst offset C
+    ; c_in = tid % (block_n / vec_c_n)
+    ; c_im = tid / (block_n / vec_c_n)
+    ; sld_c_offset = c_in * vec_c_n + c_im * block_n
+    ; gst_c_offset = c_in * vec_c_n + c_im * ldc
+    v_and_b32 v[v_c_in], {F_b_cn_minus_1}, v[v_tid]
+    v_lshrrev_b32 v[v_c_im], {F_log2_b_cn}, v[v_tid]
+    v_lshlrev_b32 v[v_tmp], {F_log2_t_cn_byte}, v[v_c_in]
+    v_lshl_add_u32 v[v_sld_offset_c], v[v_c_im], {F_log2_cta_n_byte}, v[v_tmp]
+    v_mul_lo_u32 v[v_tmp + 1], v[v_c_im], s[s_ldc]
+    v_add_u32 v[v_gst_offset_c], v[v_tmp + 1], v[v_tmp]
+"""
+        b_cn_minus_1 = self.b_cn - 1
+        log2_b_cn = int(math.log2(self.b_cn))
+        log2_t_cn_byte = int(math.log2(self.c_datatype.data_size * self.tile.gmem_vec_c))
+        log2_cta_n_byte = int(math.log2(self.c_datatype.data_size * self.tile.cta_n))
+
+        sld_gst_c_offset = SLD_GST_C_OFFSET.format(F_b_cn_minus_1=b_cn_minus_1, F_log2_b_cn=log2_b_cn, F_log2_t_cn_byte=log2_t_cn_byte, F_log2_cta_n_byte=log2_cta_n_byte)
+
+        C_GRID_POINTER = """
+    ; c grid pointer
+    s_mul_i32 s[s_tmp], s[s_m_idx], s[s_ldc]
+    s_lshl_b32 s[s_tmp + 2], s[s_n_idx], {F_log2_sizeof_dt}
+    s_add_u32 s[s_tmp + 1], s[s_tmp + 2], s[s_tmp]
+    s_mul_i32 s[s_tmp], s[s_m], s[s_ldc]
+    s_mul_i32 s[s_tmp], s[s_tmp], s[s_bz]
+    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp + 1]
+    s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
+    s_add_u32 s[s_ptr_c], s[s_ptr_c], s[s_tmp]
+    s_addc_u32 s[s_ptr_c + 1], s[s_ptr_c + 1], 0
+    s_mul_i32 s[s_ptr_c + 2], s[s_m], s[s_ldc]
+    s_sub_i32 s[s_ptr_c + 2], s[s_ptr_c + 2], s[s_tmp + 1]
+    ; c n flag
+    v_lshl_add_u32 v[v_tmp], v[v_c_in], {F_log2_t_cn}, s[s_n_idx]
+    v_cmp_gt_u32 vcc, s[s_n], v[v_c_in]
+    v_cndmask_b32 v[v_c_n_flag],  0, 1, vcc
+"""
+        log2_t_cn = int(math.log2(self.tile.gmem_vec_c))
+
+        c_grid_src = C_GRID_POINTER.format(F_log2_sizeof_dt=log2_sizeof_dt, F_log2_t_cn=log2_t_cn)
+
+        inst_src = COMMENT + wave_id_src + lane_id_str + sst_c_offset_src + sld_gst_c_offset + c_grid_src
+        return inst_src
 
     def gen_kernel(self):
         # traits
@@ -488,6 +572,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # B global prefetch
         b_gld_load_str = self.gen_b_matrix_gld_inst("v_gld_b0")
         kernel_str += b_gld_load_str
+
+        # C global store address
+        c_gst_addr_str = self.gen_c_gst_addr()
+        kernel_str += c_gst_addr_str
         
         print(kernel_str)
 
