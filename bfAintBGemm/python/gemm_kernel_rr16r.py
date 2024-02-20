@@ -373,6 +373,23 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         inst_src = COMMENT + wave_id_src + lane_id_str + sst_c_offset_src + sld_gst_c_offset + c_grid_src
         return inst_src
 
+    def gen_sst_a_offset(self):
+        SST_A_OFFSET = """
+    ; store A to shared mem offset
+    ; sst_iak0 = iak0 * (block_m + pad) * ak1
+    ; sst_offset_a = sst_iak0 + v_im * {}
+    v_lshlrev_b32 v[v_tmp], {F_log2_}, v[v_im]
+    v_mov_b32 v[v_tmp + 1], (32 + 1) * 8 * 2
+    ;v_lshrrev_b32 v[v_tmp + 2], 1, v[v_iak0]
+    ;v_and_b32 v[v_tmp + 3], 1, v[v_iak0]
+    ;v_lshlrev_b32 v[v_tmp + 3], 3, v[v_tmp + 3]
+    ;v_add_u32 v[v_tmp], v[v_tmp], v[v_tmp + 3]
+    v_mad_u32_u24 v[v_sst_offset_a0], v[v_iak0], v[v_tmp + 1], v[v_tmp]
+    v_mov_b32 v[v_tmp], 0x8000
+    v_xor_b32 v[v_sst_offset_a1], v[v_tmp], v[v_sst_offset_a0]
+"""
+
+
     def gen_kernel(self):
         # traits
         lds_size = self.get_lds_size()
