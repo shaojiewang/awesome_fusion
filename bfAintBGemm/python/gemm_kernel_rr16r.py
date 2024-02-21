@@ -437,7 +437,79 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         return sst_b_offset_src
 
     def gen_sld_a_offset(self):
-        pass
+        SLD_A_OFFSET = """
+    ; load A to shared mem offset
+    ; sld_iak0 = laneid / inst_m * ((block_m + pad) * ak1)
+    ; sld_im = lane_id % inst_m + wave_im
+    ; sld_offset_a = sld_im * ak1 + sld_iak0
+    v_lshrrev_b32 v[v_sld_iak0], {F_log2_inst_m}, v[v_lane_id]
+    v_mov_b32 v[v_tmp], {F_smem_ak0_stride}
+    v_mul_lo_u32 v[v_sld_iak0], v[v_tmp], v[v_sld_iak0] 
+    v_and_b32 v[v_sld_im], {F_inst_m_minus_1}, v[v_lane_id]
+    v_add_lshl_u32 v[v_sld_im], v[v_sld_im], s[s_wave_im], {F_log2_smem_ak1}
+    v_add_lshl_u32 v[v_sld_offset_a0], v[v_sld_iak0], v[v_sld_im], {F_log2_sizeof_dt}
+    v_mov_b32 v[v_tmp], 0x8000
+    v_xor_b32 v[v_sld_offset_a1], v[v_tmp], v[v_sld_offset_a0]
+"""
+        log2_inst_m = int(math.log2(self.tile.inst_m))
+        smem_ak0_stride = (self.tile.cta_m + self.smem_a_padding) * self.tile.smem_a_k1
+        inst_m_minus_1 = self.tile.inst_m - 1
+        log2_smem_ak1 = int(math.log2(self.tile.smem_a_k1))
+        log2_sizeof_dt = int(math.log2(self.a_datatype.data_size))
+        sld_offfset_src = SLD_A_OFFSET.format(F_log2_inst_m=log2_inst_m, F_smem_ak0_stride=smem_ak0_stride, F_inst_m_minus_1=inst_m_minus_1, F_log2_smem_ak1=log2_smem_ak1, F_log2_sizeof_dt=log2_sizeof_dt)
+        return sld_offfset_src
+
+    def gen_sld_b_offset(self):
+        SLD_B_OFFSET = """
+    ; load B to shared mem offset
+    ; k1 = max(ak1, bk1)
+    ; sld_ibk0 = laneid / inst_n * (block_n * k1)
+    ; sld_in = laneid % inst_n + wave_in
+    ; sld_offset_b = sld_ibk0 + sld_in * bk1
+    ; padding = sld_offset_b / 64 * 8
+    ; sld_offset_b = padding + sld_offset_b
+    v_lshrrev_b32 v[v_sld_ibk0], {F_log2_inst_n}, v[v_lane_id]
+    v_lshlrev_b32 v[v_sld_ibk0], {F_log2_smem_bk0_stride}, v[v_sld_ibk0]
+    v_and_b32 v[v_sld_in], {F_inst_n_minus_1}, v[v_lane_id]
+    v_add_lshl_u32 v[v_sld_in], v[v_sld_in], s[s_wave_in], {F_log2_smem_bk1}
+    v_add_u32 v[v_sld_offset_b0], v[v_sld_in], v[v_sld_ibk0]
+    v_lshlrev_b32 v[v_sld_offset_b0], {F_log2_sizeof_dt}, v[v_sld_offset_b0]
+    v_mov_b32 v[v_tmp], {F_a_smem_size}
+    v_add_u32 v[v_sld_offset_b0], v[v_sld_offset_b0], v[v_tmp]
+    v_mov_b32 v[v_tmp], 0x8000
+    v_xor_b32 v[v_sld_offset_b1], v[v_tmp], v[v_sld_offset_b0]
+"""
+        log2_inst_n = int(math.log2(self.tile.inst_n))
+        log2_smem_bk0_stride = int(math.log2(self.tile_cta_n * self.tile.smem_b_k1))
+        inst_n_minus_1 = self.tile.inst_n - 1
+        log2_smem_bk1 = int(math.log2(self.tile.smem_b_k1))
+        log2_sizeof_dt = int(math.log2(self.compute_datatype.data_size))
+        a_smem_size = self.get_a_smem_size()
+        sld_b_offset_src = SLD_B_OFFSET.format(F_log2_inst_n=log2_inst_n, F_log2_smem_bk0_stride=log2_smem_bk0_stride, F_inst_n_minus_1=inst_n_minus_1, F_log2_smem_bk1=log2_smem_bk1, F_log2_sizeof_dt=log2_sizeof_dt, F_a_smem_size=a_smem_size)
+        return sld_b_offset_src
+
+    def gen_dup_scale_and_magic_num(self, wait_cnt_for_scale):
+        DUP_SCALE_AND_MAGIC_NUM = """
+    ; duplicate scale 
+    s_waitcnt vmcnt({})
+    v_mov_b32 v[v_scale + 1], v[v_scale + 0]
+
+    ; v_pk_mul_f32 v[v_sub_magic_num + 0 : v_sub_magic_num + 1], v[v_scale + 0 : v_scale + 1], v[v_sub_magic_num + 0 : v_sub_magic_num + 1]
+    v_mul_f32 v[v_sub_magic_num + 0], v[v_scale + 0], v[v_sub_magic_num + 0]
+    v_mul_f32 v[v_sub_magic_num + 1], v[v_scale + 1], v[v_sub_magic_num + 1]
+"""
+        return DUP_SCALE_AND_MAGIC_NUM.format(wait_cnt_for_scale)
+
+    def gen_clear_acc_vgpr(self, acc_num):
+        CLEAR_ACC = """
+    ; clear ACC vgpr
+    .cnt = 0
+    .rept {F_acc_num}
+        v_mov_b32 v[v_c + .cnt], 0
+        .cnt = .cnt + 1
+    .endr
+"""
+        return CLEAR_ACC.format(F_acc_num=acc_num)
 
     def gen_kernel(self):
         # traits
@@ -650,7 +722,23 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # B sst offset
         b_sst_addr_str = self.gen_sst_b_offset()
         kernel_str += b_sst_addr_str
-     
+
+        # A sld offset
+        a_sld_addr_str = self.gen_sld_a_offset()
+        kernel_str += a_sld_addr_str
+
+        # B sld offset
+        b_sld_addr_str = self.gen_sld_b_offset()
+        kernel_str += b_sld_addr_str
+
+        # dup scale and magic num
+        dup_scale_m_num = self.gen_dup_scale_and_magic_num(waitcnt_scale)
+        kernel_str += dup_scale_m_num
+
+        # clear acc register
+        clear_acc = self.gen_clear_acc(self.acc_num)
+        kernel_str += clear_acc
+ 
         print(kernel_str)
 
         # program end
