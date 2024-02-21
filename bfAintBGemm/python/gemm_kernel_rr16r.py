@@ -18,6 +18,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                  b_datatype, 
                  c_datatype, 
                  scale_datatype, 
+                 acc_datatype,
+                 compute_datatype,
                  splitk, 
                  gemm_tile : gemm_kernel_traits.GemmTileSize, 
                  pipeline="v1"):
@@ -47,9 +49,19 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         self.num_warp_m = self.tile.warp_m // self.tile.inst_m
 
         self.acc_gpr_group = 4
-        self.acc_datatype = datatype.F32
+        self.acc_datatype = acc_datatype
+        self.compute_datatype = compute_datatype
 
         self.b_cn = self.tile.cta_n // self.tile.gmem_vec_c
+
+        self.smem_a_padding = 1
+
+    def get_a_smem_size(self) -> int:
+        cta_m = self.tile.cta_m
+        cta_k = self.tile.cta_k
+        smem_a_padding = self.smem_a_padding
+        a_smem_size = (cta_m + smem_a_padding) * cta_k * self.a_datatype.data_size
+        return int(a_smem_size)
 
     def get_lds_size(self) -> int:
         return 65536
@@ -377,9 +389,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         SST_A_OFFSET = """
     ; store A to shared mem offset
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
-    ; sst_offset_a = sst_iak0 + v_im * {}
-    v_lshlrev_b32 v[v_tmp], {F_log2_}, v[v_im]
-    v_mov_b32 v[v_tmp + 1], (32 + 1) * 8 * 2
+    ; sst_offset_a = sst_iak0 + v_im * {F_smem_ak1}
+    v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_im]
+    v_mov_b32 v[v_tmp + 1], {F_smem_a_line_byte}
     ;v_lshrrev_b32 v[v_tmp + 2], 1, v[v_iak0]
     ;v_and_b32 v[v_tmp + 3], 1, v[v_iak0]
     ;v_lshlrev_b32 v[v_tmp + 3], 3, v[v_tmp + 3]
@@ -388,7 +400,44 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_mov_b32 v[v_tmp], 0x8000
     v_xor_b32 v[v_sst_offset_a1], v[v_tmp], v[v_sst_offset_a0]
 """
+        smem_ak1 = self.tile.smem_a_k1
+        smem_ak1_byte = smem_ak1 * self.a_datatype.data_size
+        log2_smem_ak1_byte = int(math.log2(smem_ak1_byte))
+        smem_a_line_byte = (self.tile.cta_m + self.smem_a_padding) * smem_ak1 * self.a_datatype.data_size
+        sst_a_offset_src = SST_A_OFFSET.format(F_smem_ak1=smem_ak1, F_log2_smem_ak1_byte=log2_smem_ak1_byte, F_smem_a_line_byte=smem_a_line_byte)
+        return sst_a_offset_src
 
+    def gen_sst_b_offset(self):
+        SST_B_OFFSET = """
+    ; store B to shared mem offset. when B is stored to shared mem, B datatype is bf16/fp16
+    ; bk1 = max(ak1, bk1_gld, 8)
+    ; sst_in = v_in * bk1 * n1 = v_in * 8 * 1
+    ; sst_ibk0 = v_ibk0 * block_n * bk1_gld = v_ibk0 * {F_cta_n} * {F_global_bk1}
+    ; sst_offset_b = sst_in + sst_ibk0
+    ; padding = sst_offset_b / 64 * 8
+    ; sst_offset_b = sst_offset_b + padding
+    v_lshlrev_b32 v[v_tmp], {F_log2_smem_b_k1}, v[v_in]
+    v_lshlrev_b32 v[v_tmp + 1], {F_log2_smem_bk0_stride}, v[v_ibk0]
+    v_add_u32 v[v_sst_offset_b0], v[v_tmp], v[v_tmp + 1]
+    ; v_lshrrev_b32 v[v_tmp], 6, v[v_sst_offset_b]
+    ; v_lshl_add_u32 v[v_sst_offset_b], v[v_tmp], 3, v[v_sst_offset_b] 
+    v_lshlrev_b32 v[v_sst_offset_b0], {F_log2_compute_dt_size}, v[v_sst_offset_b0]
+    v_mov_b32 v[v_tmp], {F_a_smem_size}
+    v_add_u32 v[v_sst_offset_b0], v[v_sst_offset_b0], v[v_tmp]
+    v_mov_b32 v[v_tmp], 0x8000
+    v_xor_b32 v[v_sst_offset_b1], v[v_tmp], v[v_sst_offset_b0]
+"""
+        cta_n = self.tile.cta_n
+        global_bk1 = self.tile.global_bk1
+        log2_smem_b_k1 = int(math.log2(self.tile.smem_b_k1))
+        log2_smem_bk0_stride = int(math.log2(cta_n * global_bk1))
+        log2_compute_dt_size = int(math.log2(self.compute_datatype.data_size))
+        a_smem_size = self.get_a_smem_size()
+        sst_b_offset_src = SST_B_OFFSET.format(F_cta_n=cta_n, F_global_bk1=global_bk1, F_log2_smem_b_k1=log2_smem_b_k1, F_log2_smem_bk0_stride=log2_smem_bk0_stride, F_log2_compute_dt_size=log2_compute_dt_size, F_a_smem_size=a_smem_size)
+        return sst_b_offset_src
+
+    def gen_sld_a_offset(self):
+        pass
 
     def gen_kernel(self):
         # traits
@@ -593,7 +642,15 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # C global store address
         c_gst_addr_str = self.gen_c_gst_addr()
         kernel_str += c_gst_addr_str
-        
+   
+        # A sst offset
+        a_sst_addr_str = self.gen_sst_a_offset()
+        kernel_str += a_sst_addr_str
+
+        # B sst offset
+        b_sst_addr_str = self.gen_sst_b_offset()
+        kernel_str += b_sst_addr_str
+     
         print(kernel_str)
 
         # program end

@@ -10,7 +10,7 @@ import host_side_compile
 def gen_kernel_list():
     tile_b256_32x128x64 = gemm_kernel_traits.GemmTileSize(256, 32, 128, 64, 16, 32, 128, 32, 32, 8, 1, 8, 16, 8, 1, 8, 8, 8, 8, 8)
     k_list = []
-    k_list.append(gemm_kernel_rr16r.GemmKernelRR16R(datatype.BF16, datatype.I8, datatype.BF16, datatype.F32, 1, tile_b256_32x128x64, "v1"))
+    k_list.append(gemm_kernel_rr16r.GemmKernelRR16R(datatype.BF16, datatype.I8, datatype.BF16, datatype.F32, datatype.F32, datatype.BF16, 1, tile_b256_32x128x64, "v1"))
 
     return k_list
 
