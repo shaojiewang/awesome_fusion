@@ -49,6 +49,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         self.num_warp_m = self.tile.warp_m // self.tile.inst_m
 
         self.acc_gpr_group = 4
+        self.acc_num = self.tile.cta_n * self.tile.cta_m // self.tile.cta_size
         self.acc_datatype = acc_datatype
         self.compute_datatype = compute_datatype
 
@@ -480,7 +481,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_xor_b32 v[v_sld_offset_b1], v[v_tmp], v[v_sld_offset_b0]
 """
         log2_inst_n = int(math.log2(self.tile.inst_n))
-        log2_smem_bk0_stride = int(math.log2(self.tile_cta_n * self.tile.smem_b_k1))
+        log2_smem_bk0_stride = int(math.log2(self.tile.cta_n * self.tile.smem_b_k1))
         inst_n_minus_1 = self.tile.inst_n - 1
         log2_smem_bk1 = int(math.log2(self.tile.smem_b_k1))
         log2_sizeof_dt = int(math.log2(self.compute_datatype.data_size))
@@ -732,11 +733,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str += b_sld_addr_str
 
         # dup scale and magic num
+        waitcnt_scale = self.thread_vec_a[0] + self.thread_vec_b[0]
         dup_scale_m_num = self.gen_dup_scale_and_magic_num(waitcnt_scale)
         kernel_str += dup_scale_m_num
 
         # clear acc register
-        clear_acc = self.gen_clear_acc(self.acc_num)
+        clear_acc = self.gen_clear_acc_vgpr(self.acc_num)
         kernel_str += clear_acc
  
         print(kernel_str)
