@@ -11,6 +11,8 @@ import amdgpu_metadata
 import rodata
 import text_seg
 import datatype
+import pipeline_1x1_interleaved
+import c_write_out
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
@@ -740,9 +742,16 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # clear acc register
         clear_acc = self.gen_clear_acc_vgpr(self.acc_num)
         kernel_str += clear_acc
- 
-        print(kernel_str)
 
+        # pipeline
+        pipeline = pipeline_1x1_interleaved.Pipeline1x1Interleaved()
+        kernel_str += pipeline.k_pipeline_src
+
+        # write out part
+        write_out = c_write_out.WriteOut()
+        kernel_str += write_out.c_write_out_src
+
+        print(kernel_str)
         # program end
         p_end_str = self.gen_program_end() 
         kernel_str += p_end_str
