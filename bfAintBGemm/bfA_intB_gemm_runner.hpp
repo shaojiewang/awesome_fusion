@@ -98,7 +98,7 @@ public:
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
         if (sk_blocks > 1)     
             tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
-        //std::cout<<"safe here"<<std::endl;
+        // std::cout<<"safe here"<<std::endl;
     }
 
     auto tune(hipStream_t c_stream,

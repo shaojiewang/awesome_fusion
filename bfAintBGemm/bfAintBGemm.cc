@@ -161,7 +161,7 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
 
     for(int i = 0; i < total_loop; i++)
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[i], c_stream, sk_blocks);
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], c_stream, sk_blocks);
 
     GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
     GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
@@ -189,7 +189,9 @@ int main(int argc, char ** argv)
     float time_per_loop = elapsed_ms / total_loop;
     float tflops = (float)2 * m * n * k / time_per_loop / (1024 * 1024 * 1024);
     float bw_gbs = (float)(2 * (m * k + m * n) + n * k) / time_per_loop / (1024 * 1024);
-    printf("m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+    
+    printf("best [sol, sk_blocks]: [%d, %d], m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+        sol_idx, sk_blocks,
         m,
         n,
         k,
