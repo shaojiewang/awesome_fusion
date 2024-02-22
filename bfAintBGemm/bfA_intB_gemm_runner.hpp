@@ -1,5 +1,10 @@
 #pragma once
 
+#include <hip/hip_runtime.h>
+#include <cfloat>
+
+#include "build/kernel_list.hpp"
+
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
     void*  ptr_a;
@@ -31,7 +36,7 @@ public:
                       uint32_t& ldb_,
                       uint32_t& ldc_,
                       uint32_t& k_per_cta_,
-                      void* print
+                      void* print_,
                       uint32_t& max_sk_blocks_)
     {
         k_ptr = k_vec_.data();
@@ -46,9 +51,9 @@ public:
         args.ldb = ldb_;
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
-        args.print = print_;
+        args.ptr_workspace = print_;
 
-        k_prt_len = k_vec_.size();
+        k_ptr_len = k_vec_.size();
         max_sk_blocks = max_sk_blocks_;
 
         for(auto ker : k_vec_)
@@ -62,7 +67,7 @@ public:
         }
     }
  
-    void run(kernel_tunable& ker,
+    void run(const kernel_tunable& ker,
              hipFunction_t& kernel_func,
              hipStream_t c_stream,
              int sk_blocks)
@@ -70,11 +75,12 @@ public:
         size_t arg_size = sizeof(args);
         
         int bdx = ker.wg_size;
-        int gdx = (m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
-        int gdy = (n + ker.wg_tile_n - 1) / ker.wg_tile_n;
+        int gdx = (args.m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
+        int gdy = (args.n + ker.wg_tile_n - 1) / ker.wg_tile_n;
 
         int gdz = sk_blocks;
-        void* c_ptr = args.ptr_c;
+        bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);
+        bfloat16* ptr_workspace = reinterpret_cast<bfloat16*>(args.ptr_workspace);
 
         // printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
         if (sk_blocks > 1)
@@ -82,16 +88,16 @@ public:
             args.ptr_c = args.ptr_workspace;
         }
 
-        int k_per_cta = ((k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
+        int k_per_cta = ((args.k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
         args.k_per_cta = k_per_cta;
-        int ldb_packed = n * ker.b_packed_k;
+        int ldb_packed = args.n * ker.b_packed_k;
         args.ldb    = ldb_packed;
         void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
             &arg_size, HIP_LAUNCH_PARAM_END};
    
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
         if (sk_blocks > 1)     
-            tensor_reduce(args.ptr_c, c_ptr, sk_blocks, m * n, c_stream);
+            tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
         //std::cout<<"safe here"<<std::endl;
     }
 

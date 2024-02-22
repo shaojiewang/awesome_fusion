@@ -47,9 +47,9 @@ using CDataType = bfloat16;
 int main(int argc, char ** argv)
 {
     int validation = 0;
-    int m = 32;
-    int n = 64 * 2;
-    int k = 256 * 2;
+    uint32_t m = 32;
+    uint32_t n = 64 * 2;
+    uint32_t k = 256 * 2;
     if(argc >= 2) {
         validation = atoi(argv[1]);
     }
@@ -58,9 +58,9 @@ int main(int argc, char ** argv)
         n = atoi(argv[3]);
         k = atoi(argv[4]);
     }
-    int lda = k;
-    int ldb = n;
-    int ldc = n;
+    uint32_t lda = k;
+    uint32_t ldb = n;
+    uint32_t ldc = n;
 
     if(argc >= 8) {
         lda = atoi(argv[5]);
@@ -71,8 +71,8 @@ int main(int argc, char ** argv)
     // get kernel list
     std::vector<kernel_tunable> k_list = get_kernel_list();
 
-    hipModule_t module;
-    hipFunction_t kernel_func;
+    // hipModule_t module;
+    // hipFunction_t kernel_func;
     hipEvent_t evt_00, evt_11;
     GPU_CHECK_ERROR(hipSetDevice(0));
 
@@ -86,7 +86,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    int max_sk_blocks = 2;
+    uint32_t max_sk_blocks = 2;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -154,7 +154,6 @@ int main(int argc, char ** argv)
     bfa_intb_gemm_runner.set_workspace_ptr(c_workspace_device_buf.GetBuffer());
     auto [sol_idx, sk_blocks] = bfa_intb_gemm_runner.tune(c_stream, warm_ups, total_loop);
 
-    hipEvent_t evt_00, evt_11;
     float elapsed_ms;
     GPU_CHECK_ERROR(hipEventCreate(&evt_00));
     GPU_CHECK_ERROR(hipEventCreate(&evt_11));
