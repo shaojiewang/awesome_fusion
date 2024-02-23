@@ -77,6 +77,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
         self.smem_a_padding = 1
 
+        # wg repeat and number m/n in wave
+        self.num_wave_m = gemm_tile.warp_m // gemm_tile.inst_m
+        self.num_wave_n = gemm_tile.warp_n // gemm_tile.inst_n
+        self.wg_repeat_m = gemm_tile.cta_m // gemm_tile.warp_m
+        self.wg_repeat_n = gemm_tile.cta_n // gemm_tile.warp_n
+         
+
     def get_a_smem_size(self) -> int:
         cta_m = self.tile.cta_m
         cta_k = self.tile.cta_k
@@ -91,7 +98,20 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         return 64
 
     def get_kernel_name(self) -> str:
-        return "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
+        KERNEL_NAME = """bf16gemm_rr{F_bk1}r_b{F_cta_size}_{F_cta_m}x{F_cta_n}x{F_cta_k}_wg{F_repeat_m}x{F_repeat_n}_w{F_wave_num_m}x{F_wave_num_n}_{F_inst_m}x{F_inst_n}x{F_inst_k}bf16_1k_pregld1_pipeline_interleaved_splitk"""
+        name_str = KERNEL_NAME.format(F_bk1=self.tile.global_bk1,
+                                      F_cta_size=self.tile.cta_size,
+                                      F_cta_m=self.tile.cta_m,
+                                      F_cta_n=self.tile.cta_n,
+                                      F_cta_k=self.tile.cta_k,
+                                      F_repeat_m=self.wg_repeat_m,
+                                      F_repeat_n=self.wg_repeat_n,
+                                      F_wave_num_m=self.num_wave_m,
+                                      F_wave_num_n=self.num_wave_n,
+                                      F_inst_m=self.tile.inst_m,
+                                      F_inst_n=self.tile.inst_n,
+                                      F_inst_k=self.tile.inst_k)
+        return name_str
 
     def get_asm_file_name(self) -> str:
         return self.get_kernel_name() + ".s"
