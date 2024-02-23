@@ -253,6 +253,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                       F_b_ak0_minus_1=b_ak0 - 1, F_log2_b_ak0=log2_b_ak0, 
                                       F_log2_t_ak1=log2_t_ak1, F_log2_sizeof_type=log2_sizeof_dt,
                                       F_move_step=move_step)
+        
+        OFFSET = """
+    s_mul_i32 s[s_offset_a + {F_soffset_idx}], s[s_lda], {F_idx}
+"""
+        
+
         return a_addr_calc
 
     def gen_a_matrix_gld_inst(self, v_gld_a):
