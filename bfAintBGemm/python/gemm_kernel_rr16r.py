@@ -3,6 +3,7 @@ import os
 import subprocess
 
 import gemm_kernel_traits
+import common_funcs
 import common_macro
 import kernel_args
 import sgprs 
@@ -39,13 +40,30 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                               gemm_tile,
                                               pipeline)
         self.kernel_body = ""
-        self.thread_vec_scale = [1,   1, 1]
-        self.block_vec_scale  = [2, 128, 1]
 
-        self.thread_vec_a = [1,   1,  8]
-        self.block_vec_a  = [8,  32,  1]
-        self.thread_vec_b = [2,   1, 16]
-        self.block_vec_b  = [2, 128,  1]
+        cta_size = gemm_tile.cta_size
+        
+        self.b_n = gemm_tile.cta_n
+        self.b_bk0 = cta_size // self.b_n
+        self.b_bk1 = 1
+        self.t_bk1 = gemm_tile.global_bk1
+        self.t_bk0 = gemm_tile.cta_k // (self.t_bk1 * self.b_bk0 * self.b_bk1)
+        self.t_n = 1
+
+        self.t_ak1 = gemm_tile.gmem_vec_a
+        self.b_ak1 = 1
+        self.t_ak0 = 1
+        self.b_ak0 = gemm_tile.cta_k // (self.t_ak1 * self.b_ak1 * self.t_ak0)
+        self.b_m = gemm_tile.cta_size // self.b_ak0
+        self.t_m = gemm_tile.cta_m // self.b_m
+
+        self.thread_vec_scale = [1, 1, 1]
+        self.block_vec_scale  = [self.b_bk0, self.b_n, self.b_bk1]
+
+        self.thread_vec_a = [self.t_ak0, self.t_m, self.t_ak1]
+        self.block_vec_a  = [self.b_ak0, self.b_m, self.b_ak1]
+        self.thread_vec_b = [self.t_bk0, self.t_n, self.t_bk1]
+        self.block_vec_b  = [self.b_bk0, self.b_n, self.b_ak1]
 
         self.num_warp_n = self.tile.warp_n // self.tile.inst_n
         self.num_warp_m = self.tile.warp_m // self.tile.inst_m
