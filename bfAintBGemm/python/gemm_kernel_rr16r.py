@@ -253,20 +253,29 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
                                       F_b_ak0_minus_1=b_ak0 - 1, F_log2_b_ak0=log2_b_ak0, 
                                       F_log2_t_ak1=log2_t_ak1, F_log2_sizeof_type=log2_sizeof_dt,
                                       F_move_step=move_step)
-        
+
         OFFSET = """
     s_mul_i32 s[s_offset_a + {F_soffset_idx}], s[s_lda], {F_idx}
 """
-        
-
+        for i in range(1, t_m, 1):
+            a_addr_calc += OFFSET.format(F_soffset_idx=i - 1, F_idx=i * b_m)
+            
         return a_addr_calc
 
     def gen_a_matrix_gld_inst(self, v_gld_a):
         GLDDWORDX4 = """
-    buffer_load_dwordx4 v[{F_v_gld_a} + 0 : {F_v_gld_a} + 3], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], 0 offen offset:0
+    buffer_load_dwordx4 v[{F_v_gld_a} + {F_vgpr_b} : {F_v_gld_a} + {F_vgpr_e}], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], {F_s_offset} offen offset:0"""
+        MOVE_STEP = """
     v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
 """
-        a_gld_src = GLDDWORDX4.format(F_v_gld_a=v_gld_a)
+        a_gld_src = ""
+        t_m = self.thread_vec_a[1]
+        for i in range(t_m):
+            soff_idx = i - 1
+            s_offset = 0 if i == 0 else "s[s_offset_a + {F_soff_idx}]".format(F_soff_idx=soff_idx)
+            a_gld_src += GLDDWORDX4.format(F_v_gld_a=v_gld_a, F_vgpr_b=i * 4, F_vgpr_e=i * 4 + 3, F_s_offset=s_offset)
+        a_gld_src += MOVE_STEP
+
         return a_gld_src
 
     def gen_b_matrix_gld_addr(self):
@@ -617,8 +626,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             "s_m_blocks" : 1,
             "s_m_idx" : 1,
             "s_n_idx" : 1,
-            "s_offset_a" : 1,
-            "s_offset_b" : 4,
+            "s_offset_a" : 4,
+            "s_offset_b" : 1,
             "s_kitr" : 1,
             "s_wave_id" : 1,
             "s_wave_im" : 1,
