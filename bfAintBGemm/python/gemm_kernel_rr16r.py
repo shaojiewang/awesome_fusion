@@ -673,6 +673,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         o_pipeline = self.pipeline.pipeline_select()
         return o_pipeline.k_pipeline_src
 
+    def gen_write_out(self):
+        
+
     def gen_kernel(self):
         # traits
         lds_size = self.get_lds_size()
