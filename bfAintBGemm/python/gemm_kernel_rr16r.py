@@ -137,6 +137,100 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         end_p_str += "    s_endpgm"
         return end_p_str
 
+    def get_sgpr_dict(self) -> dict:
+        # sgprs
+        dict_sgprs = {
+            "s_ka" : 2,
+            "s_bx" : 1,
+            "s_by" : 1,
+            "s_bz" : 1,
+            "s_ptr_c" : 4,
+            "s_ptr_a" : 4,
+            "s_ptr_b" : 4,
+            "s_ptr_scale" : 4,
+            "s_m" : 1,
+            "s_n" : 1,
+            "s_k" : 1,
+            "s_lda" : 1,
+            "s_ldb" : 1,
+            "s_ldc" : 1,
+            "s_k_per_cta" : 1,
+            "s_print" : 2,
+            "s_bs_a" : 1,
+            "s_bs_b" : 1,
+            "s_m_blocks" : 1,
+            "s_m_idx" : 1,
+            "s_n_idx" : 1,
+            "s_offset_a" : 4,
+            "s_offset_b" : 1,
+            "s_kitr" : 1,
+            "s_wave_id" : 1,
+            "s_wave_im" : 1,
+            "s_wave_in" : 1,
+            "s_k_idx" : 1,
+            "s_tmp" : 8,
+        }
+        return dict_sgprs
+        
+    def get_vgpr_dict(self) -> dict:
+        acc_num = self.tile.cta_m * self.tile.cta_n // self.tile.cta_size
+        ele_per_compute_vgpr = 4 // (self.compute_datatype.data_size)
+        ele_per_a_vgpr = 4 // (self.a_datatype.data_size)
+        ele_per_b_vgpr = 4 // (self.b_datatype.data_size)
+        sld_a_num = self.tile.inst_m * 2 * self.tile.inst_k // (self.get_warp_size() * ele_per_compute_vgpr)
+        sld_b_num = self.tile.inst_n * 2 * self.tile.inst_k // (self.get_warp_size() * ele_per_compute_vgpr)
+        gld_a_num = self.tile.cta_m * self.tile.cta_k // (self.tile.cta_size * ele_per_a_vgpr)
+        gld_b_num = self.tile.cta_n * self.tile.cta_k // (self.tile.cta_size * ele_per_b_vgpr)
+        dict_vgprs = {
+            "v_c" : acc_num,
+            "v_sld_a0" : sld_a_num,
+            "v_sld_b0" : sld_b_num,
+            "v_sld_a1" : sld_a_num,
+            "v_sld_b1" : sld_b_num,
+            "v_gld_a0" : gld_a_num,
+            "v_gld_a1" : gld_a_num,
+            "v_gld_b0" : gld_b_num,
+            "v_gld_b1" : gld_b_num,
+            "v_lane_id" : 1,
+            "v_offset_a_k0" : 1,
+            "v_offset_a" : 1,
+            "v_offset_b_k0" : 1,
+            "v_offset_b" : 1,
+            "v_lane_im" : 1,
+            "v_lane_in" : 1,
+            "v_sst_offset_c" : 1,
+            "v_iak0" : 1,
+            "v_im" : 1,
+            "v_ibk0" : 1,
+            "v_in" : 1,
+            "v_sst_offset_a0" : 1,
+            "v_sst_offset_a1" : 1,
+            "v_sst_offset_b0" : 1,
+            "v_sst_offset_b1" : 1,
+            "v_sld_iak0" : 1,
+            "v_sld_im" : 1,
+            "v_sld_offset_a0" : 1,
+            "v_sld_offset_a1" : 1,
+            "v_sld_ibk0" : 1,
+            "v_sld_in" : 1,
+            "v_sld_offset_b0" : 1,
+            "v_sld_offset_b1" : 1,
+            "v_c_in" : 1,
+            "v_c_im" : 1,
+            "v_sld_offset_c" : 1,
+            "v_gst_offset_c" : 1,
+            "v_fp32_base" : 1,
+            "v_sel_b" : 4,
+            "v_sub_magic_num" : 2,
+            "v_scale" : 2,
+            "v_c_n_flag" : 1,
+            "v_c_cur_m" : 1,
+            "v_tid" : 1,
+            "v_wave_id" : 1,
+            "v_tmp" : 8,
+        }
+        return dict_vgprs
+
     def gen_kargs_load(self) -> str:
         kargs_load_str = """
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -616,90 +710,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # print(k_args.karg_begin_byte)
 
         # sgprs
-        dict_sgprs = {
-            "s_ka" : 2,
-            "s_bx" : 1,
-            "s_by" : 1,
-            "s_bz" : 1,
-            "s_ptr_c" : 4,
-            "s_ptr_a" : 4,
-            "s_ptr_b" : 4,
-            "s_ptr_scale" : 4,
-            "s_m" : 1,
-            "s_n" : 1,
-            "s_k" : 1,
-            "s_lda" : 1,
-            "s_ldb" : 1,
-            "s_ldc" : 1,
-            "s_k_per_cta" : 1,
-            "s_print" : 2,
-            "s_bs_a" : 1,
-            "s_bs_b" : 1,
-            "s_m_blocks" : 1,
-            "s_m_idx" : 1,
-            "s_n_idx" : 1,
-            "s_offset_a" : 4,
-            "s_offset_b" : 1,
-            "s_kitr" : 1,
-            "s_wave_id" : 1,
-            "s_wave_im" : 1,
-            "s_wave_in" : 1,
-            "s_k_idx" : 1,
-            "s_tmp" : 8,
-        }
+        dict_sgprs = self.get_sgpr_dict()
         k_sgprs = sgprs.Sgprs(**dict_sgprs)
         kernel_str += k_sgprs.sgprs_body
         # print(kernel_str)
 
         # vgprs
-        dict_vgprs = {
-            "v_c" : 16,
-            "v_sld_a0" : 4,
-            "v_sld_b0" : 4,
-            "v_sld_a1" : 4,
-            "v_sld_b1" : 4,
-            "v_gld_a0" : 4,
-            "v_gld_a1" : 4,
-            "v_gld_b0" : 8,
-            "v_gld_b1" : 8,
-            "v_lane_id" : 1,
-            "v_offset_a_k0" : 1,
-            "v_offset_a" : 1,
-            "v_offset_b_k0" : 1,
-            "v_offset_b" : 1,
-            "v_lane_im" : 1,
-            "v_lane_in" : 1,
-            "v_sst_offset_c" : 1,
-            "v_iak0" : 1,
-            "v_im" : 1,
-            "v_ibk0" : 1,
-            "v_in" : 1,
-            "v_sst_offset_a0" : 1,
-            "v_sst_offset_a1" : 1,
-            "v_sst_offset_b0" : 1,
-            "v_sst_offset_b1" : 1,
-            "v_sld_iak0" : 1,
-            "v_sld_im" : 1,
-            "v_sld_offset_a0" : 1,
-            "v_sld_offset_a1" : 1,
-            "v_sld_ibk0" : 1,
-            "v_sld_in" : 1,
-            "v_sld_offset_b0" : 1,
-            "v_sld_offset_b1" : 1,
-            "v_c_in" : 1,
-            "v_c_im" : 1,
-            "v_sld_offset_c" : 1,
-            "v_gst_offset_c" : 1,
-            "v_fp32_base" : 1,
-            "v_sel_b" : 4,
-            "v_sub_magic_num" : 2,
-            "v_scale" : 2,
-            "v_c_n_flag" : 1,
-            "v_c_cur_m" : 1,
-            "v_tid" : 1,
-            "v_wave_id" : 1,
-            "v_tmp" : 8,
-        }
+        dict_vgprs = self.get_vgpr_dict()
         k_vgprs = vgprs.Vgprs(**dict_vgprs)
         kernel_str += k_vgprs.vgprs_body
         #print(kernel_str)
