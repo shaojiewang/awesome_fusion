@@ -82,11 +82,15 @@ class DequantMacro(KernelMacro):
 
 @dataclass
 class MfmaMacro(KernelMacro):
-    def __init__(self, name):
-        mfma_body = self.write_macro()
+    def __init__(self, name, repeat_m, repeat_n):
+        mfma_body = ""
+        if repeat_m == 1 and repeat_n == 1:
+            mfma_body = self.write_wg1x1_macro()
+        if repeat_m == 2 and repeat_n == 2:
+            mfma_body = self.write_wg2x2_macro()
         super(MfmaMacro, self).__init__(name, mfma_body)
 
-    def write_macro(self):
+    def write_wg1x1_macro(self):
         MFMA = """
 .macro .mfma_wg1x1_w1x4_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 ;    .rept 8
@@ -123,6 +127,20 @@ class MfmaMacro(KernelMacro):
     ;s_setprio 0
 .endm
 """
+        return MFMA
+
+    def write_wg2x2_macro(self);
+        MFMA = """
+.macro .mfma_wg1x1_w1x4_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+;    .rept 8
+;        v_fmac_f32 v0, v1, v2
+;    .endr
+;.endm
+;.macro fake1
+    
+.endm
+"""
+
         return MFMA
 
 
