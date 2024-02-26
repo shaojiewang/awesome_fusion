@@ -12,7 +12,9 @@ import amdgpu_metadata
 import rodata
 import text_seg
 import datatype
+import pipeline_selector
 import pipeline_1x1_interleaved
+import pipeline_2x2_interleaved
 import c_write_out
 
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
@@ -82,7 +84,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         self.num_wave_n = gemm_tile.warp_n // gemm_tile.inst_n
         self.wg_repeat_m = gemm_tile.cta_m // gemm_tile.warp_m
         self.wg_repeat_n = gemm_tile.cta_n // gemm_tile.warp_n
-         
+        
+        # pipeline selector
+        if pipeline == "v1":
+            if self.wg_repeat_m == 1 and self.wg_repeat_n == 1:
+                self.pipeline = pipeline_selector.k_pipeline_1x1_lds_double_buffer_interleaved
+            if self.wg_repeat_m == 2 and self.wg_repeat_n == 2:
+                self.pipeline = pipeline_selector.k_pipeline_2x2_interleaved
 
     def get_a_smem_size(self) -> int:
         cta_m = self.tile.cta_m
@@ -567,6 +575,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 """
         return CLEAR_ACC.format(F_acc_num=acc_num)
 
+    def gen_pipeline(self):
+        o_pipeline = self.pipeline.pipeline_select()
+        return o_pipeline.k_pipeline_src
+
     def gen_kernel(self):
         # traits
         lds_size = self.get_lds_size()
@@ -797,8 +809,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str += clear_acc
 
         # pipeline
-        pipeline = pipeline_1x1_interleaved.Pipeline1x1Interleaved()
-        kernel_str += pipeline.k_pipeline_src
+        pipeline_src = self.gen_pipeline()
+        kernel_str += pipeline_src
 
         # write out part
         write_out = c_write_out.WriteOut()
