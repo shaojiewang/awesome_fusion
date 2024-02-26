@@ -129,15 +129,48 @@ class MfmaMacro(KernelMacro):
 """
         return MFMA
 
-    def write_wg2x2_macro(self);
+    def write_wg2x2_macro(self):
         MFMA = """
-.macro .mfma_wg1x1_w1x4_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
+.macro .mfma_wg2x2_w2x2_32x32x8bf16_1k_ak1_8_bk1_8 v_sld_a0, v_sld_a1, v_sld_b0, v_sld_b1, v_sld_offset_a, v_sld_offset_b, v_c
 ;    .rept 8
 ;        v_fmac_f32 v0, v1, v2
 ;    .endr
 ;.endm
 ;.macro fake1
-    
+    ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a], offset: 0
+    ds_read_b128 v[\\v_sld_b0 + 0 : \\v_sld_b0 + 3], v[\\v_sld_offset_b], offset: 0 
+    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: 64 * 8 * 2 * 2 * 1
+
+    s_waitcnt lgkmcnt(0)
+
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b0 + 0 : \\v_sld_b0 + 1], v[\\v_c + 0 : \\v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 2 : \\v_sld_a0 + 3], v[\\v_sld_b0 + 2 : \\v_sld_b0 + 3], v[\\v_c + 0 : \\v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 16 : \\v_c + 31], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 16 : \\v_c + 31]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 16 : \\v_c + 31], v[\\v_sld_a0 + 2 : \\v_sld_a0 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 16 : \\v_c + 31]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 32 : \\v_c + 47], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b0 + 0 : \\v_sld_b0 + 1], v[\\v_c + 32 : \\v_c + 47]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 32 : \\v_c + 47], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b0 + 2 : \\v_sld_b0 + 3], v[\\v_c + 32 : \\v_c + 47]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 48 : \\v_c + 63]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 48 : \\v_c + 63]
+
+    ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a], offset: (128 + 1) * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_b0 + 0 : \\v_sld_b0 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: (128 + 1) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 2 * 1
+
+    s_waitcnt lgkmcnt(0)
+
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b0 + 0 : \\v_sld_b0 + 1], v[\\v_c + 0 : \\v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 2 : \\v_sld_a0 + 3], v[\\v_sld_b0 + 2 : \\v_sld_b0 + 3], v[\\v_c + 0 : \\v_c + 15]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 16 : \\v_c + 31], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 16 : \\v_c + 31]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 16 : \\v_c + 31], v[\\v_sld_a0 + 2 : \\v_sld_a0 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 16 : \\v_c + 31]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 32 : \\v_c + 47], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b0 + 0 : \\v_sld_b0 + 1], v[\\v_c + 32 : \\v_c + 47]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 32 : \\v_c + 47], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b0 + 2 : \\v_sld_b0 + 3], v[\\v_c + 32 : \\v_c + 47]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 48 : \\v_c + 63]
+    v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 48 : \\v_c + 63]
+
+    s_barrier
+    s_waitcnt lgkmcnt(0)
 .endm
 """
 
