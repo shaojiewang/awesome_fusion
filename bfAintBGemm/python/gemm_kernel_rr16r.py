@@ -746,7 +746,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             k_sgprs.sgpr_offset,
             k_vgprs.vgpr_offset,
             8,
-            k_args.kargs_offset,
+            k_args.kargs_offset + 12,
             lds_size,
             0,
             warp_size,

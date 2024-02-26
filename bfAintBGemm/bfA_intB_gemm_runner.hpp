@@ -82,7 +82,7 @@ public:
         bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);
         bfloat16* ptr_workspace = reinterpret_cast<bfloat16*>(args.ptr_workspace);
 
-        // printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
+        printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
         if (sk_blocks > 1)
         {
             args.ptr_c = args.ptr_workspace;

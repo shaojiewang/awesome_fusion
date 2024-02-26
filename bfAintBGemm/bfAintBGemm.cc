@@ -86,7 +86,8 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 2;
+    uint32_t max_sk_blocks = 1;
+    uint32_t print_sk_blocks = 1;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -140,7 +141,7 @@ int main(int argc, char ** argv)
                                            k,
 #ifdef ASM_PRINT
                                            print,
-                                           1
+                                           print_sk_blocks
 #else
                                            nullptr,
                                            max_sk_blocks
@@ -151,7 +152,8 @@ int main(int argc, char ** argv)
     hipStream_t c_stream;
     GPU_CHECK_ERROR(hipStreamCreate(&c_stream));
 
-    bfa_intb_gemm_runner.set_workspace_ptr(c_workspace_device_buf.GetBuffer());
+    if(max_sk_blocks > 1)
+        bfa_intb_gemm_runner.set_workspace_ptr(c_workspace_device_buf.GetBuffer());
     auto [sol_idx, sk_blocks] = bfa_intb_gemm_runner.tune(c_stream, warm_ups, total_loop);
 
     float elapsed_ms;
@@ -171,7 +173,7 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipEventDestroy(evt_11));
 
 #ifdef ASM_PRINT
-    int max_i = ker.wg_size;
+    int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
     GPU_CHECK_ERROR(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
     for(int i = 0; i < max_i; i++){
         // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
@@ -179,7 +181,7 @@ int main(int argc, char ** argv)
         uint32_t fp32_val_bit = __builtin_bit_cast(uint32_t, fp32_val);
         float bf16_lo = __builtin_bit_cast(float, (fp32_val_bit << 16));
         float bf16_hi = __builtin_bit_cast(float, (fp32_val_bit & 0xffff0000));
-        printf("Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n",((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
+        printf("%dth: Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n", i, ((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
         //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
         //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
     }    

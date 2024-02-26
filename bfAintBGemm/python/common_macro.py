@@ -24,6 +24,7 @@ class PrintMacro(KernelMacro):
     s_waitcnt vmcnt(0)
     global_store_dword v[\\v_offset], v[\\v_tid], s[\\s_out:\\s_out+1], offset:0x0
     global_store_dword v[\\v_offset], v[\\v_val], s[\\s_out:\\s_out+1], offset:0x0004
+    s_waitcnt vmcnt(0)
     ;s_mov_b64 exec, -1
 ;L_endhere:
     s_endpgm  
@@ -169,8 +170,8 @@ class MfmaMacro(KernelMacro):
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 48 : \\v_c + 63]
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 48 : \\v_c + 63]
 
-    s_barrier
     s_waitcnt lgkmcnt(0)
+    s_barrier
 .endm
 """
 

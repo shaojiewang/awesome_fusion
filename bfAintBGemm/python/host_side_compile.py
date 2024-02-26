@@ -15,6 +15,7 @@ class HostSideCompile(object):
             compile_cmd.append('-std=c++17')
             compile_cmd.append('-O3')
             compile_cmd.append('-Wall')
+            compile_cmd.append('-DASM_PRINT')
             compile_cmd.append('--offload-arch=gfx90a')
             # compile_cmd.append('-save-temps={}'.format(self.tmp_path)) # TODO: let temp file stored in the right path
             compile_cmd.append('-o')
