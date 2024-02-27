@@ -140,8 +140,8 @@ class MfmaMacro(KernelMacro):
 ;.macro fake1
     ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a], offset: 0
     ds_read_b128 v[\\v_sld_b0 + 0 : \\v_sld_b0 + 3], v[\\v_sld_offset_b], offset: 0 
-    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 64 * 8 * 2 * 2 * 1
-    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: 64 * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 64 * 8 * 2 
+    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: 64 * 8 * 2
 
     s_waitcnt lgkmcnt(0)
 
@@ -156,8 +156,8 @@ class MfmaMacro(KernelMacro):
 
     ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a], offset: (128 + 1) * 8 * 2 * 2 * 1
     ds_read_b128 v[\\v_sld_b0 + 0 : \\v_sld_b0 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1
-    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 2 * 1
-    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: (128 + 1) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 2 * 1
+    ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 
+    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: (128 + 1) * 8 * 2 * 2 * 1 + 64 * 8 * 2
 
     s_waitcnt lgkmcnt(0)
 
