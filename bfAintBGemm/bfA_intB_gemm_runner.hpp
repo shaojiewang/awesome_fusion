@@ -3,7 +3,7 @@
 #include <hip/hip_runtime.h>
 #include <cfloat>
 
-#include "build/kernel_list.hpp"
+#include "kernel_list.hpp"
 
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
@@ -82,7 +82,7 @@ public:
         bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);
         bfloat16* ptr_workspace = reinterpret_cast<bfloat16*>(args.ptr_workspace);
 
-        printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
+        // printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
         if (sk_blocks > 1)
         {
             args.ptr_c = args.ptr_workspace;
@@ -115,6 +115,10 @@ public:
         {
             for(int k = 1; k <= max_sk_blocks; k *= 2)
             {
+                if(!is_support(k_ptr[i], k))
+                {
+                    break;
+                }
                 // warm_up
                 for(int n = 0; n < warm_ups; n++)
                 {
@@ -161,6 +165,26 @@ public:
         {
             return 0;
         }
+    }
+
+    bool is_support(const kernel_tunable& ker,
+                    int sk_blocks)
+    {
+        int n = args.n;
+        int k = args.k;
+        
+        if(n % ker.wg_tile_n)
+        {
+            return false;
+        }
+
+        if(k % (ker.wg_tile_k * sk_blocks))
+        {
+            return false;
+        }
+
+        return true;
+
     }
 
     void set_workspace_ptr(void* workspace)

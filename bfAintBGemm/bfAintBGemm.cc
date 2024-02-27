@@ -16,7 +16,7 @@
 #include "tensor_reduction.hpp"
 #include "bfA_intB_gemm_runner.hpp"
 
-#include "build/kernel_list.hpp"
+#include "kernel_list.hpp"
 
 using Row = gemm_layout::gemm::RowMajor;
 using Col = gemm_layout::gemm::ColumnMajor;
@@ -86,8 +86,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 1;
-    uint32_t print_sk_blocks = 1;
+    uint32_t max_sk_blocks = 16;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -123,6 +122,7 @@ int main(int argc, char ** argv)
 #ifdef ASM_PRINT
     //debug pointer
     float *host_print, *print;
+    uint32_t print_sk_blocks = 1;
     host_print = (float*)malloc(1024*8);
     GPU_CHECK_ERROR(hipMalloc(&print, 1024*8));
 #endif

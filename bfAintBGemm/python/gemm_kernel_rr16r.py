@@ -837,7 +837,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         write_out_str = self.gen_write_out()
         kernel_str += write_out_str 
 
-        print(kernel_str)
+        # print(kernel_str)
         # program end
         p_end_str = self.gen_program_end() 
         kernel_str += p_end_str

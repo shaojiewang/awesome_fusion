@@ -2,7 +2,7 @@
 
 cd build/
 
-for m in 1 32 1024 2048; do
+for m in 1 1024 2048; do
     
     echo "llama 13B tp 1"
     ./bfAintBGemm.exe 0 $m 5120 5120
