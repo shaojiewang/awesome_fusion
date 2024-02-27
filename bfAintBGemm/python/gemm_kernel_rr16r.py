@@ -674,7 +674,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         return o_pipeline.k_pipeline_src
 
     def gen_write_out(self):
-        k_write_out = c_write_out.WriteOut(self.wg_repeat_m, self.wg_repeat_n, self.num_warp_m, self.num_warp_n)
+        k_write_out = c_write_out.WriteOut(self.wg_repeat_m, self.wg_repeat_n, self.num_warp_m, self.num_warp_n, self.tile.inst_m, self.tile.inst_n, self.get_warp_size(), self.c_datatype.data_size)
+        return k_write_out.c_write_out_src
 
     def gen_kernel(self):
         # traits
@@ -833,8 +834,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         kernel_str += pipeline_src
 
         # write out part
-        write_out = c_write_out.WriteOut()
-        kernel_str += write_out.c_write_out_src
+        write_out_str = self.gen_write_out()
+        kernel_str += write_out_str 
 
         print(kernel_str)
         # program end

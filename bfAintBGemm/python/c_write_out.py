@@ -81,7 +81,7 @@ label_write_out_c:
         vgpr_per_inst = vgpr_groups * self.vgpr_per_group
         for m in range(self.repeat_m):
             for n in range(self.repeat_n):
-                write_out_src += SST_C.format(F_acc_offst=vgpr_per_inst * (m * self.repeat_n + n), F_repeat_n_offset=self.repeat_n_offset, F_acc_group_offset=self.acc_group_offset, F_acc_offset=self.acc_offset)
+                write_out_src += SST_C.format(F_vgpr_groups=self.vgpr_per_group, F_acc_offst=vgpr_per_inst * (m * self.repeat_n + n), F_repeat_n_offset=self.repeat_n_offset, F_acc_group_offset=self.acc_group_offset, F_acc_offset=self.acc_offset)
 
             write_out_src += CTA_BARRIER
             sld_c_num = self.inst_m * self.inst_n * self.num_warp_m * self.num_warp_n * self.repeat_n // (self.cta_size * (16 // self.sizeof_dt))
@@ -93,7 +93,7 @@ label_write_out_c:
             write_out_src += GST_BEGIN
             rows_per_sld = (self.cta_size * (16 // self.sizeof_dt)) // self.cta_n
             for i in range(sld_c_num):
-                write_out_src += GST_C.format(F_rows_per_gst=rows_per_sld + self.num_warp_m * self.inst_m * m, F_gst_c_offset=i * 4)
+                write_out_src += GST_C.format(F_rows_per_gst=rows_per_sld * i + self.num_warp_m * self.inst_m * m, F_gst_c_offset=i * 4)
 
             write_out_src += GST_END
             
