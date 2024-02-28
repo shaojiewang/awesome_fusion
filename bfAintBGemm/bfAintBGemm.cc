@@ -93,7 +93,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 16;
+    uint32_t max_sk_blocks = 1;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -116,7 +116,7 @@ int main(int argc, char ** argv)
     {
         rand_vector_2d(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
         rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
-        rand_vector_2d(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+        rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
     }
 
     SimpleHostMem a_host_buf_to_device(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
