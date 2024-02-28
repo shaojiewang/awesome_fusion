@@ -23,6 +23,7 @@ struct __attribute__((packed)) kargs{
 class bfAintBGemmRunner {
 public:
     bfAintBGemmRunner(const std::vector<kernel_tunable>& k_vec_,
+                      const std::string& hsaco_path,
                       void* ptr_c_,
                       void* ptr_a_,
                       void* ptr_b_,
@@ -58,7 +59,7 @@ public:
         {
             hipFunction_t kernel_func;
             std::string kernel_name = ker.kernel_name;
-            std::string hsaco_name = ker.kernel_name + ".hsaco";
+            std::string hsaco_name = hsaco_path + "/" + ker.kernel_name + ".hsaco";
             GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
             GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
             kernel_func_vec.push_back(kernel_func);

@@ -31,19 +31,6 @@ using BDataType = int8_t;
 using ScaleDataType = float;
 using CDataType = bfloat16;
 
-// #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
-// #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2"
-// #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
-// #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rr8r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rr8r_wg128_32x64x64_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rrr_wg256_32x256x64_wg1x2_w1x4_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rrr_wg256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld1"
-// #define KER_NAME "bf16gemm_rrr_wg1x1_w1x2_32x32x8bf16_1k_pregld2"
-
-
 int main(int argc, char ** argv)
 {
     int validation = 0;
@@ -53,26 +40,31 @@ int main(int argc, char ** argv)
     uint32_t n = 64 * 2;
     uint32_t k = 256 * 2;
 
-    if(argc >= 3) 
+    std::string hsaco_path;
+    if(argc >= 2)
     {
-        validation = atoi(argv[1]);
-        init_method = atoi(argv[2]);
+        hsaco_path = argv[1];
     }
-    if(argc >= 6) {
-        m = atoi(argv[3]);
-        n = atoi(argv[4]);
-        k = atoi(argv[5]);
+    if(argc >= 4) 
+    {
+        validation = atoi(argv[2]);
+        init_method = atoi(argv[3]);
+    }
+    if(argc >= 7) {
+        m = atoi(argv[4]);
+        n = atoi(argv[5]);
+        k = atoi(argv[6]);
     }
 
     uint32_t lda = k;
     uint32_t ldb = n;
     uint32_t ldc = n;
 
-    if(argc >= 9) 
+    if(argc >= 10) 
     {
-        lda = atoi(argv[6]);
-        ldb = atoi(argv[7]);
-        ldc = atoi(argv[8]);
+        lda = atoi(argv[7]);
+        ldb = atoi(argv[8]);
+        ldc = atoi(argv[9]);
     }
 
     // get kernel list
@@ -147,7 +139,8 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipMalloc(&print, 1024*8));
 #endif
 
-    bfAintBGemmRunner bfa_intb_gemm_runner(k_list, 
+    bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
+                                           hsaco_path,  
                                            c_device_buf.GetBuffer(),
                                            a_device_buf.GetBuffer(),
                                            b_device_buf.GetBuffer(),

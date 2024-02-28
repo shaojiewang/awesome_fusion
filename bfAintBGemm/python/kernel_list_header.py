@@ -25,13 +25,13 @@ struct kernel_tunable {{
 static inline std::vector<kernel_tunable> 
 get_kernel_list() {{
     std::vector<kernel_tunable> k_list = {{
-        {F_kerel_list}
+{F_kerel_list}
     }};
     return k_list;
 }}
 
 """
-        TUNABLE = "kernel_tunable{{{F_wg_size}, {F_wg_tile_m}, {F_wg_tile_n}, {F_wg_tile_k}, B_PACKED_K, \"{F_name}\"}}, \n"
+        TUNABLE = "        kernel_tunable{{{F_wg_size}, {F_wg_tile_m}, {F_wg_tile_n}, {F_wg_tile_k}, B_PACKED_K, \"{F_name}\"}}, \n"
         str_tunable = ""
         for k in self.kernel_list:
             str_tunable += TUNABLE.format(
