@@ -17,9 +17,7 @@ struct __attribute__((packed)) kargs{
     unsigned int ldb;
     unsigned int ldc;
     unsigned int k_per_cta;
-// #ifdef ASM_PRINT
     void*  ptr_workspace; // also use this one to be debug pointer
-// #endif
 };
 
 class bfAintBGemmRunner {
@@ -36,7 +34,7 @@ public:
                       uint32_t& ldb_,
                       uint32_t& ldc_,
                       uint32_t& k_per_cta_,
-                      void* print_,
+                      void* ptr_workspace_,
                       uint32_t& max_sk_blocks_)
     {
         k_ptr = k_vec_.data();
@@ -51,7 +49,7 @@ public:
         args.ldb = ldb_;
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
-        args.ptr_workspace = print_;
+        args.ptr_workspace = ptr_workspace_;
 
         k_ptr_len = k_vec_.size();
         max_sk_blocks = max_sk_blocks_;
