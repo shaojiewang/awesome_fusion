@@ -31,7 +31,7 @@ using BDataType = int8_t;
 using ScaleDataType = float;
 using CDataType = bfloat16;
 
-#define HSACO "bf16gemm_kernel_gfx90a.hsaco"
+// #define HSACO "bf16gemm_kernel_gfx90a.hsaco"
 // #define KER_NAME "bf16gemm_rr8r_wg512_32x64x64_wg1x1_w2x4_16x16x16bf16_1k_pregld2"
 // #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipelined_splitk"
 // #define KER_NAME "bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1"
@@ -47,25 +47,32 @@ using CDataType = bfloat16;
 int main(int argc, char ** argv)
 {
     int validation = 0;
+    int init_method = 0;
+
     uint32_t m = 32;
     uint32_t n = 64 * 2;
     uint32_t k = 256 * 2;
-    if(argc >= 2) {
+
+    if(argc >= 3) 
+    {
         validation = atoi(argv[1]);
+        init_method = atoi(argv[2]);
     }
-    if(argc >= 5) {
-        m = atoi(argv[2]);
-        n = atoi(argv[3]);
-        k = atoi(argv[4]);
+    if(argc >= 6) {
+        m = atoi(argv[3]);
+        n = atoi(argv[4]);
+        k = atoi(argv[5]);
     }
+
     uint32_t lda = k;
     uint32_t ldb = n;
     uint32_t ldc = n;
 
-    if(argc >= 8) {
-        lda = atoi(argv[5]);
-        ldb = atoi(argv[6]);
-        ldc = atoi(argv[7]);
+    if(argc >= 9) 
+    {
+        lda = atoi(argv[6]);
+        ldb = atoi(argv[7]);
+        ldc = atoi(argv[8]);
     }
 
     // get kernel list
@@ -99,9 +106,18 @@ int main(int argc, char ** argv)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
 
-    rand_vector_2d_int_a(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
-    rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
-    rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+    if(init_method == 1)
+    {
+        rand_vector_2d_int_a(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
+        rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
+        rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+    }
+    else if(init_method > 1)
+    {
+        rand_vector_2d(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
+        rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
+        rand_vector_2d(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+    }
 
     SimpleHostMem a_host_buf_to_device(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleHostMem b_host_buf_to_device(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
