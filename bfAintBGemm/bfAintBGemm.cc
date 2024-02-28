@@ -93,7 +93,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 1;
+    uint32_t max_sk_blocks = 4;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -106,17 +106,20 @@ int main(int argc, char ** argv)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
 
-    if(init_method == 1)
+    if(validation)
     {
-        rand_vector_2d_int_a(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
-        rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
-        rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
-    }
-    else if(init_method > 1)
-    {
-        rand_vector_2d(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
-        rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
-        rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+        if(init_method == 1)
+        {
+            rand_vector_2d_int_a(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
+            rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
+            rand_vector_2d_int_scale(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+        }
+        else if(init_method > 1)
+        {
+            rand_vector_2d(reinterpret_cast<float*>(a_host_buf.GetBuffer()), m, k, lda);
+            rand_vector_2d_int_b(reinterpret_cast<float*>(b_host_buf.GetBuffer()), k, n, ldb);
+            rand_vector_2d(reinterpret_cast<float*>(scale_host_buf.GetBuffer()), n, 1, 1);
+        }
     }
 
     SimpleHostMem a_host_buf_to_device(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
@@ -124,6 +127,7 @@ int main(int argc, char ** argv)
     SimpleHostMem c_host_buf_from_device(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
 
     mem_transfer<ADataType, float, SimpleHostMem, SimpleHostMem>(a_host_buf_to_device, a_host_buf, m, k, 1);
+    mem_transfer<float, ADataType, SimpleHostMem, SimpleHostMem>(a_host_buf, a_host_buf_to_device, m, k, 1);
     mem_transfer<BDataType, float, SimpleHostMem, SimpleHostMem>(b_host_buf_to_device, b_host_buf, k, n, B_PACKED_K);
 
     GPU_CHECK_ERROR(hipMemcpy(a_device_buf.GetBuffer(), a_host_buf_to_device.GetBuffer(), m * k * sizeof(ADataType), hipMemcpyHostToDevice));

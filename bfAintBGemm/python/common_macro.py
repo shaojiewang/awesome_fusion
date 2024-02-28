@@ -48,14 +48,14 @@ class DequantMacro(KernelMacro):
     v_perm_b32 v[\\v_tmp + 2], v[\\v_base], v[\\v_gld_b], v[\\v_sel_b + 2]
     v_perm_b32 v[\\v_tmp + 3], v[\\v_base], v[\\v_gld_b], v[\\v_sel_b + 3]
 
-    ;v_pk_add_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
-    ;v_pk_add_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    v_pk_add_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    v_pk_add_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
 
-    ;v_pk_mul_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 0 : v_tmp + 1]
-    ;v_pk_mul_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 2 : v_tmp + 3]
+    v_pk_mul_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 0 : v_tmp + 1]
+    v_pk_mul_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 2 : v_tmp + 3]
 
-    v_pk_fma_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
-    v_pk_fma_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    ;v_pk_fma_f32 v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_tmp + 0 : \\v_tmp + 1], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    ;v_pk_fma_f32 v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_tmp + 2 : \\v_tmp + 3], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
 
     v_pack_b32_f16 v[\\v_tmp + 0], v[\\v_tmp + 0], v[\\v_tmp + 1], op_sel: [1, 1]
     v_pack_b32_f16 v[\\v_tmp + 1], v[\\v_tmp + 2], v[\\v_tmp + 3], op_sel: [1, 1]
@@ -65,14 +65,14 @@ class DequantMacro(KernelMacro):
     v_perm_b32 v[\\v_tmp + 6], v[\\v_base], v[\\v_gld_b + 1], v[\\v_sel_b + 2]
     v_perm_b32 v[\\v_tmp + 7], v[\\v_base], v[\\v_gld_b + 1], v[\\v_sel_b + 3]
 
-    ;v_pk_add_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
-    ;v_pk_add_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    v_pk_add_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    v_pk_add_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
 
-    ;v_pk_mul_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 4 : v_tmp + 5]
-    ;v_pk_mul_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 6 : v_tmp + 7]
+    v_pk_mul_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 4 : v_tmp + 5]
+    v_pk_mul_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_tmp + 6 : v_tmp + 7]
 
-    v_pk_fma_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
-    v_pk_fma_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    ;v_pk_fma_f32 v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_tmp + 4 : \\v_tmp + 5], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
+    ;v_pk_fma_f32 v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_tmp + 6 : \\v_tmp + 7], v[\\v_scale + 0 : \\v_scale + 1], v[\\v_sub_magic_num + 0 : \\v_sub_magic_num + 1]
     
     v_pack_b32_f16 v[\\v_tmp + 2], v[\\v_tmp + 4], v[\\v_tmp + 5], op_sel: [1, 1]
     v_pack_b32_f16 v[\\v_tmp + 3], v[\\v_tmp + 6], v[\\v_tmp + 7], op_sel: [1, 1]

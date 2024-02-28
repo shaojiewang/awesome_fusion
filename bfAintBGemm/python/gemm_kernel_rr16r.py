@@ -653,8 +653,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_mov_b32 v[v_scale + 1], v[v_scale + 0]
 
     ; v_pk_mul_f32 v[v_sub_magic_num + 0 : v_sub_magic_num + 1], v[v_scale + 0 : v_scale + 1], v[v_sub_magic_num + 0 : v_sub_magic_num + 1]
-    v_mul_f32 v[v_sub_magic_num + 0], v[v_scale + 0], v[v_sub_magic_num + 0]
-    v_mul_f32 v[v_sub_magic_num + 1], v[v_scale + 1], v[v_sub_magic_num + 1]
+    ;v_mul_f32 v[v_sub_magic_num + 0], v[v_scale + 0], v[v_sub_magic_num + 0]
+    ;v_mul_f32 v[v_sub_magic_num + 1], v[v_scale + 1], v[v_sub_magic_num + 1]
 """
         return DUP_SCALE_AND_MAGIC_NUM.format(wait_cnt_for_scale)
 

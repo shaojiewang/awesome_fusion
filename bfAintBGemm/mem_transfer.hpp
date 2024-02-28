@@ -29,6 +29,25 @@ void mem_transfer<bfloat16, float, SimpleHostMem, SimpleHostMem>(
 }
 
 template<>
+void mem_transfer<float, bfloat16, SimpleHostMem, SimpleHostMem>(
+    SimpleHostMem& dst, 
+    SimpleHostMem& src, 
+    std::size_t col, 
+    std::size_t row, 
+    std::size_t packed)
+{
+    float* p_dst = (float*)(dst.GetBuffer());
+    bfloat16* p_src = (bfloat16*)(src.GetBuffer());
+    for(std::size_t i = 0; i < col; i++)
+    {
+        for(std::size_t j = 0; j < row; j++)
+        {
+            p_dst[i * row + j] = type_convert<float, bfloat16>(p_src[i * row + j]);
+        }
+    }
+}
+
+template<>
 void mem_transfer<int8_t, float, SimpleHostMem, SimpleHostMem>(
     SimpleHostMem& dst, 
     SimpleHostMem& src, 

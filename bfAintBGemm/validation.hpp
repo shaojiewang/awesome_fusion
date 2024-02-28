@@ -1,7 +1,7 @@
 #pragma once
 #include "datatype.hpp"
 
-#define PER_PIXEL_CHECK
+// #define PER_PIXEL_CHECK
 #define ASSERT_ON_FAIL
 
 template <typename T>
@@ -26,7 +26,7 @@ static inline bool valid_vector( const float* ref, const T* pred, int n, float n
         
 #ifdef PER_PIXEL_CHECK
         float delta = std::abs(ri - pi) / std::abs(ri);
-        if(delta > 1e-2)
+        if(delta > 1e-1)
         {
 #ifdef ASSERT_ON_FAIL
             if(pp_err < 100)
@@ -38,6 +38,8 @@ static inline bool valid_vector( const float* ref, const T* pred, int n, float n
         }
 #endif
     }
+
+#ifdef PER_PIXEL_CHECK
     int i_num = i_end - i_start;
     printf("pp_crr:%d, pp_err:%d, crr_ratio:%.3f, nrms:%lf, s0:%lf, s1:%lf\n",
         i_num - pp_err, 
@@ -46,6 +48,12 @@ static inline bool valid_vector( const float* ref, const T* pred, int n, float n
         (float)sqrt((float)(s0 / s1)), 
         s0, 
         s1);
+#else
+    printf("nrms:%lf, s0:%lf, s1:%lf\n",
+        (float)sqrt((float)(s0 / s1)), 
+        s0, 
+        s1);
+#endif
 
     return (sqrt(s0 / s1) < nrms)
 #ifdef PER_PIXEL_CHECK

@@ -12,11 +12,14 @@ static inline void gemm_rrr(
     std::size_t ldb,
     std::size_t ldc)
 {
-    for(auto i_m = 0 ; i_m < m; i_m++) {
-        for(auto i_n = 0; i_n < n; i_n++) {
+    for(auto i_m = 0 ; i_m < m; i_m++) 
+    {
+        for(auto i_n = 0; i_n < n; i_n++) 
+        {
             float acc = 0;
             float scale = ptr_scale[i_n];
-            for(auto i_k = 0; i_k < k; i_k++) {
+            for(auto i_k = 0; i_k < k; i_k++) 
+            {
                 acc += ptr_a[i_m * lda + i_k] * (ptr_b[i_k * ldb + i_n] * scale);
             }
             ptr_c[i_m * ldc + i_n] = acc;
