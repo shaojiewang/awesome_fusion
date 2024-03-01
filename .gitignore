@@ -34,3 +34,4 @@
 *build/
 *.swp
 *__pycache__*
+*release/
