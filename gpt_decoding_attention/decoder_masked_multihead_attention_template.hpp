@@ -32,6 +32,7 @@
 
 // Seems to slightly improve the accuracy
 #define MMHA_USE_FP32_ACUM_FOR_OUT
+// #define MMHA_USE_FP32_ACUM_FOR_LOGITS
 
 #if 0 && defined(MMHA_USE_FP32_ACUM_FOR_OUT)
  // Does not seem to improve the accuracy
@@ -822,6 +823,35 @@ inline __device__ Float8_ cast_to_float(uint4 u)
     tmp.y = half2_to_float2(u.y);
     tmp.z = half2_to_float2(u.z);
     tmp.w = half2_to_float2(u.w);
+    return tmp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ float2 cast_to_float(__nv_bfloat162 u)
+{
+    return bf1622float2(u);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float4_ cast_to_float(bf16_4_t u)
+{
+    Float4_ tmp;
+    tmp.x = bf1622float2(u.x);
+    tmp.y = bf1622float2(u.y);
+    return tmp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float8_ cast_to_float(bf16_8_t u)
+{
+    Float8_ tmp;
+    tmp.x = bf1622float2(u.x);
+    tmp.y = bf1622float2(u.y);
+    tmp.z = bf1622float2(u.z);
+    tmp.w = bf1622float2(u.w);
     return tmp;
 }
 
