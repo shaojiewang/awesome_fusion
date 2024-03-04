@@ -141,7 +141,7 @@ bool test_masked_multihead_attention(const test_args_t& test_args)
 int main(int argc, char** argv)
 {
     if (argc != 6) {
-        printf("[ERROR] Usage: %s batch_size head_num max_seq_len"
+        printf("[ERROR] Usage: %s batch_size head_num max_seq_len "
                "size_per_head rotary_dim\n",
                argv[0]);
         printf("e.g., %s 32 16 40 256 32\n", argv[0]);
