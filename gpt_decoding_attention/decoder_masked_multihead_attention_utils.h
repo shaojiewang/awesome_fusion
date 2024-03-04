@@ -21,6 +21,12 @@
 
 namespace mmha {
 
+template <typename T, typename T_cache>
+struct kv_cache_scale_type_t
+{
+    using Type = float;
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Float8_ {
