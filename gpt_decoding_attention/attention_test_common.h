@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <vector>
 
 #include "hip_utils.h"
 #include "decoder_masked_multihead_attention.h"
