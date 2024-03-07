@@ -364,6 +364,25 @@ GPUBuf<T> reshape_key_cache(const GPUBuf<T>& key_cache, int BS, int H, int Dh, i
     return key_cache_T;
 }
 
+_global__ void setPageBlockOffset(size_t* dst, size_t stride, size_t offset, size_t size) 
+{
+    int tid = threadIdx.x;
+    int bid = blockIdx.x;
+    int cta_size = blockDim.x;
+    int page_block_offset = bid * cta_size + tid;
+    if (page_block_offset < size)
+    {
+        dst[page_block_offset] = page_block_offset * stride + offset;
+    }
+}
+
+void invokeSetPageBlockOffset(size_t* dst, size_t stride, size_t offset, size_t length)
+{
+    constexpr int cta_size = 256;
+    int grid = (size + cta_size - 1) / cta_size;
+    setPageBlockOffset<<<grid, cta_size>>>(dst, stride, offset, length);
+}
+
 __global__ void setPageBlockPtrs(size_t* dst, size_t src)
 {
     size_t i = threadIdx.x;

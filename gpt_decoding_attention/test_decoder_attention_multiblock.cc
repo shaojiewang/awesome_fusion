@@ -1,7 +1,7 @@
 #include "attention_test_common.h"
 
 template<typename T>
-float test_paged_masked_multihead_attention(const test_args_t& test_args)
+float test_masked_multihead_attention_multiblock(const test_args_t& test_args)
 {
     using Tmha                    = typename mha_type_t<T>::Type;
     const float max_allowed_error = 0.05f;
@@ -20,37 +20,31 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<T> vcache_T_transpose(BS * Dh * H * L);
     GPUBuf<T> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
     GPUBuf<T> vcache_T(BS * Dh * H * L);
-    GPUBuf<T> kv_blocks(4 * BS * Dh * H * L);
     GPUBuf<T> out_T(BS * Dh * H);
 
     size_t num_blocks_per_bs = (L + PB - 1) / PB;
     size_t num_blocks = num_blocks_per_bs * BS;
 
     // prepare paged kv cache
-    // std::vector<T*> k_paged_cache(num_blocks);
-    // std::vector<T*> v_paged_cache(num_blocks);
-    // for(int i = 0; i < num_blocks; i++)
-    // {
-    //     hipMalloc((void**)(&k_paged_cache[i]), sizeof(T) * PB * Dh * H);
-    //     hipMalloc((void**)(&v_paged_cache[i]), sizeof(T) * PB * Dh * H);
-    // }
+    std::vector<T*> k_paged_cache(num_blocks);
+    std::vector<T*> v_paged_cache(num_blocks);
+    for(int i = 0; i < num_blocks; i++)
+    {
+        hipMalloc((void**)(&k_paged_cache[i]), sizeof(T) * PB * Dh * H);
+        hipMalloc((void**)(&v_paged_cache[i]), sizeof(T) * PB * Dh * H);
+    }
 
     GPUBuf<size_t> k_block_offset(num_blocks);
     GPUBuf<size_t> k_batch_offset(BS);
     GPUBuf<size_t> v_block_offset(num_blocks);
     GPUBuf<size_t> v_batch_offset(BS);
 
-    // invokeSetPageBlockPtrs(k_block_offset.ptr, k_paged_cache, num_blocks);
-    // invokeSetPageBlockPtrs(v_block_offset.ptr, v_paged_cache, num_blocks);
-    invokeSetPageBlockOffset(k_block_offset.ptr, PB * Dh * H * 2, 0, num_blocks);
-    invokeSetPageBlockOffset(v_block_offset.ptr, PB * Dh * H * 2, 2 * num_blocks * PB * Dh * H * L, num_blocks);
+    invokeSetPageBlockPtrs(k_block_offset.ptr, k_paged_cache, num_blocks);
+    invokeSetPageBlockPtrs(v_block_offset.ptr, v_paged_cache, num_blocks);
     hipDeviceSynchronize();
     invokeSetBatchBlockPtrs(k_batch_offset.ptr, k_block_offset.ptr, BS, num_blocks_per_bs);
     invokeSetBatchBlockPtrs(v_batch_offset.ptr, v_block_offset.ptr, BS, num_blocks_per_bs);
     hipDeviceSynchronize();
-
-    GPUBuf<int> seq_lengths(BS);
-    seq_lengths.set((std::vector<int>(BS, L * 4 / 4)).data());
 
 #if 1
     invokeTranspose4dBatchMajor(
@@ -66,12 +60,10 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
         (hipStream_t)(0)
     );
     invokeTranspose4dBatchMajorWithKVCachePtr(
-        reinterpret_cast<T*>(kv_blocks.ptr),
-        reinterpret_cast<size_t**>(k_batch_offset.ptr),
-        reinterpret_cast<size_t**>(v_batch_offset.ptr),
+        reinterpret_cast<T***>(k_batch_offset.ptr),
+        reinterpret_cast<T***>(v_batch_offset.ptr),
         reinterpret_cast<T*>(kcache_T.ptr),
         reinterpret_cast<T*>(vcache_T.ptr),
-        reinterpret_cast<int*>(seq_lengths.ptr),
         PB,
         0,
         BS,
@@ -84,6 +76,9 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
 #endif        
     hipDeviceSynchronize();
     
+
+    GPUBuf<int> seq_lengths(BS);
+    seq_lengths.set((std::vector<int>(BS, L / 4)).data());
 
     GPUBuf<int> cur_timesteps(BS);
     cur_timesteps.set((std::vector<int>(BS, L)).data());
@@ -221,8 +216,8 @@ int main(int argc, char** argv)
 
     float total_time_fp16 = 0.0f, total_time_bf16 = 0.0f;
     for(int i = 0; i < test_args.max_output_len - 1; i++){
-        total_time_fp16 += test_paged_masked_multihead_attention<half>(test_args);
-        total_time_bf16 += test_paged_masked_multihead_attention<__nv_bfloat16>(test_args);
+        // total_time_fp16 += test_masked_multihead_attention_multiblock<half>(test_args);
+        total_time_bf16 += test_masked_multihead_attention_multiblock<__nv_bfloat16>(test_args);
         test_args.max_seq_len ++;
     }
 

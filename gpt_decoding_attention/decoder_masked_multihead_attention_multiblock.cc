@@ -19,6 +19,8 @@
 #include <float.h>
 #include <type_traits>
 
+#define LLAMA_ONLY
+
 namespace tensorrt_llm
 {
 namespace kernels
@@ -32,6 +34,14 @@ template <typename T, typename KVCacheBuffer, typename T_PARAMS, int Dh, bool IM
 void mmha_launch_kernel(const T_PARAMS& params, const KVCacheBuffer& kv_cache_buffer,
     const KVLinearBuffer& shift_k_cache, const cudaStream_t& stream);
 
+auto constexpr kSizePerHead = 128;
+INSTANTIATE_MMHA_LAUNCHERS(__nv_bfloat16, kSizePerHead);
+INSTANTIATE_MMHA_LAUNCHERS(uint16_t, kSizePerHead);
+INSTANTIATE_MMHA_LAUNCHERS(float, kSizePerHead);
+
+INSTANTIATE_MMHA_LAUNCHERS_WITH_IMPLICIT_REL_ATTN_BIAS(__nv_bfloat16, kSizePerHead);
+INSTANTIATE_MMHA_LAUNCHERS_WITH_IMPLICIT_REL_ATTN_BIAS(uint16_t, kSizePerHead);
+INSTANTIATE_MMHA_LAUNCHERS_WITH_IMPLICIT_REL_ATTN_BIAS(float, kSizePerHead);
 } // namespace mmha
 
 namespace
@@ -65,9 +75,12 @@ void multihead_attention_(const KERNEL_PARAMS_TYPE& params, const KVCacheBuffer&
         "MMHA kernels haven't instantiate implicit_relative_attention_bias paths for head size %d.", head_size);
     switch (params.hidden_size_per_head)
     {
+#ifdef LLAMA_ONLY
+    case 128: MMHA_LAUNCH_KERNE_WITH_IMPLICIT_RELATIVE_ATTN(128);
+#else
     case 32: MMHA_LAUNCH_KERNE_WITH_IMPLICIT_RELATIVE_ATTN(32);
     case 64: MMHA_LAUNCH_KERNE_WITH_IMPLICIT_RELATIVE_ATTN(64);
-    case 128: MMHA_LAUNCH_KERNE_WITH_IMPLICIT_RELATIVE_ATTN(128);
+    // case 128: MMHA_LAUNCH_KERNE_WITH_IMPLICIT_RELATIVE_ATTN(128);
     case 256: MMHA_LAUNCH_KERNEL(256);
 #ifndef FAST_BUILD // skip mmha 48, 80, 96, 104, 112, 144, 160, 192 and 224 for fast build
     case 48: MMHA_LAUNCH_KERNEL(48);
@@ -80,6 +93,7 @@ void multihead_attention_(const KERNEL_PARAMS_TYPE& params, const KVCacheBuffer&
     case 192: MMHA_LAUNCH_KERNEL(192);
     case 224: MMHA_LAUNCH_KERNEL(224);
 #endif // FAST_BUILD
+#endif
     default: TLLM_CHECK_WITH_INFO(false, "unsupported head_size %d", params.hidden_size_per_head);
     }
 }
