@@ -151,31 +151,32 @@ void set_params_struct(Masked_multihead_attention_params<T>& params,
 
 template<typename T>
 void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
-                       T*                                    out,
-                       const T*                              q,
-                       const T*                              q_bias,
-                       const T*                              k,
-                       const T*                              k_bias,
-                       const T*                              v,
-                       const T*                              v_bias,
-                       T*                                    k_cache,
-                       T*                                    v_cache,
-                       const int*                            cache_indir,
-                       int                                   stride,
-                       int                                   batch_size,
-                       int                                   beam_width,
-                       int                                   seq_length,
-                       int                                   num_heads,
-                       int                                   hidden_size_per_head,
-                       int                                   rotary_embedding_dim,
-                       int                                   timestep,
-                       float                                 inv_sqrt_dh,
-                       const int*                            input_lengths,
-                       int                                   max_input_len,
-                       const T*                              relative_attention_bias,
-                       int                                   relative_attention_bias_stride,
-                       int                                   paged_block_size,
-                       int*                            cur_timesteps)
+                       T*                                          out,
+                       const T*                                    q,
+                       const T*                                    q_bias,
+                       const T*                                    k,
+                       const T*                                    k_bias,
+                       const T*                                    v,
+                       const T*                                    v_bias,
+                       T*                                          kv_blocks,
+                       T*                                          k_cache,
+                       T*                                          v_cache,
+                       const int*                                  cache_indir,
+                       int                                         stride,
+                       int                                         batch_size,
+                       int                                         beam_width,
+                       int                                         seq_length,
+                       int                                         num_heads,
+                       int                                         hidden_size_per_head,
+                       int                                         rotary_embedding_dim,
+                       int                                         timestep,
+                       float                                       inv_sqrt_dh,
+                       const int*                                  input_lengths,
+                       int                                         max_input_len,
+                       const T*                                    relative_attention_bias,
+                       int                                         relative_attention_bias_stride,
+                       int                                         paged_block_size,
+                       int*                                        cur_timesteps)
 {
     params.out                            = out;
     params.q                              = q;
@@ -184,6 +185,7 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     params.k_bias                         = k_bias;
     params.v                              = v;
     params.v_bias                         = v_bias;
+    params.kv_blocks                      = kv_blocks;
     params.k_cache                        = k_cache;
     params.v_cache                        = v_cache;
     params.cache_indir                    = cache_indir;

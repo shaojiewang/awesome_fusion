@@ -137,6 +137,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       (Tmha*)k_bias_T.ptr,
                       (Tmha*)v_T.ptr,
                       (Tmha*)v_bias_T.ptr,
+                      (Tmha*)kv_blocks.ptr,
                       (Tmha*)k_batch_offset.ptr,
                       (Tmha*)v_batch_offset.ptr,
                       nullptr,

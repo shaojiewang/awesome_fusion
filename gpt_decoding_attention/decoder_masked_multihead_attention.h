@@ -172,6 +172,36 @@ struct Multihead_attention_params_base {
     const float* qkv_scale_out       = nullptr;
     const float* attention_out_scale = nullptr;
     int          int8_mode           = 0;
+
+    int          kv_cache_quant_mode = 0;
+    float**      k_scale_cache_ptr   = nullptr;
+    float**      v_scale_cache_ptr   = nullptr;
+
+    int heads_per_gqa_group = 1;
+    float rope_theta = 10000.0f;
+
+    // Multi-block setups
+    bool enable_multi_block = false;
+
+    // Number of streaming processors on the device.
+    // Tune block size to maximum occupancy.
+    int multi_processor_count = 1;
+
+    mutable int timesteps_per_block = -1;
+    mutable int seq_len_tile        = -1;
+    mutable int max_seq_len_tile    = -1;
+
+    // The partial output buffer. Dimensions max_seq_len_tile x B x D. (for each timestep only seq_len_tile x B x D is
+    // needed)
+    T* partial_out = nullptr;
+    // ThreadBlock sum. Dimensions max_seq_len_tile x 1. (for each timestep only seq_len_tile x 1 is needed)
+    float* partial_sum = nullptr;
+    // ThreadBlock max. Dimensions max_seq_len_tile x 1. (for each timestep only seq_len_tile x 1 is needed)
+    float* partial_max = nullptr;
+    // threadblock counter to identify the complete of partial attention computations
+    int* block_counter = nullptr;
+
+    const int* memory_length_per_sample = nullptr;
 };
 
 template<typename T, bool CROSS_ATTENTION, bool SPLIT_KV_CACHE>
@@ -179,10 +209,13 @@ struct Paged_multihead_attention_params: public Multihead_attention_params_base<
     using KV_CACHE_T = typename KVCacheType<T, SPLIT_KV_CACHE>::Type;
     using STEP_T     = typename KVCacheType<T, SPLIT_KV_CACHE>::StepType;
 
+    // Base ptr of key/value cache block
+    KV_CACHE_T* kv_blocks = nullptr;
     // The cache for the Ks. The size must be at least B x L x D.
-    KV_CACHE_T* k_cache_paged = nullptr;
+    size_t** k_cache = nullptr;
     // The cache for the Vs. The size must be at least B x L x D.
-    KV_CACHE_T* v_cache_paged = nullptr;
+    size_t** v_cache = nullptr;
+
     // Number of tokens in each block of KV cache.
     int tokens_per_block;
     int layer_index;

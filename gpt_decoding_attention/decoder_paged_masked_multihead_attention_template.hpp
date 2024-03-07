@@ -44,67 +44,23 @@ inline size_t smem_size_in_bytes(const Paged_multihead_attention_params<T, DO_CR
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<typename T, typename KV_CACHE_T, bool SPLIT_KV_CACHE>
-inline __device__ T* get_kv_cache_ptr(KV_CACHE_T* kv_cache_base,
-                                      const int   batch_index,
-                                      const int   layer_index,
-                                      const int   head_index,
-                                      const int   token_index,
-                                      const int   tokens_per_block,
-                                      const int   layer_stride,
-                                      const int   head_stride,
-                                      const int   head_offset);
-
-#define GET_KV_CACHE_PTR0(T1, T2)                                                                                      \
-    template<>                                                                                                         \
-    inline __device__ T1* get_kv_cache_ptr<T1, T2, false>(T2 * kv_cache_base,                                          \
-                                                          const int batch_index,                                       \
-                                                          const int layer_index,                                       \
-                                                          const int head_index,                                        \
-                                                          const int token_index,                                       \
-                                                          const int tokens_per_block,                                  \
-                                                          const int layer_stride,                                      \
-                                                          const int head_stride,                                       \
-                                                          const int head_offset)                                       \
-    {                                                                                                                  \
-        assert(false);                                                                                                 \
-    }
-
-#define GET_KV_CACHE_PTR1(T1, T2)                                                                                      \
-    template<>                                                                                                         \
-    inline __device__ T1* get_kv_cache_ptr<T1, T2, true>(T2 * kv_cache_base,                                           \
-                                                         const int batch_index,                                        \
-                                                         const int layer_index,                                        \
-                                                         const int head_index,                                         \
-                                                         const int token_index,                                        \
-                                                         const int tokens_per_block,                                   \
-                                                         const int layer_stride,                                       \
-                                                         const int head_stride,                                        \
-                                                         const int head_offset)                                        \
-    {                                                                                                                  \
-        T2 batch_kvcache_base = kv_cache_base[batch_index]; \
-        T1* block_kvcache_base = batch_kvcache_base[token_index / tokens_per_block]; \ 
-        return block_kvcache_base + (layer_index * layer_stride + head_index * head_stride + head_offset); \
-    }
-        //return &(kv_cache_base[batch_index][token_index / tokens_per_block]                                            \
-                              [layer_index * layer_stride + head_index * head_stride + head_offset]);                  \
-    }
-
-GET_KV_CACHE_PTR0(float, float)
-GET_KV_CACHE_PTR0(uint16_t, uint16_t)
-GET_KV_CACHE_PTR0(int8_t, int8_t)
-#ifdef ENABLE_BF16
-GET_KV_CACHE_PTR0(__nv_bfloat16, __nv_bfloat16)
-#endif
-GET_KV_CACHE_PTR1(float, float**)
-GET_KV_CACHE_PTR1(uint16_t, uint16_t**)
-GET_KV_CACHE_PTR1(int8_t, int8_t**)
-#ifdef ENABLE_BF16
-GET_KV_CACHE_PTR1(__nv_bfloat16, __nv_bfloat16**)
-#endif
-
-#undef GET_KV_CACHE_PTR0
-#undef GET_KV_CACHE_PTR1
+template<typename T>
+inline __device__ T* get_kv_cache_ptr(T*        kv_blocks,
+                                      size_t**  bt_offset,
+                                      const int batch_index,
+                                      const int layer_index,
+                                      const int head_index,
+                                      const int token_index,
+                                      const int tokens_per_block,
+                                      const int layer_stride,
+                                      const int head_stride,
+                                      const int head_offset,
+                                      const int heads_per_gqa_group)
+{
+    const size_t cur_bt_offset = bt_offset[batch_index][token_index / tokens_per_block];
+    return &(kv_blocks[cur_bt_offset + layer_index * layer_stride + head_index / heads_per_gqa_group * head_stride
+                       + head_offset]);
+}
 
 template<typename STEP_T, bool SPLIT_KV_CACHE>
 inline __device__ int get_cur_timestep(STEP_T timestep, const int bbi);
@@ -153,8 +109,9 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     constexpr bool FP8_MHA_KERNEL = false;
 #endif
 
-    KV_CACHE_T* inp_kcache = reinterpret_cast<KV_CACHE_T*>(params.k_cache);
-    KV_CACHE_T* inp_vcache = reinterpret_cast<KV_CACHE_T*>(params.v_cache);
+    KV_CACHE_T* kv_blocks        = reinterpret_cast<KV_CACHE_T*>(params.kv_blocks);
+    size_t**    kcache_bt_offset = params.k_cache;
+    size_t**    vcache_bt_offset = params.v_cache;
 
     // Make sure the hidden dimension per head is a multiple of the number of threads per key.
     static_assert(Dh_MAX % THREADS_PER_KEY == 0, "");
