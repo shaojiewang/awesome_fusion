@@ -228,8 +228,9 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                                                            head_stride,
                                                            head_offset,
                                                            heads_per_gqa_group);
+
         k = !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ?
-                vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(cur_k_cache_ptr))) :
+                vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(cur_k_cache_ptr)) :
                 k;
     }
     else {
@@ -894,7 +895,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         }
     }
 
-    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && ENABLE_8BITS_CACHE && (!MULTI_BLOCK_FLAG || last_tile)) {
+    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile) && ENABLE_8BITS_CACHE) {
 #if ENABLE_INT8
         v_local_max          = mmha::fabs_max(v);
         v_local_max          = blockDim.x <= 32 ? warpReduceMax(v_local_max) : blockReduceMax(v_local_max);
@@ -936,7 +937,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         }
     }
 
-    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh)) {
+    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile)) {
         // Initialize the output value with the current timestep.
 #if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
         if (!MULTI_BLOCK_FLAG) {
@@ -970,6 +971,8 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     // Make sure we can start writing to shared memory.
     __syncthreads();
+
+    const auto bhi_seq_len_tile = bhi * params.max_seq_len_tile;
 
     // Run the final reduction amongst the different groups computing different partial outputs.
     if (Dh == Dh_MAX || vi < Dh) {
@@ -1039,6 +1042,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         // TODO: support int8_mode?
         *reinterpret_cast<V_vec_m*>(&params.out[bhi * Dh + vi]) = vec_conversion<V_vec_m, V_vec_acum>(out);
 #endif  // MMHA_USE_FP32_ACUM_FOR_OUT
+    }
 
 #ifdef ENABLE_MULTI_BLOCK_OPTION
     if (MULTI_BLOCK_FLAG) {
