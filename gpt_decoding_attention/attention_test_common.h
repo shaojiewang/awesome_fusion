@@ -77,6 +77,7 @@ void set_params_struct(MMHA_PARAMS<T>& params,
                        int                                   beam_width,
                        int                                   seq_length,
                        int                                   num_heads,
+                       int                                   heads_per_gqa_group,
                        int                                   hidden_size_per_head,
                        int                                   rotary_embedding_dim,
                        int                                   timestep,
@@ -107,6 +108,7 @@ void set_params_struct(Masked_multihead_attention_params<T>& params,
                        int                                   beam_width,
                        int                                   seq_length,
                        int                                   num_heads,
+                       int                                   heads_per_gqa_group,
                        int                                   hidden_size_per_head,
                        int                                   rotary_embedding_dim,
                        int                                   timestep,
@@ -167,6 +169,7 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
                        int                                         beam_width,
                        int                                         seq_length,
                        int                                         num_heads,
+                       int                                         heads_per_gqa_group,
                        int                                         hidden_size_per_head,
                        int                                         rotary_embedding_dim,
                        int                                         timestep,
@@ -194,6 +197,7 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     params.beam_width                     = beam_width;
     params.memory_max_len                 = seq_length;
     params.num_heads                      = num_heads;
+    params.heads_per_gqa_group            = heads_per_gqa_group;
     params.hidden_size_per_head           = hidden_size_per_head;
     params.rotary_embedding_dim           = rotary_embedding_dim;
     // params.timestep                       = timestep;

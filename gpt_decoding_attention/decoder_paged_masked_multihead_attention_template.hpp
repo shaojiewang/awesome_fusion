@@ -242,6 +242,14 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     __shared__ float v_s_max, v_scale_f;
     float            k_local_max = -FLT_MAX;
     float            v_local_max = -FLT_MAX;
+
+    float* k_scale_ptr = nullptr;
+    float* v_scale_ptr = nullptr;
+
+    if (ENABLE_8BITS_CACHE) {
+        k_scale_ptr = params.k_scale_cache_ptr[bi] + hi / heads_per_gqa_group * params.memory_max_len;
+        v_scale_ptr = params.v_scale_cache_ptr[bi] + hi / heads_per_gqa_group * params.memory_max_len;
+    }
 #endif
 
     // Trigger the loads from the Q and K buffers.
@@ -276,13 +284,20 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         // Two chunks are separated by L * x elements. A thread write QK_VEC_SIZE elements.
         int head_offset = co * tokens_per_block * QK_ELTS_IN_16B + tlength % tokens_per_block * QK_ELTS_IN_16B + ci;
         // get (layer_index, hi, co, tlength, ci) of k_cache
-        Tcache* cur_k_cache_ptr = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-            inp_kcache, bi, layer_index, hi, tlength, tokens_per_block, layer_stride, head_stride, head_offset);
-        // k = !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ?
-        //         vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(cur_k_cache_ptr)) :
-        //         k;
+        Tcache* cur_k_cache_ptr = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                                           kcache_bt_offset,
+                                                           bi,
+                                                           layer_index,
+                                                           hi,
+                                                           tlength,
+                                                           tokens_per_block,
+                                                           layer_stride,
+                                                           head_stride,
+                                                           head_offset,
+                                                           heads_per_gqa_group);
+
         k = !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ?
-                vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(cur_k_cache_ptr))) :
+                vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(cur_k_cache_ptr)) :
                 k;
     }
     else {
@@ -308,14 +323,9 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     // Trigger the loads from the Q and K bias buffers.
     Qk_vec_k q_bias;
     zero(q_bias);
-    // q_bias =
-    //     (!is_masked && Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
-    //         vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[qk_bias_offset])) :
-    //         q_bias;
-    q_bias =
-        (!is_masked && Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
-            vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.q_bias[qk_bias_offset]))) :
-            q_bias;
+    q_bias = (!is_masked && Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
+                 vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[q_bias_offset])) :
+                 q_bias;
 
     Qk_vec_k k_bias;
     zero(k_bias);
@@ -444,10 +454,19 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         int head_offset =
             co * tokens_per_block * QK_ELTS_IN_16B + tlength_circ % tokens_per_block * QK_ELTS_IN_16B + ci;
         // get (layer_index, hi, co, tlength_circ, ci) of k_cache
-        Tcache* cur_k_cache_ptr = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-            inp_kcache, bi, layer_index, hi, tlength_circ, tokens_per_block, layer_stride, head_stride, head_offset);
+        Tcache* cur_k_cache_ptr = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                                           kcache_bt_offset,
+                                                           bi,
+                                                           layer_index,
+                                                           hi,
+                                                           tlength_circ,
+                                                           tokens_per_block,
+                                                           layer_stride,
+                                                           head_stride,
+                                                           head_offset,
+                                                           heads_per_gqa_group);
 
-        if (handle_kv) {
+        if (handle_kv && hi % heads_per_gqa_group == 0) {
             // Trigger the stores to global memory.
             if (Dh == Dh_MAX || co < Dh / QK_ELTS_IN_16B) {
                 if (!ENABLE_8BITS_CACHE) {
@@ -554,8 +573,18 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
 
     for (int ti = first_step + ko; ti < ti_end; ti += K_PER_ITER) {
         const int ti_circ = ti % params.memory_max_len;
-        Tcache*   k_cache = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-            inp_kcache, bi, layer_index, hi, ti_circ, tokens_per_block, layer_stride, head_stride, ki);
+        const int valid_ti_circ = min(ti_circ, tlength - 1);
+        Tcache*   k_cache       = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                                   kcache_bt_offset,
+                                                   bi,
+                                                   layer_index,
+                                                   hi,
+                                                   valid_ti_circ,
+                                                   tokens_per_block,
+                                                   layer_stride,
+                                                   head_stride,
+                                                   ki,
+                                                   heads_per_gqa_group);
         bool is_mask = (SPLIT_KV_CACHE) ?
                            false :
                            (params.masked_tokens != nullptr) && params.masked_tokens[bi_seq_len_offset + ti];
@@ -584,7 +613,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
                             // get (layer_index, hi, ii, ti_circ, ki) of k_cache
                             k[ii] = vec_conversion<K_vec_k, K_vec_m>((ldg(reinterpret_cast<const K_vec_m*>(
                                 &k_cache[ii * tokens_per_block * QK_ELTS_IN_16B
-                                         + ti_circ % params.tokens_per_block * QK_ELTS_IN_16B]))));
+                                         + valid_ti_circ % params.tokens_per_block * QK_ELTS_IN_16B]))));
                         }
                         else {
 #if ENABLE_INT8
@@ -629,12 +658,12 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
 
         // Store the product to shared memory. There's one qk value per timestep. Update the max.
-        if (ti < tlength && tidx % THREADS_PER_KEY == 0) {
+        if (ti_circ < tlength && tidx % THREADS_PER_KEY == 0) {
             if (params.relative_attention_bias != nullptr) {
                 qk = add(qk,
                          params.relative_attention_bias[hi * params.relative_attention_bias_stride
                                                             * params.relative_attention_bias_stride
-                                                        + tlength * params.relative_attention_bias_stride + ti]);
+                                                        + tlength * params.relative_attention_bias_stride + ti_circ]);
             }
             if (params.linear_bias_slopes != nullptr) {
                 // Apply the linear position bias: (ki - qi) * slope[hi].
@@ -644,7 +673,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
                 //   token: i i i i p p p o o o where i=input, p=pad, o=output.
                 // e.g. ti = 2, dist = (9 - 3) - 2 = 4.
                 int   max_context_length = params.max_prefix_prompt_length + params.max_input_length;
-                float dist               = (ti < max_context_length ? ti + padd_len : ti) - tlength;
+                float dist               = (ti_circ < max_context_length ? ti_circ + padd_len : ti_circ) - tlength;
 
                 qk += mul<float, T, float>(params.linear_bias_slopes[hi], dist);
             }
@@ -780,26 +809,36 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         // to prevent ti % memory_len when ti < memory_len, and
         // the compiler cannot optimize the codes automatically.
         const int min_length = min(tlength, params.memory_max_len);
-        for (int ti = first_step + vo; ti < min_length; ti += V_PER_ITER) {
+        int       context_v_loop_end = MULTI_BLOCK_FLAG ? timesteps_per_block : min_length;
+        int       time_now           = 0;
+        float     v_scale_f          = 1.0f;
+        for (int ti = first_step + vo; ti < context_v_loop_end; ti += V_PER_ITER) {
+            int time_now    = ti + tile_offset;
+            time_now        = min(time_now, tlength - 1);
+            Tcache* v_cache = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                                       vcache_bt_offset,
+                                                       bi,
+                                                       layer_index,
+                                                       hi,
+                                                       time_now,
+                                                       tokens_per_block,
+                                                       layer_stride,
+                                                       head_stride,
+                                                       vi,
+                                                       heads_per_gqa_group);
+
             // Fetch offset based on cache_indir when beam sampling
-            Tcache* v_cache = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-                inp_vcache, bi, layer_index, hi, ti, tokens_per_block, layer_stride, head_stride, vi);
-            const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + ti] : 0;
+            const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + time_now] : 0;
             const int beam_offset = HAS_BEAMS ? beam_src * params.num_heads * params.memory_max_len * Dh : 0;
             // get (layer_index, hi, ti, vi) of v_cache.
             V_vec_k v;
             if (!ENABLE_8BITS_CACHE) {
                 v = vec_conversion<V_vec_k, V_vec_m>(
-                    ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + ti % tokens_per_block * Dh])));
+                    ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh])));
             }
             else {
 #if ENABLE_INT8
-                float*  v_scale_ptr = params.v_scale_cache_ptr[bi] + hi * params.memory_max_len;
-                float   v_scale_f   = v_scale_ptr[ti];
-                T_scale v_scale_quant_orig;
-                mmha::convert_from_float(&v_scale_quant_orig, v_scale_f);
-                mmha::load_8bits_kv_cache_vec(
-                    &v, v_cache, beam_offset + ti % tokens_per_block * Dh, v_scale_quant_orig);
+                v_scale_f   = v_scale_ptr[time_now];
 #endif
             }
 

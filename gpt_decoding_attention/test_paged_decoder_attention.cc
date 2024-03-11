@@ -12,6 +12,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     int Dh = test_args.size_per_head;
     int R  = test_args.rotary_dimension;
     int PB = test_args.paged_block_size;
+    int heads_per_gqa_group = 1;
 
     GPUBuf<T> q_T(BS * Dh * H), q_bias_T(Dh * H);
     GPUBuf<T> k_T(BS * Dh * H), k_bias_T(Dh * H);
@@ -112,6 +113,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       1,
                       L,
                       H,
+                      heads_per_gqa_group, 
                       Dh,
                       R,
                       L - 1,
