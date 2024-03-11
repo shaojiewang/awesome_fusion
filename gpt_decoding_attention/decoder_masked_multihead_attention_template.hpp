@@ -594,6 +594,49 @@ struct Qk_dot<uint16_t, 4> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template<typename Tk, typename V_vec_accum, typename V_vec_m, bool INT8_KV_CACHE, bool FP8_KV_CACHE>
+inline __device__ void
+Logit_value_fma(V_vec_accum& out, const Tk* logits_smem, const V_vec_m& v_vec, const float v_scale, const bool is_mask)
+{
+#if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
+    float logit = is_mask ? 0.f : reinterpret_cast<float*>(logits_smem)[0];
+    if constexpr (INT8_KV_CACHE) {
+        V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
+        out                = fma(logit, cast_to_float(v_vec_), out);
+    }
+    else if constexpr (FP8_KV_CACHE) {
+#ifdef MMHA_FP8_SCALE_P_INSTEAD_OF_V
+        out = fma(logit, cast_to_float(v_vec), out);
+#else
+        V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
+        out                = fma(logit, cast_to_float(v_vec_), out);
+#endif  // MMHA_FP8_SCALE_P_INSTEAD_OF_V
+    }
+    else {
+        out = fma(logit, cast_to_float(v_vec), out);
+    }
+#else  // MMHA_USE_FP32_ACUM_FOR_LOGITS
+    Tk logit = is_mask ? Tk(0.f) : logits_smem[0];
+    if constexpr (INT8_KV_CACHE) {
+        V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
+        out                = fma(logit, v_vec_, out);
+    }
+    else if constexpr (FP8_KV_CACHE) {
+#ifdef MMHA_FP8_SCALE_P_INSTEAD_OF_V
+        out = fma(logit, v_vec, out);
+#else
+        V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
+        out                = fma(logit, v_vec_, out);
+#endif  // MMHA_FP8_SCALE_P_INSTEAD_OF_V
+    }
+    else {
+        out = fma(logit, v_vec, out);
+    }
+#endif  // MMHA_USE_FP32_ACUM_FOR_LOGITS
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template<int WARPS_PER_BLOCK, int WARP_SIZE = 32>
 inline __device__ float block_sum(float* red_smem, float sum)
 {

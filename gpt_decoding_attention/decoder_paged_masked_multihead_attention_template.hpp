@@ -841,49 +841,30 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
                 v_scale_f   = v_scale_ptr[time_now];
 #endif
             }
-
-            // if (DO_CROSS_ATTENTION && cur_timestep == 0) {
-                // assert(false);  // TODO: support cross attention
-                // v = add(v, vec_conversion<V_vec_k, V_vec_m>(*reinterpret_cast<V_vec_m*>(&bias_smem[vi])));
-                // if (do_ia3) {
-                //     v = mul<V_vec_k, V_vec_k, V_vec_k>(
-                //         v,
-                //         ldg(reinterpret_cast<const V_vec_k*>(
-                //             &params.ia3_value_weights[(ia3_task_id * params.num_heads + hi) * Dh + vi])));
-                // }
-                // *reinterpret_cast<V_vec_m*>(&v_cache[ti * Dh]) = vec_conversion<V_vec_m, V_vec_k>(v);
-            // }
             // Load the logits from shared memory.
-#if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
-            float logit = logits_smem[ti - first_step];
-            out         = fma(logit, cast_to_float(v), out);
-#else  // MMHA_USE_FP32_ACUM_FOR_LOGITS
-#ifdef FP8_MHA
-            Tk logit;
-            if (FP8_MHA_KERNEL) {
-                // NOTE: fake quantization
-                // logit = vec_conversion<Tk, Tquant>(vec_conversion<Tquant, Tk>(mul<Tk, float, Tk>(1.0f /
-                // params.attention_qk_scale[0], logits_smem[ti])));
-                logit = logits_smem[ti - first_step];
-            }
-            else {
-                logit = logits_smem[ti - first_step];
-            }
-            out = fma(logit, v, out);
-#else   // FP8_MHA
-            Tk logit = logits_smem[ti - first_step];
-            out      = fma(logit, v, out);
-#endif  // FP8_MHA
-#endif  // MMHA_USE_FP32_ACUM_FOR_LOGITS
+            // Note that fma will convert 8bit vec to the accumulation data type (float by default).
+            Logit_value_fma<Tk, V_vec_acum, V_vec_m, ENABLE_8BITS_CACHE, false>(
+                out, reinterpret_cast<Tk*>(logits_smem + ti - first_step), v, v_scale_f, is_mask);
         }
-        for (int ti = first_step + vo; ti < tlength; ti += V_PER_ITER) {
+        for (int ti = first_step + vo; ti < context_v_loop_end; ti += V_PER_ITER) {
+            ti = MULTI_BLOCK_FLAG ? ti + c_tile_times_timesteps_per_block : ti; 
             if (ti < params.memory_max_len) {
                 // handled by previous loop
                 continue;
             }
+            assert(false);
             const int ti_circ = ti % params.memory_max_len;
-            Tcache*   v_cache = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-                inp_vcache, bi, layer_index, hi, ti_circ, tokens_per_block, layer_stride, head_stride, vi);
+            Tcache*   v_cache = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                                       vcache_bt_offset,
+                                                       bi,
+                                                       layer_index,
+                                                       hi,
+                                                       ti_circ,
+                                                       tokens_per_block,
+                                                       layer_stride,
+                                                       head_stride,
+                                                       vi,
+                                                       heads_per_gqa_group);
 
             // Fetch offset based on cache_indir when beam sampling
             const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + ti_circ] : 0;
@@ -896,7 +877,6 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
             }
             else {
 #if ENABLE_INT8
-                float*  v_scale_ptr = params.v_scale_cache_ptr[bi] + hi * params.memory_max_len;
                 float   v_scale_f   = v_scale_ptr[ti_circ];
                 T_scale v_scale_quant_orig;
                 mmha::convert_from_float(&v_scale_quant_orig, v_scale_f);
@@ -944,7 +924,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     zero(v);
 
     // One group of threads computes the product(s) for the current timestep.
-    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh)) {
+    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile)) {
         if (DO_CROSS_ATTENTION) {
             assert(false);  // TODO: support cross attention
             // v = vec_conversion<V_vec_k, V_vec_m>(*reinterpret_cast<const V_vec_m*>(&v_cache[tlength * Dh]));
@@ -981,8 +961,8 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         }
     }
 
-    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && ENABLE_8BITS_CACHE) {
-#if ENABLE_INT7     
+    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile) && ENABLE_8BITS_CACHE) {
+#if ENABLE_INT8
         v_local_max          = mmha::fabs_max(v);
         v_local_max          = blockDim.x <= 32 ? warpReduceMax(v_local_max) : blockReduceMax(v_local_max);
         float* v_cache_scale = params.v_scale_cache_ptr[bi] + hi * params.memory_max_len;
@@ -997,9 +977,18 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
 
     // Store the values with bias back to global memory in the cache for V.
     // get (layer_index, hi, tlength_circ, vi) of v_cache
-    Tcache* v_cache = get_kv_cache_ptr<Tcache, KV_CACHE_T, SPLIT_KV_CACHE>(
-        inp_vcache, bi, layer_index, hi, tlength_circ, tokens_per_block, layer_stride, head_stride, vi);
-    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && vo == tlength % V_PER_ITER) {
+    Tcache* v_cache = get_kv_cache_ptr<Tcache>(kv_blocks,
+                                               vcache_bt_offset,
+                                               bi,
+                                               layer_index,
+                                               hi,
+                                               tlength_circ,
+                                               tokens_per_block,
+                                               layer_stride,
+                                               head_stride,
+                                               vi,
+                                               heads_per_gqa_group);
+    if (handle_kv && (Dh == Dh_MAX || vi < Dh) && vo == tlength % V_PER_ITER && (!MULTI_BLOCK_FLAG || last_tile)) {
         if (!ENABLE_8BITS_CACHE) {
             *reinterpret_cast<V_vec_m*>(&v_cache[tlength_circ % tokens_per_block * Dh]) =
                 vec_conversion<V_vec_m, V_vec_k>(v);
@@ -1014,10 +1003,15 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         }
     }
 
-    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh)) {
+    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile)) {
         // Initialize the output value with the current timestep.
 #if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
-        out = fma(logits_smem[tlength - first_step], cast_to_float(v), out);
+        if (!MULTI_BLOCK_FLAG) {
+            out = fma(logits_smem[tlength], cast_to_float(v), out);
+        }
+        else {
+            out = fma(logits_current_smem[0], cast_to_float(v), out);
+        }
 #else  // MMHA_USE_FP32_ACUM_FOR_LOGITS
 #ifdef FP8_MHA
         Tk logit;
@@ -1031,13 +1025,20 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         }
         out = fma(logit, v, out);
 #else   // FP8_MHA
-        out = fma(logits_smem[tlength - first_step], v, out);
+        if (!MULTI_BLOCK_FLAG) {
+            out = fma(logits_smem[tlength - first_step], v, out);
+        }
+        else {
+            out = fma(logits_current_smem[0], v, out);
+        }
 #endif  // FP8_MHA
 #endif  // MMHA_USE_FP32_ACUM_FOR_LOGITS
     }
 
     // Make sure we can start writing to shared memory.
     __syncthreads();
+
+    const auto bhi_seq_len_tile = bhi * params.max_seq_len_tile;
 
     // Run the final reduction amongst the different groups computing different partial outputs.
     if (Dh == Dh_MAX || vi < Dh) {
@@ -1084,13 +1085,184 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
                 cast_to_int8(out);
         }
         else {
-            convert_from_float(*reinterpret_cast<V_vec_m*>(&params.out[bhi * Dh + vi]), out);
+            if (!MULTI_BLOCK_FLAG) {
+                V_vec_k final_out;
+                convert_from_float(final_out, out);
+                *reinterpret_cast<V_vec_k*>(&params.out[bhi * Dh + vi]) = final_out;
+            }
+            else {
+                // for write partial output to partial_out
+                int partial_out_offset = c_tile * params.batch_size * params.num_heads * params.hidden_size_per_head;
+                // for write partial statistics to partial_max and partial_sum
+                int partial_stats_offset = bhi_seq_len_tile + c_tile;
+
+                // This makes sure we have coalesced memory access.
+                V_vec_k partial_out;
+                convert_from_float(partial_out, out);
+                *reinterpret_cast<V_vec_k*>(&params.partial_out[partial_out_offset + bhi * Dh + vi]) = partial_out;
+                convert_from_float(*reinterpret_cast<float*>(&params.partial_max[partial_stats_offset]), qk_max);
+                convert_from_float(*reinterpret_cast<float*>(&params.partial_sum[partial_stats_offset]), sum);
+            }
         }
 #else   // MMHA_USE_FP32_ACUM_FOR_OUT
         // TODO: support int8_mode?
         *reinterpret_cast<V_vec_m*>(&params.out[bhi * Dh + vi]) = vec_conversion<V_vec_m, V_vec_acum>(out);
 #endif  // MMHA_USE_FP32_ACUM_FOR_OUT
     }
+
+#ifdef ENABLE_MULTI_BLOCK_OPTION
+    if (MULTI_BLOCK_FLAG) {
+
+        cuda::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
+        bool                                             last_block{false};
+        if (tidx == 0) {
+            if (count_ref.fetch_add(1, cuda::memory_order_acq_rel) == (sample_tile - 1)) {
+                last_block = true;
+            }
+        }
+
+        ////////////////////
+        ////////////////////
+        // Make sure every threadblock finishes the previous computation, and enter the last threadblock in the
+        // following (for each B and H) Do the final computation in the last threadblock Final reduction computation
+        // by combining all the partial max/sum and outputs
+        ////////////////////
+        ////////////////////
+        if (__syncthreads_or(last_block)) {
+
+            ////////////////////
+            // Find the global max from all partial max -> use CUB BlockReduce
+            ////////////////////
+
+            float final_max          = -FLT_MAX;
+            float thread_partial_max = -FLT_MAX;
+            if (tidx < sample_tile)
+                thread_partial_max = params.partial_max[bhi_seq_len_tile + tidx];
+            // final_max = fmaxf(final_max, thread_partial_max);
+
+            // Make sure we can start writing to shared memory.
+            __syncthreads();
+
+            // Specialize BlockReduce for a 1D block of THREADS_PER_BLOCK threads of type int
+            typedef cub::BlockReduce<float, THREADS_PER_BLOCK> BlockReduce;
+            // Allocate shared memory for BlockReduce
+            __shared__ typename BlockReduce::TempStorage temp_storage;
+            // Obtain a segment of consecutive items that are blocked across threads (final_max from above)
+            // Compute the block-wide max for thread0
+            final_max = BlockReduce(temp_storage).Reduce(thread_partial_max, cub::Max(), sample_tile);
+
+            __shared__ float final_max_smem;
+            if (tidx == 0) {
+                final_max_smem = final_max;
+            }
+            __syncthreads();
+
+            // Finish the final_max computation
+            final_max = final_max_smem;
+
+            ////////////////////
+            // Reduction for global sum over all partial sum (scaled by the exponential term from global max) -> use
+            // gridDim.z threads
+            ////////////////////
+
+            float final_sum = 0.f;
+            if (tidx < sample_tile) {
+                thread_partial_max            = params.partial_max[bhi_seq_len_tile + tidx];
+                const auto thread_partial_sum = params.partial_sum[bhi_seq_len_tile + tidx];
+                final_sum += __expf(thread_partial_max - final_max) * thread_partial_sum;
+            }
+
+            // Compute the final_sum.
+            final_sum = block_sum<WARPS_PER_BLOCK>(&red_smem[WARPS_PER_BLOCK], final_sum);
+
+            ////////////////////
+            // Reduction for final output (scaled by the exponential term from global max) -> use THREADS_PER_VALUE
+            // * gridDim.z threads
+            ////////////////////
+
+            // Shared memory to store partial outputs for each oi. -> size: gridDim.z * Dh * 4 Bytes. Reuse qk_smem.
+            T* out_oi_smem = reinterpret_cast<T*>(smem_);
+
+            // Number of threads to utilize: THREADS_PER_VALUE * gridDim.z (THREADS_PER_VALUE for vectorized output
+            // and gridDim.z for all the partial outputs)
+            int threads_boundary = THREADS_PER_VALUE * sample_tile;  // should be smaller than THREADS_PER_BLOCK
+            assert(threads_boundary <= THREADS_PER_BLOCK);
+
+            const auto o_idx = chunk_index<T, V_vec_k, THREADS_PER_VALUE>(tidx);
+            // The partial output region this thread takes care of
+            const auto oo = o_idx.x;
+            // The hidden dimensions computed by this particular thread. (refer to vi)
+            const auto oi = o_idx.y;
+
+            // Load partial output
+            int thread_partial_out_offset = oo * params.batch_size * params.num_heads * params.hidden_size_per_head;
+            // Load partial max (different to thread_partial_max since the threadIdx rule changes here)
+            float thread_partial_max_for_out = params.partial_max[bhi_seq_len_tile + oo];
+
+            // Load the partial outputs.
+            V_vec_k thread_partial_out =
+                *reinterpret_cast<const V_vec_k*>(&params.partial_out[thread_partial_out_offset + bhi * Dh + oi]);
+
+            if (tidx >= threads_boundary) {
+                zero(thread_partial_out);
+                thread_partial_max_for_out = final_max;
+            }
+
+            Tk factor_compute;
+            convert_from_float(factor_compute, __expf(thread_partial_max_for_out - final_max));
+
+            thread_partial_out = mul<V_vec_k, Tk, V_vec_k>(factor_compute, thread_partial_out);
+
+            // Make sure we can start writing to shared memory.
+            __syncthreads();
+
+            // The reduction iteration should start with a number which is a power of 2
+            const auto reduction_iteration =
+                static_cast<int>(cuda::std::bit_ceil(static_cast<std::size_t>(sample_tile)));
+
+            // Run the final reduction amongst the different groups computing different partial outputs.
+#pragma unroll
+            for (int active_groups = reduction_iteration; active_groups >= 2; active_groups /= 2) {
+
+                // The midpoint in the number of active groups.
+                int midpoint = active_groups / 2;
+
+                // The upper part of active threads store to shared memory.
+                if (oo >= midpoint && oo < active_groups && (Dh == Dh_MAX || oi < Dh)) {
+                    *reinterpret_cast<V_vec_k*>(&out_oi_smem[(oo - midpoint) * Dh + oi]) = thread_partial_out;
+                }
+                __syncthreads();
+
+                // The bottom warps update their values.
+                if (oo < midpoint && (Dh == Dh_MAX || oi < Dh)) {
+                    thread_partial_out =
+                        add(thread_partial_out, *reinterpret_cast<const V_vec_k*>(&out_oi_smem[oo * Dh + oi]));
+                }
+                __syncthreads();
+            }
+
+            ////////////////////
+            // Final output O * inv_sum
+            ////////////////////
+
+            if (oo == 0 && (Dh == Dh_MAX || oi < Dh)) {
+                const auto inv_sum = __fdividef(1.f, final_sum + 1.e-6f);
+                Tk         inv_sum_compute;
+                convert_from_float(inv_sum_compute, inv_sum);
+
+                thread_partial_out = mul<V_vec_k, Tk, V_vec_k>(inv_sum_compute, thread_partial_out);
+
+                *reinterpret_cast<V_vec_k*>(&params.out[bhi * Dh + oi]) = thread_partial_out;
+            }
+
+            // Reset qk_current_smem and block_counter for the next timestep
+            if (tidx == 0) {
+                params.block_counter[bhi] = 0;
+            }
+        }
+    }
+#endif  // ENABLE_MULTI_BLOCK_OPTION
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
