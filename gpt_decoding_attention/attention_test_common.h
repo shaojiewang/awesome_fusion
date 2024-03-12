@@ -2,7 +2,7 @@
 
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
-#include "hiprand_kernel.h"
+#include <hiprand/hiprand_kernel.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -28,15 +28,15 @@ typedef struct {
 #define TIMEIT(print, n, ms, stream, fn, ...)                                                                              \
     ({                                                                                                                 \
         hipEvent_t _macro_event_start, _macro_event_stop;                                                             \
-        hipEventCreate(&_macro_event_start);                                                                          \
-        hipEventCreate(&_macro_event_stop);                                                                           \
-        hipEventRecord(_macro_event_start, stream);                                                                   \
+        check_cuda_error(hipEventCreate(&_macro_event_start));                                                                          \
+        check_cuda_error(hipEventCreate(&_macro_event_stop));                                                                           \
+        check_cuda_error(hipEventRecord(_macro_event_start, stream));                                                                   \
         for (int i = 0; i < n; i++) {                                                                                  \
             fn(__VA_ARGS__);                                                                                           \
         }                                                                                                              \
-        hipEventRecord(_macro_event_stop, stream);                                                                    \
-        hipStreamSynchronize(stream);                                                                                 \
-        hipEventElapsedTime(&ms, _macro_event_start, _macro_event_stop);                                              \
+        check_cuda_error(hipEventRecord(_macro_event_stop, stream));                                                                    \
+        check_cuda_error(hipStreamSynchronize(stream));                                                                                 \
+        check_cuda_error(hipEventElapsedTime(&ms, _macro_event_start, _macro_event_stop));                                              \
         ms /= n;                                                                                                       \
         if (print)                                                                                                     \
             printf("[TIMEIT] " #fn ": %.2fµs\n", ms * 1000);                                                           \
@@ -87,7 +87,7 @@ void set_params_struct(MMHA_PARAMS<T>& params,
                        const T*                              relative_attention_bias,
                        int                                   relative_attention_bias_stride,
                        int                                   paged_block_size,
-                       int*                            cur_timesteps)
+                       int*                                  cur_timesteps)
 {
 }
 
@@ -118,7 +118,7 @@ void set_params_struct(Masked_multihead_attention_params<T>& params,
                        const T*                              relative_attention_bias,
                        int                                   relative_attention_bias_stride,
                        int                                   paged_block_size,
-                       int*                            cur_timesteps)
+                       int*                                  cur_timesteps)
 {
     params.out                            = out;
     params.q                              = q;
@@ -161,8 +161,8 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
                        const T*                                    v,
                        const T*                                    v_bias,
                        T*                                          kv_blocks,
-                       T*                                          k_cache,
-                       T*                                          v_cache,
+                       size_t**                                    k_cache,
+                       size_t**                                    v_cache,
                        const int*                                  cache_indir,
                        int                                         stride,
                        int                                         batch_size,
@@ -334,7 +334,7 @@ public:
     ~GPUBuf() 
     {
         if (ptr != nullptr)
-            hipFree(ptr);
+            check_cuda_error(hipFree(ptr));
     }
 
     size_t size;

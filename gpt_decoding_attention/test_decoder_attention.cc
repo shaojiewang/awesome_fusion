@@ -1,4 +1,4 @@
-#include "attention_test_common.h""
+#include "attention_test_common.h"
 
 template<typename T>
 bool test_masked_multihead_attention(const test_args_t& test_args)
@@ -46,6 +46,7 @@ bool test_masked_multihead_attention(const test_args_t& test_args)
                       1,
                       L,
                       H,
+                      1,
                       Dh,
                       R,
                       L - 1,
@@ -76,6 +77,7 @@ bool test_masked_multihead_attention(const test_args_t& test_args)
                       BS,
                       1,
                       L,
+                      1,
                       H,
                       Dh,
                       R,
@@ -127,7 +129,7 @@ bool test_masked_multihead_attention(const test_args_t& test_args)
     }
 
     hipStream_t stream;
-    hipStreamCreate(&stream);
+    check_cuda_error(hipStreamCreate(&stream));
 
     float ms = 0.0f;
     printf("[FP32] ");

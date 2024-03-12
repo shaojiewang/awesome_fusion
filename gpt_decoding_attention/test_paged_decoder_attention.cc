@@ -27,28 +27,17 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     size_t num_blocks_per_bs = (L + PB - 1) / PB;
     size_t num_blocks = num_blocks_per_bs * BS;
 
-    // prepare paged kv cache
-    // std::vector<T*> k_paged_cache(num_blocks);
-    // std::vector<T*> v_paged_cache(num_blocks);
-    // for(int i = 0; i < num_blocks; i++)
-    // {
-    //     hipMalloc((void**)(&k_paged_cache[i]), sizeof(T) * PB * Dh * H);
-    //     hipMalloc((void**)(&v_paged_cache[i]), sizeof(T) * PB * Dh * H);
-    // }
-
     GPUBuf<size_t> k_block_offset(num_blocks);
     GPUBuf<size_t> k_batch_offset(BS);
     GPUBuf<size_t> v_block_offset(num_blocks);
     GPUBuf<size_t> v_batch_offset(BS);
 
-    // invokeSetPageBlockPtrs(k_block_offset.ptr, k_paged_cache, num_blocks);
-    // invokeSetPageBlockPtrs(v_block_offset.ptr, v_paged_cache, num_blocks);
     invokeSetPageBlockOffset(k_block_offset.ptr, PB * Dh * H * 2, 0, num_blocks);
     invokeSetPageBlockOffset(v_block_offset.ptr, PB * Dh * H * 2, 2 * num_blocks * PB * Dh * H * L, num_blocks);
-    hipDeviceSynchronize();
+    check_cuda_error(hipDeviceSynchronize());
     invokeSetBatchBlockPtrs(k_batch_offset.ptr, k_block_offset.ptr, BS, num_blocks_per_bs);
     invokeSetBatchBlockPtrs(v_batch_offset.ptr, v_block_offset.ptr, BS, num_blocks_per_bs);
-    hipDeviceSynchronize();
+    check_cuda_error(hipDeviceSynchronize());
 
     GPUBuf<int> seq_lengths(BS);
     seq_lengths.set((std::vector<int>(BS, L * 4 / 4)).data());
@@ -83,7 +72,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
         (hipStream_t)(0)
     );
 #endif        
-    hipDeviceSynchronize();
+    check_cuda_error(hipDeviceSynchronize());
     
 
     GPUBuf<int> cur_timesteps(BS);
@@ -140,14 +129,15 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       (Tmha*)v_T.ptr,
                       (Tmha*)v_bias_T.ptr,
                       (Tmha*)kv_blocks.ptr,
-                      (Tmha*)k_batch_offset.ptr,
-                      (Tmha*)v_batch_offset.ptr,
+                      (size_t**)k_batch_offset.ptr,
+                      (size_t**)v_batch_offset.ptr,
                       nullptr,
                       0,
                       BS,
                       1,
                       L,
                       H,
+                      heads_per_gqa_group,
                       Dh,
                       R,
                       L - 1,
@@ -187,19 +177,13 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     }
 
     hipStream_t stream;
-    hipStreamCreate(&stream);
+    check_cuda_error(hipStreamCreate(&stream));
 
     float ms = 0.0f;
     printf("[FP32] ");
     TIMEIT(true, 10, ms, stream, masked_multihead_attention, params_fp32, stream);
     printf("[%s] ", string_rep_t<T>::value.c_str());
     TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
-
-    for(int i = 0; i < num_blocks; i++)
-    {
-        hipFree(k_paged_cache[i]);
-        hipFree(v_paged_cache[i]);
-    }
 
     printf("%s\n", !error ? "." : "X");
     return ms;
