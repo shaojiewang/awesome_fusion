@@ -33,7 +33,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<size_t> v_batch_offset(BS);
 
     invokeSetPageBlockOffset(k_block_offset.ptr, PB * Dh * H * 2, 0, num_blocks);
-    invokeSetPageBlockOffset(v_block_offset.ptr, PB * Dh * H * 2, 2 * num_blocks * PB * Dh * H * L, num_blocks);
+    invokeSetPageBlockOffset(v_block_offset.ptr, PB * Dh * H * 2, 2 * num_blocks * PB * Dh * H, num_blocks);
     check_cuda_error(hipDeviceSynchronize());
     invokeSetBatchBlockPtrs(k_batch_offset.ptr, k_block_offset.ptr, BS, num_blocks_per_bs);
     invokeSetBatchBlockPtrs(v_batch_offset.ptr, v_block_offset.ptr, BS, num_blocks_per_bs);
@@ -74,7 +74,6 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
 #endif        
     check_cuda_error(hipDeviceSynchronize());
     
-
     GPUBuf<int> cur_timesteps(BS);
     cur_timesteps.set((std::vector<int>(BS, L)).data());
 
