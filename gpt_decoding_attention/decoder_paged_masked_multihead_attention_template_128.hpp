@@ -67,6 +67,9 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // The shared memory for the Q*K^T values and partial logits in softmax.
     float* qk_smem = reinterpret_cast<float*>(smem_);
 
+    __shared__ float qk_current_smem[1];
+    __shared__ Tk    logits_current_smem[1];
+
     // The shared memory for the logits. For FP32, that's the same buffer as qk_smem.
     char* logits_smem_ = smem_;
 #ifndef MMHA_USE_FP32_ACUM_FOR_LOGITS
@@ -167,6 +170,12 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                                          params.length_per_sample[bi] + params.max_prefix_prompt_length;
     const int first_step   = max(0, tlength + 1 - params.memory_max_len);
     const int tlength_circ = tlength % params.memory_max_len;
+    int       sample_tile  = MULTI_BLOCK_FLAG ? divUp(tlength, params.timesteps_per_block) : 1;
+
+    if (MULTI_BLOCK_FLAG && c_tile >= sample_tile) {
+        return;
+    }
+    const bool last_tile = (c_tile == sample_tile - 1) ? true : false;
 
     // First QK_VECS_PER_WARP load Q and K + the bias values for the current timestep.
     const bool is_masked = tidx >= QK_VECS_PER_WARP;
@@ -267,7 +276,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     Qk_vec_k q_bias;
     zero(q_bias);
     q_bias = (!is_masked && Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
-                 vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[q_bias_offset])) :
+                 vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[qk_bias_offset])) :
                  q_bias;
 
     Qk_vec_k k_bias;
@@ -505,14 +514,21 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // The number of keys per warp.
     constexpr int K_PER_WARP = WARP_SIZE / THREADS_PER_KEY;
 
+    const auto timesteps_per_block = params.timesteps_per_block;
+
     // Pick a number of keys to make sure all the threads of a warp enter (due to shfl_sync).
-    int ti_end = div_up(tlength - first_step, K_PER_WARP) * K_PER_WARP + first_step;
+    int ti_end = MULTI_BLOCK_FLAG ? div_up(timesteps_per_block, K_PER_WARP) * K_PER_WARP :
+                                    div_up(tlength - first_step, K_PER_WARP) * K_PER_WARP
+                                        + first_step;  // first_step seems 0 all the time
 
     // prefix prompt length if has
     const int prefix_prompt_length = (params.prefix_prompt_lengths == nullptr) ? 0 : params.prefix_prompt_lengths[bi];
 
     // Iterate over the keys/timesteps to compute the various (Q*K^T)_{ti} values.
     const int* beam_indices = HAS_BEAMS ? &params.cache_indir[bi_seq_len_offset] : nullptr;
+
+    const auto c_tile_times_timesteps_per_block = c_tile * timesteps_per_block;
+    const int  tile_offset                      = MULTI_BLOCK_FLAG ? c_tile_times_timesteps_per_block : 0;
 
     for (int ti = first_step + ko; ti < ti_end; ti += K_PER_ITER) {
         const int ti_circ = ti % params.memory_max_len;
@@ -784,6 +800,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 v_scale_f   = v_scale_ptr[time_now];
 #endif
             }
+
+            int        local_time_idx = ti;
+            int        time_idx       = local_time_idx + (MULTI_BLOCK_FLAG ? c_tile_times_timesteps_per_block : 0);
+            const bool is_mask = (MULTI_BLOCK_FLAG && local_time_idx >= timesteps_per_block) || (time_idx >= tlength);
             // Load the logits from shared memory.
             // Note that fma will convert 8bit vec to the accumulation data type (float by default).
             Logit_value_fma<Tk, V_vec_acum, V_vec_m, ENABLE_8BITS_CACHE, false>(

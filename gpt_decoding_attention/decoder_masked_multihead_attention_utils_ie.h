@@ -460,6 +460,7 @@ inline __device__ int8_t cast_to_int8(float val)
 
     asm volatile("v_cvt_i32_f32 %0, %1 \n" : "=v"(ret) : "v"(val));
 
+    // return __float2int_rn(val);
     return static_cast<int8_t>(ret);
 }
 

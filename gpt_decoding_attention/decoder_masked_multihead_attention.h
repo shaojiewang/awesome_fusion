@@ -61,7 +61,7 @@ struct KVCacheType<float, false> {
 
 template<>
 struct KVCacheType<float, true> {
-    using Type     = float**;
+    using Type     = float;
     using StepType = int*;
 };
 
@@ -73,7 +73,7 @@ struct KVCacheType<uint16_t, false> {
 
 template<>
 struct KVCacheType<uint16_t, true> {
-    using Type     = uint16_t**;
+    using Type     = uint16_t;
     using StepType = int*;
 };
 
@@ -85,7 +85,7 @@ struct KVCacheType<int8_t, false> {
 
 template<>
 struct KVCacheType<int8_t, true> {
-    using Type     = int8_t**;
+    using Type     = int8_t;
     using StepType = int*;
 };
 
@@ -98,7 +98,7 @@ struct KVCacheType<__nv_bfloat16, false> {
 
 template<>
 struct KVCacheType<__nv_bfloat16, true> {
-    using Type     = __nv_bfloat16**;
+    using Type     = __nv_bfloat16;
     using StepType = int*;
 };
 #endif

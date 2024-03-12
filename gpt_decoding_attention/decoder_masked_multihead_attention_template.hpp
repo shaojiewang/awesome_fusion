@@ -18,6 +18,7 @@
 #include "hip/hip_runtime.h"
 #include "decoder_masked_multihead_attention.h"
 #include "decoder_masked_multihead_attention_utils.h"
+#include "decoder_masked_multihead_attention_utils_ie.h"
 #include "hip_type_utils.cuh"
 #include <assert.h>
 #include <float.h>
@@ -899,102 +900,6 @@ inline __device__ Float8_ cast_to_float(bf16_8_t u)
 }
 
 #endif
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ float float_from_int8(int8_t u)
-{
-    return u;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ float2 float_from_int8(int16_t u)
-{
-    union {
-        int16_t int16;
-        int8_t  int8[2];
-    };
-    int16 = u;
-    return make_float2(int8[0], int8[1]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ float4 float_from_int8(int32_t u)
-{
-    union {
-        int32_t int32;
-        int8_t  int8[4];
-    };
-    int32 = u;
-    return make_float4(int8[0], int8[1], int8[2], int8[3]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// clang-format off
-inline __device__ Float8_ float_from_int8(int64_t u)
-{
-    union {
-        int64_t int64;
-        int16_t int16[4];
-    };
-    int64 = u;
-    return Float8_ {float_from_int8(int16[0]),
-                    float_from_int8(int16[1]),
-                    float_from_int8(int16[2]),
-                    float_from_int8(int16[3])};
-}
-// clang-format on
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ int8_t cast_to_int8(float val)
-{
-    union {
-        int8_t  int8[2];
-        int16_t int16;
-    };
-    // asm volatile("cvt.rni.sat.s8.f32 %0, %1;" : "=h"(int16) : "f"(val));
-    // return int8[0];
-    // printf("kernels todo : f32_to_int8");
-    return __float2int_rn(val);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ int32_t cast_to_int8(float4 val)
-{
-    union {
-        int8_t  int8[4];
-        int32_t int32;
-    };
-    int8[0] = cast_to_int8(val.x);
-    int8[1] = cast_to_int8(val.y);
-    int8[2] = cast_to_int8(val.z);
-    int8[3] = cast_to_int8(val.w);
-    return int32;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-inline __device__ int64_t cast_to_int8(Float8_ val)
-{
-    union {
-        int8_t  int8[8];
-        int64_t int64;
-    };
-    int8[0] = cast_to_int8(val.x.x);
-    int8[1] = cast_to_int8(val.x.y);
-    int8[2] = cast_to_int8(val.y.x);
-    int8[3] = cast_to_int8(val.y.y);
-    int8[4] = cast_to_int8(val.z.x);
-    int8[5] = cast_to_int8(val.z.y);
-    int8[6] = cast_to_int8(val.w.x);
-    int8[7] = cast_to_int8(val.w.y);
-    return int64;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
