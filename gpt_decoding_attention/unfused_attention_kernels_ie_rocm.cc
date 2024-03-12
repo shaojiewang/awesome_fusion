@@ -1,6 +1,9 @@
 #include "hip_utils.h"
 #include "hip_type_utils.cuh"
 
+#include "decoder_masked_multihead_attention_utils.h"
+#include "decoder_masked_multihead_attention_utils_ie.h"
+
 template<typename T>
 __global__ void transpose_4d_batch_major_k_cache_ptr(T*         kv_blocks,
                                                      size_t**   k_bt_offset,

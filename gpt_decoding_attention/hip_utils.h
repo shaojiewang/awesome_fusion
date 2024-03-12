@@ -2,6 +2,8 @@
 
 #include <hip/hip_runtime.h>
 
+using cudaStream_t = hipStream_t;
+
 static const char* _cudaGetErrorEnum(hipError_t error)
 {
     return hipGetErrorString(error);
