@@ -40,6 +40,13 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     constexpr bool FP8_MHA_KERNEL = false;
 #endif
 
+#ifdef ENABLE_MULTI_BLOCK_OPTION
+    constexpr bool MULTI_BLOCK_FLAG = DO_MULTI_BLOCK;
+#else
+    constexpr bool MULTI_BLOCK_FLAG = false;
+#endif
+    const auto max_time_step = static_cast<unsigned>(DO_MULTI_BLOCK ? params.timesteps_per_block : params.max_timestep);
+
     KV_CACHE_T* kv_blocks        = reinterpret_cast<KV_CACHE_T*>(params.kv_blocks);
     size_t**    kcache_bt_offset = params.k_cache;
     size_t**    vcache_bt_offset = params.v_cache;
@@ -132,9 +139,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // Layer stride in the block of KV Cache.
     const int layer_stride = params.num_heads * params.hidden_size_per_head * params.tokens_per_block;
     // Head stride in the block of KV Cache.
-    const int head_stride      = params.hidden_size_per_head * params.tokens_per_block;
-    const int tokens_per_block = params.tokens_per_block;
-    const int layer_index      = params.layer_index;
+    const int head_stride         = params.hidden_size_per_head * params.tokens_per_block;
+    const int tokens_per_block    = params.tokens_per_block;
+    const int layer_index         = params.layer_index;
+    const int heads_per_gqa_group = params.heads_per_gqa_group;
+    const int c_tile              = MULTI_BLOCK_FLAG ? blockIdx.z : 0;
 
     // timestep of current batch
     const int cur_timestep = get_cur_timestep<STEP_T, SPLIT_KV_CACHE>(params.timestep, bbi);

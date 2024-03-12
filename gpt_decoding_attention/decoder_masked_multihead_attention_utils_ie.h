@@ -23,8 +23,6 @@
 #include <hip/hip_fp16.h>
 #include <stdint.h>
 
-using namespace fastertransformer;
-
 namespace mmha {
 
 inline __device__ void print_vec_info(
@@ -160,7 +158,7 @@ inline __device__ void print_vec_info(
 inline __device__ void print_vec_info(
     const int bid_x, const int bid_y, const int seq_id, const int tid, const __nv_bfloat162 val, const float append = 0)
 {
-    float2 ele_f = __bfloat1622float2(val);
+    float2 ele_f = bf1622float2(val);
     printf("pvi block and thread index is: %d, %d, %d, %d, value: (%f, %f), append value: %f \n",
            bid_x,
            bid_y,
@@ -174,8 +172,8 @@ inline __device__ void print_vec_info(
 inline __device__ void print_vec_info(
     const int bid_x, const int bid_y, const int seq_id, const int tid, const bf16_4_t val, const float append = 0)
 {
-    float2 ele_x = __bfloat1622float2(val.x);
-    float2 ele_y = __bfloat1622float2(val.y);
+    float2 ele_x = bf1622float2(val.x);
+    float2 ele_y = bf1622float2(val.y);
     printf("pvi block and thread index is: %d, %d, %d, %d, value: (%f, %f, %f, %f), append value: %f \n",
            bid_x,
            bid_y,
@@ -191,10 +189,10 @@ inline __device__ void print_vec_info(
 inline __device__ void print_vec_info(
     const int bid_x, const int bid_y, const int seq_id, const int tid, const bf16_8_t val, const float append = 0)
 {
-    float2 ele_x = __bfloat1622float2(val.x);
-    float2 ele_y = __bfloat1622float2(val.y);
-    float2 ele_z = __bfloat1622float2(val.z);
-    float2 ele_w = __bfloat1622float2(val.w);
+    float2 ele_x = bf1622float2(val.x);
+    float2 ele_y = bf1622float2(val.y);
+    float2 ele_z = bf1622float2(val.z);
+    float2 ele_w = bf1622float2(val.w);
     printf(
         "pvi block and thread index is: %d, %d, %d, %d, value: (%f, %f, %f, %f, %f, %f, %f, %f), append value: %f \n",
         bid_x,
@@ -396,7 +394,7 @@ inline __device__ Float8_ convert_to_float(uint4 u)
 template<>
 inline __device__ float2 convert_to_float(__nv_bfloat162 u)
 {
-    float2 ret = __bfloat1622float2(u);
+    float2 ret = bf1622float2(u);
     return ret;
 }
 
@@ -404,8 +402,8 @@ template<>
 inline __device__ float4 convert_to_float(bf16_4_t u)
 {
     float4 ret;
-    float2 f2x = __bfloat1622float2(u.x);
-    float2 f2y = __bfloat1622float2(u.y);
+    float2 f2x = bf1622float2(u.x);
+    float2 f2y = bf1622float2(u.y);
     ret.x      = f2x.x;
     ret.y      = f2x.y;
     ret.z      = f2y.x;
@@ -417,10 +415,10 @@ template<>
 inline __device__ Float8_ convert_to_float(bf16_8_t u)
 {
     Float8_ f8;
-    f8.x = __bfloat1622float2(u.x);
-    f8.y = __bfloat1622float2(u.y);
-    f8.z = __bfloat1622float2(u.z);
-    f8.w = __bfloat1622float2(u.w);
+    f8.x = bf1622float2(u.x);
+    f8.y = bf1622float2(u.y);
+    f8.z = bf1622float2(u.z);
+    f8.w = bf1622float2(u.w);
     return f8;
 }
 
@@ -451,13 +449,18 @@ inline __device__ float2 convert_to_float(uint32_t u)
 
 inline __device__ int8_t cast_to_int8(float val)
 {
-    union {
-        int8_t  int8[2];
-        int16_t int16;
-    };
+    // union {
+    //     int8_t  int8[2];
+    //     int16_t int16;
+    // };
 
-    asm volatile("cvt.rni.sat.s8.f32 %0, %1;" : "=h"(int16) : "f"(val));
-    return int8[0];
+    // asm volatile("cvt.rni.sat.s8.f32 %0, %1;" : "=h"(int16) : "f"(val));
+    // return int8[0];
+    int ret;
+
+    asm volatile("v_cvt_i32_f32 %0, %1 \n" : "=v"(ret) : "v"(val));
+
+    return static_cast<int8_t>(ret);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -798,7 +801,7 @@ inline __device__ float fabs_max(const float4 a) // for float
 template<>
 inline __device__ float fabs_max(const __nv_bfloat162 a) // for bf16
 {
-    float2 ele_x =  __bfloat1622float2(a);
+    float2 ele_x =  bf1622float2(a);
     float max_value = max(fabsf(ele_x.x), fabsf(ele_x.y));
     return max_value;
 }
@@ -806,8 +809,8 @@ inline __device__ float fabs_max(const __nv_bfloat162 a) // for bf16
 template<>
 inline __device__ float fabs_max(const bf16_4_t a) // for bf16
 {
-    float2 ele_x =  __bfloat1622float2(a.x);
-    float2 ele_y =  __bfloat1622float2(a.y);
+    float2 ele_x =  bf1622float2(a.x);
+    float2 ele_y =  bf1622float2(a.y);
     float max_x = max(fabsf(ele_x.x), fabsf(ele_x.y));
     float max_y = max(fabsf(ele_y.x), fabsf(ele_y.y));
 
@@ -818,10 +821,10 @@ inline __device__ float fabs_max(const bf16_4_t a) // for bf16
 template<>
 inline __device__ float fabs_max(const bf16_8_t a) // for bf16
 {
-    float2 ele_x =  __bfloat1622float2(a.x);
-    float2 ele_y =  __bfloat1622float2(a.y);
-    float2 ele_z =  __bfloat1622float2(a.z);
-    float2 ele_w =  __bfloat1622float2(a.w);
+    float2 ele_x =  bf1622float2(a.x);
+    float2 ele_y =  bf1622float2(a.y);
+    float2 ele_z =  bf1622float2(a.z);
+    float2 ele_w =  bf1622float2(a.w);
     float max_x = max(fabsf(ele_x.x), fabsf(ele_x.y));
     float max_y = max(fabsf(ele_y.x), fabsf(ele_y.y));
     float max_z = max(fabsf(ele_z.x), fabsf(ele_z.y));
@@ -876,7 +879,7 @@ inline __device__ __host__ T divUp(T m, T n)
 }
 
 template <typename T, int Dh, bool DO_CROSS_ATTENTION, bool SPLIT_KV_CACHE = false>
-inline size_t multi_block_grid_setup(const Multihead_attention_params<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE>& params,
+inline size_t multi_block_grid_setup(const Paged_multihead_attention_params<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE>& params,
     int threads_per_value, int threads_per_block, int tlength, bool do_multi_block)
 {
     if (!do_multi_block)

@@ -21,12 +21,6 @@
 
 namespace mmha {
 
-template <typename T, typename T_cache>
-struct kv_cache_scale_type_t
-{
-    using Type = float;
-};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Float8_ {
@@ -153,6 +147,12 @@ template<typename T>
 struct packed_type<T, 1> {
     using type = T;
 };
+
+template<>
+struct packed_type<int8_t, 1> {
+    using type = int8_t;
+};
+
 template<>
 struct packed_type<int8_t, 2> {
     using type = int16_t;
@@ -164,6 +164,68 @@ struct packed_type<int8_t, 4> {
 template<>
 struct packed_type<int8_t, 8> {
     using type = int64_t;
+};
+
+#ifdef ENABLE_FP8
+template<>
+struct packed_type<__nv_fp8_e4m3, 2> {
+    using type = fp8_2_t;
+};
+
+template<>
+struct packed_type<__nv_fp8_e4m3, 4> {
+    using type = fp8_4_t;
+};
+
+template<>
+struct packed_type<__nv_fp8_e4m3, 8> {
+    using type = fp8_8_t;
+};
+#endif  // ENABLE_FP8
+
+template<>
+struct packed_type<uint16_t, 2> {
+    using type = uint32_t;
+};
+
+template<>
+struct packed_type<uint16_t, 4> {
+    using type = uint2;
+};
+
+template<>
+struct packed_type<uint16_t, 8> {
+    using type = uint4;
+};
+
+template<>
+struct packed_type<half, 2> {
+    using type = uint32_t;
+};
+
+template<>
+struct packed_type<half, 4> {
+    using type = uint2;
+};
+
+template<>
+struct packed_type<half, 8> {
+    using type = uint4;
+};
+
+template<>
+struct packed_type<__nv_bfloat16, 2> {
+    using type = __nv_bfloat162;
+};
+
+template<>
+struct packed_type<__nv_bfloat16, 4> {
+    using type = bf16_4_t;
+};
+
+template<>
+struct packed_type<__nv_bfloat16, 8> {
+    using type = bf16_8_t;
 };
 
 template<>

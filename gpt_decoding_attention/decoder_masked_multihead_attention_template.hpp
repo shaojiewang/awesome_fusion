@@ -533,8 +533,8 @@ struct Qk_dot {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-inline __device__ float4 hmma_fp32(const uint2& a, uint32_t b)
-{
+//inline __device__ float4 hmma_fp32(const uint2& a, uint32_t b)
+//{
     /*
     float4 c;
     float  zero = 0.f;
@@ -548,7 +548,7 @@ inline __device__ float4 hmma_fp32(const uint2& a, uint32_t b)
                  : "r"(a.x) "r"(a.y), "r"(b), "f"(zero));
     return c;
     */
-}
+//}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -178,6 +178,14 @@ inline __device__ __nv_bfloat162 bf162bf162(const __nv_bfloat16 val) {
     return val2;
 }
 
+inline __device__ __nv_bfloat162 __floats2bfloat162_rn(const float x, const float y)
+{
+	__nv_bfloat162 ret;
+	ret.x = bf16_convert_rtn<__nv_bfloat16, float>(x);
+	ret.y = bf16_convert_rtn<__nv_bfloat16, float>(y);
+	return ret;
+}
+
 inline __device__ __nv_bfloat162 __floats2bfloat162_rn(const float2 x)
 {
 	__nv_bfloat162 ret;

@@ -56,7 +56,7 @@ inline void syncAndCheck(const char* const file, int const line)
     if (level_name != nullptr) {
         static std::string level = std::string(level_name);
         if (level == "DEBUG") {
-            hipDeviceSynchronize();
+            check_cuda_error(hipDeviceSynchronize());
             hipError_t result = hipGetLastError();
             if (result) {
                 throw std::runtime_error(std::string("[FT][ERROR] CUDA runtime error: ") + (_cudaGetErrorEnum(result))

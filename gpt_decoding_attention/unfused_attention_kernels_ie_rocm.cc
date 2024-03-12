@@ -1,6 +1,7 @@
 #include "hip_utils.h"
 #include "hip_type_utils.cuh"
 
+#include "reduce_kernel_utils.cuh"
 #include "decoder_masked_multihead_attention_utils.h"
 #include "decoder_masked_multihead_attention_utils_ie.h"
 
@@ -216,7 +217,7 @@ __global__ void transpose_4d_batch_major_k_cache_ptr_quant(KV_T*      kv_blocks,
 
     for (int tid = threadIdx.x; tid < size_per_head_div_x; tid += blockDim.x) {
         const int channelIdx = tid * tokens_per_block + seq_id % tokens_per_block;
-        int       inBlockIdx = channelIdx * sizeof(mmha::packed_type<T_dst, mmha::num_elems<T_src>::value>::type);
+        int       inBlockIdx = channelIdx * sizeof(typename mmha::packed_type<T_dst, mmha::num_elems<T_src>::value>::type);
         T_src     val        = key_src[tid];
 
         // Cast float scale to dst data type.
@@ -296,7 +297,7 @@ __global__ void transpose_4d_batch_major_v_cache_ptr_quant(KV_T*      kv_blocks,
 
     T_src val = val_src[threadIdx.x];
     // const int channelIdx = v_head_size_id;
-    int inBlockIdx = v_head_size_id * sizeof(mmha::packed_type<T_dst, mmha::num_elems<T_src>::value>::type);
+    int inBlockIdx = v_head_size_id * sizeof(typename mmha::packed_type<T_dst, mmha::num_elems<T_src>::value>::type);
 
     // Cast float scale to dst data type.
     T_scale scaleOrigQuant;
