@@ -93,7 +93,8 @@ template<
     int  THREADS_PER_BLOCK,
     bool DO_CROSS_ATTENTION,
     bool HAS_BEAMS,
-    bool SPLIT_KV_CACHE = false>
+    bool SPLIT_KV_CACHE = false,
+    bool DO_MULTI_BLOCK = false>
 __global__ void
 paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE> params)
 {
