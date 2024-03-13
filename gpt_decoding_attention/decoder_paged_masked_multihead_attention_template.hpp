@@ -5,23 +5,27 @@
 namespace mmha {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<typename T, bool DO_CROSS_ATTENTION = false, bool SPLIT_KV_CACHE = true>
+template<typename T, bool DO_CROSS_ATTENTION, bool SPLIT_KV_CACHE = false, bool DO_MULTI_BLOCK = false>
 inline size_t smem_size_in_bytes(const Paged_multihead_attention_params<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE>& params,
                                  int threads_per_value,
                                  int threads_per_block)
 {
     using Tk = typename kernel_type_t<T>::Type;
     // The amount of shared memory needed to store the Q*K^T values in float.
-    const int max_timesteps = min(params.max_timestep, params.memory_max_len);
-    size_t qk_sz = (DO_CROSS_ATTENTION) ? div_up(params.memory_max_len + 1, 4) * 16 : div_up(max_timesteps + 1, 4) * 16;
+    // const int max_timesteps = min(params.max_timestep, params.memory_max_len);
+    const int max_timesteps =
+        DO_CROSS_ATTENTION ?
+            params.memory_max_len :
+            min((DO_MULTI_BLOCK ? params.timesteps_per_block : params.max_timestep), params.memory_max_len);
+    const auto qk_elts = static_cast<std::size_t>(divUp(max_timesteps + 1, 4));  // explicit cast because of the sign
+    const auto qk_sz   = qk_elts * 16;
 
     // The extra memory needed if we are not using floats for the final logits.
     size_t logits_sz = 0;
 #ifndef MMHA_USE_FP32_ACUM_FOR_LOGITS
     if (sizeof(Tk) != 4) {
         // TDOD
-        logits_sz = (DO_CROSS_ATTENTION) ? div_up(params.memory_max_len + 1, 4) * 4 * sizeof(Tk) :
-                                           div_up(max_timesteps + 1, 4) * 4 * sizeof(Tk);
+        logits_sz = qk_elts * 4 * sizeof(Tk);
     }
 #endif
 
@@ -38,8 +42,13 @@ inline size_t smem_size_in_bytes(const Paged_multihead_attention_params<T, DO_CR
         transpose_rotary_size = 2 * params.rotary_embedding_dim * sizeof(Tk);
     }
 
+    size_t out_oi_sz = 0;
+    if (params.enable_multi_block) {
+        // The size for partial output reduction computation.
+        out_oi_sz = params.max_seq_len_tile * params.hidden_size_per_head * sizeof(T);
+    }
     // The max.
-    return max(max(softmax_sz, red_sz), transpose_rotary_size);
+    return max(max(max(softmax_sz, red_sz), transpose_rotary_size), out_oi_sz);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

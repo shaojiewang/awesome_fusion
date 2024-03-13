@@ -9,21 +9,41 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define PAGED_MMHA_LAUNCH_KERNEL(                                                                                                \
-    T, Tcache, Dh, Dh_MAX, Dh_TILE_NUM, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK, DO_CROSS_ATTENTION, HAS_BEAMS, SPLIT_KV_CACHE,  stream) \
-    size_t smem_sz = mmha::smem_size_in_bytes<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE>(params, THDS_PER_VALUE, THDS_PER_BLOCK);    \
-    dim3   grid(params.num_heads * Dh_TILE_NUM, params.batch_size);                                                                            \
-    mmha::paged_masked_multihead_attention_128_kernel<T,                                                                             \
-                                                  Tcache,                                                                        \
-                                                  Dh,                                                                            \
-                                                  Dh_MAX,                                                                        \
-                                                  Dh_TILE_NUM,                                                                        \
-                                                  THDS_PER_KEY,                                                                  \
-                                                  THDS_PER_VALUE,                                                                \
-                                                  THDS_PER_BLOCK,                                                                \
-                                                  DO_CROSS_ATTENTION,                                                            \
-                                                  HAS_BEAMS,                                                                     \
-                                                  SPLIT_KV_CACHE><<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params)
+#define PAGED_MMHA_LAUNCH_KERNEL(T,                                                                                             \
+                                 Tcache,                                                                                        \
+                                 Dh,                                                                                            \
+                                 Dh_MAX,                                                                                        \
+                                 Dh_TILE_NUM,                                                                                   \
+                                 THDS_PER_KEY,                                                                                  \
+                                 THDS_PER_VALUE,                                                                                \
+                                 THDS_PER_BLOCK,                                                                                \
+                                 DO_CROSS_ATTENTION,                                                                            \
+                                 HAS_BEAMS,                                                                                     \
+                                 SPLIT_KV_CACHE,                                                                                \
+                                 DO_MULTI_BLOCK,                                                                                \
+                                 stream)                                                                                        \
+    size_t seq_len_tile = mmha::multi_block_grid_setup<T, Dh, DO_CROSS_ATTENTION, SPLIT_KV_CACHE>(                              \
+        params, THDS_PER_VALUE, THDS_PER_BLOCK, params.max_timestep, DO_MULTI_BLOCK);                                           \
+    dim3 grid{static_cast<unsigned>(params.num_heads), static_cast<unsigned>(params.batch_size),                                \
+        static_cast<unsigned>(seq_len_tile)};                                                                                   \
+    size_t smem_sz =                                                                                                            \
+        mmha::smem_size_in_bytes<T, DO_CROSS_ATTENTION, SPLIT_KV_CACHE, DO_MULTI_BLOCK>(params, THDS_PER_VALUE, THDS_PER_BLOCK);\
+    if (smem_sz >= 64 * 1024)                                                                                                   \
+    {                                                                                                                           \
+        assert(false);                                                                                                          \
+    }                                                                                                                           \
+    mmha::paged_masked_multihead_attention_128_kernel<T,                                                                        \
+                                                      Tcache,                                                                   \
+                                                      Dh,                                                                       \
+                                                      Dh_MAX,                                                                   \
+                                                      Dh_TILE_NUM,                                                              \
+                                                      THDS_PER_KEY,                                                             \
+                                                      THDS_PER_VALUE,                                                           \
+                                                      THDS_PER_BLOCK,                                                           \
+                                                      DO_CROSS_ATTENTION,                                                       \
+                                                      HAS_BEAMS,                                                                \
+                                                      SPLIT_KV_CACHE,                                                           \
+                                                      DO_MULTI_BLOCK><<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,70 +53,81 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
 {
     constexpr bool DO_CROSS_ATTENTION = std::is_same<KERNEL_PARAMS_TYPE, Cross_multihead_attention_params<T>>::value;
     int            tlength            = (DO_CROSS_ATTENTION) ? params.memory_max_len : params.max_timestep;
+
+    const int kv_cache_quant_mode = params.kv_cache_quant_mode;
+    const bool do_multi_block = params.enable_multi_block;
     // printf("tlength, CROSS_ATTENTION = %d, %d\n", tlength, DO_CROSS_ATTENTION);
-    if (params.num_heads * params.batch_size <= 16) {
-        constexpr int  Dh_TILE_NUM = 4;
-        constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
-        if (params.cache_indir == nullptr) {
-            if (tlength < 32) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else if (tlength < 512) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else {
-                if(params.batch_size * params.num_heads > 208) {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-                } else {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
+    if (kv_cache_quant_mode == 0) {
+        if (!do_multi_block) {
+            if (params.num_heads * params.batch_size <= 16) {
+                constexpr int  Dh_TILE_NUM = 4;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
+                }
+            } else if (params.num_heads * params.batch_size <= 32) {
+                constexpr int  Dh_TILE_NUM = 2;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
+                }
+            } else {
+                constexpr int  Dh_TILE_NUM = 1;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
                 }
             }
-        }
-        else {
-            assert(false);
-        }
-    } else if (params.num_heads * params.batch_size <= 32) {
-        constexpr int  Dh_TILE_NUM = 2;
-        constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
-        if (params.cache_indir == nullptr) {
-            if (tlength < 32) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else if (tlength < 512) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else {
-                if(params.batch_size * params.num_heads > 208) {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-                } else {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-                }
-            }
-        }
-        else {
+        } else {
             assert(false);
         }
     } else {
-        constexpr int  Dh_TILE_NUM = 1;
-        constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
-        if (params.cache_indir == nullptr) {
-            if (tlength < 32) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else if (tlength < 512) {
-                PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-            }
-            else {
-                if(params.batch_size * params.num_heads > 208) {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-                } else {
-                    PAGED_MMHA_LAUNCH_KERNEL(T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, stream);
-                }
-            }
-        }
-        else {
-            assert(false);
-        }
+        assert(false);
     }
 }
 
