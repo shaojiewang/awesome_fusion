@@ -16,7 +16,7 @@ set(CMAKE_CLANG_EXTENSIONS OFF) # https://www.reddit.com/user
 message(STATUS "HIP_PLATFORM: amd")
 add_compile_definitions(__HIP_PLATFORM_AMD__)
 add_definitions(-DENABLE_BF16=1 -DVIEW_ERR_POINT=1 -DINT_INIT=1 -DENABLE_INT8=0)
-# add_definitions(-DENABLE_MULTI_BLOCK_OPTION )
+add_definitions(-DENABLE_MULTI_BLOCK_OPTION )
 add_compile_options(--save-temps)
 set(CMAKE_HIP_ARCHITECTURES "gfx90a")
 

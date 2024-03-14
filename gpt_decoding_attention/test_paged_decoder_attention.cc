@@ -113,6 +113,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       PB,
                       (int*)nullptr);
     masked_multihead_attention(params_fp32, 0);
+    check_cuda_error(hipDeviceSynchronize());
 
     GPUBuf<T> out_fp32_bf16(out_fp32);
     GPUBuf<float> out_fp32_bf16_fp32(out_fp32_bf16);
@@ -142,13 +143,17 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       L - 1,
                       1.0, // / sqrtf(Dh),
                       seq_lengths.ptr,
-                      L / 4,
+                      L,
                       (const Tmha*)nullptr,
                       0,
                       PB,
                       (int*)cur_timesteps.ptr);
+    printf("params.memory_max_len=%d\n", params_T.memory_max_len);
     paged_masked_multihead_attention(params_T, 0);
+    check_cuda_error(hipDeviceSynchronize());
 
+
+    
     auto mha_T_test = GPUBuf<float>(out_T).to_host_vec();
 
 #if VIEW_ERR_POINT
