@@ -125,18 +125,18 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
                 }
             }
         } else {
-             if (tlength < 32) {
-                    PAGED_MMHA_LAUNCH_KERNEL(
-                        T, T, Dh, Dh_MAX, 1, 4, THREADS_PER_VALUE, 64, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
-                }
-                else if (tlength < 256) {
-                    PAGED_MMHA_LAUNCH_KERNEL(
-                        T, T, Dh, Dh_MAX, 1, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
-                }
-                else {
-                    PAGED_MMHA_LAUNCH_KERNEL(
-                        T, T, Dh, Dh_MAX, 1, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
-                }
+            constexpr int Dh_TILE_NUM = 1;
+            constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+            if (tlength < 32) {
+                PAGED_MMHA_LAUNCH_KERNEL(
+                    T, T, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 64, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+            } else if (tlength < 256) {
+                PAGED_MMHA_LAUNCH_KERNEL(
+                    T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+            } else {
+                PAGED_MMHA_LAUNCH_KERNEL(
+                    T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+            }
         }
     } else {
         assert(false);

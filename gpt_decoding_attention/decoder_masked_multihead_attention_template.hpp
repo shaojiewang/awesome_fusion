@@ -20,6 +20,9 @@
 #include "decoder_masked_multihead_attention_utils.h"
 #include "decoder_masked_multihead_attention_utils_ie.h"
 #include "hip_type_utils.cuh"
+#include "reduce_kernel_utils.cuh"
+#include "hip_math.hpp"
+
 #include <assert.h>
 #include <float.h>
 #include <type_traits>

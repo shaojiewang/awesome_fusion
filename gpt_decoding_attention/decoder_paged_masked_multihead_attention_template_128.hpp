@@ -1077,10 +1077,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 #ifdef ENABLE_MULTI_BLOCK_OPTION
     if (MULTI_BLOCK_FLAG) {
 
-        hip::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
+        // hip::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
         bool                                             last_block{false};
         if (tidx == 0) {
-            if (count_ref.fetch_add(1, cuda::memory_order_acq_rel) == (sample_tile - 1)) {
+            if (__atomic_fetch_add(&(params.block_counter[bhi]), 1, __ATOMIC_RELAXED) == (sample_tile - 1)) {
                 last_block = true;
             }
         }
@@ -1108,12 +1108,14 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             __syncthreads();
 
             // Specialize BlockReduce for a 1D block of THREADS_PER_BLOCK threads of type int
-            typedef cub::BlockReduce<float, THREADS_PER_BLOCK> BlockReduce;
+            //typedef cub::BlockReduce<float, THREADS_PER_BLOCK> BlockReduce;
             // Allocate shared memory for BlockReduce
-            __shared__ typename BlockReduce::TempStorage temp_storage;
+            //__shared__ typename BlockReduce::TempStorage temp_storage;
             // Obtain a segment of consecutive items that are blocked across threads (final_max from above)
             // Compute the block-wide max for thread0
-            final_max = BlockReduce(temp_storage).Reduce(thread_partial_max, cub::Max(), sample_tile);
+            //final_max = BlockReduce(temp_storage).Reduce(thread_partial_max, cub::Max(), sample_tile);
+            
+            final_max = blockReduceMax(thread_partial_max);
 
             __shared__ float final_max_smem;
             if (tidx == 0) {
@@ -1182,10 +1184,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
             // The reduction iteration should start with a number which is a power of 2
             const auto reduction_iteration =
-                static_cast<int>(cuda::std::bit_ceil(static_cast<std::size_t>(sample_tile)));
+                static_cast<int>(math::next_power_of_two(static_cast<uint32_t>(sample_tile)));
 
             // Run the final reduction amongst the different groups computing different partial outputs.
-#pragma unroll
+// #pragma unroll
             for (int active_groups = reduction_iteration; active_groups >= 2; active_groups /= 2) {
 
                 // The midpoint in the number of active groups.
