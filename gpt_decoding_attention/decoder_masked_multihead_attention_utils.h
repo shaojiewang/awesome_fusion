@@ -481,6 +481,7 @@ inline __device__ float fma(float a, float b, float c)
 inline __device__ float2 fma(float2 a, float2 b, float2 c)
 {
     float2 d;
+    // __asm__ __volatile__("v_pk_fma_f32 %0, %1, %2, %3 \n" : "=v"(d) : "v"(a), "v"(b), "v"(c));
     d.x = fma(a.x, b.x, c.x);
     d.y = fma(a.y, b.y, c.y);
     return d;

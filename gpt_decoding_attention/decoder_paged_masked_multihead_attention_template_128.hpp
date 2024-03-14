@@ -1077,7 +1077,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 #ifdef ENABLE_MULTI_BLOCK_OPTION
     if (MULTI_BLOCK_FLAG) {
 
-        cuda::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
+        hip::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
         bool                                             last_block{false};
         if (tidx == 0) {
             if (count_ref.fetch_add(1, cuda::memory_order_acq_rel) == (sample_tile - 1)) {

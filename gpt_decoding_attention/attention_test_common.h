@@ -215,7 +215,7 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     
     params.tokens_per_block = paged_block_size;
     params.timestep = cur_timesteps;
-    params.max_timestep = 5120;
+    params.max_timestep = seq_length + 1;
     params.layer_index = 0;
 }
 

@@ -229,6 +229,11 @@ inline __device__ T fma(T a, T b, T c) {
     return a * b + c;
 }
 
+template<>
+inline __device__ float4 fma(float4 a, float4 b, float4 c) {
+    return a * b + c;
+}
+
 #if ENABLE_BF16
 template<>
 inline __device__ __nv_bfloat162 fma(__nv_bfloat162 a, __nv_bfloat162 b, __nv_bfloat162 c) {
