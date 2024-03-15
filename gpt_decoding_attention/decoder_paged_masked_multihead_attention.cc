@@ -60,7 +60,7 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
     if (kv_cache_quant_mode == 0) {
         if (!do_multi_block) {
             if (params.num_heads * params.batch_size <= 16) {
-                constexpr int  Dh_TILE_NUM = 1;
+                constexpr int  Dh_TILE_NUM = 4;
                 constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
                 if (params.cache_indir == nullptr) {
                     if (tlength < 32) {
@@ -80,7 +80,7 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
                 else {
                     assert(false);
                 }
-            } else if (params.num_heads * params.batch_size <= 32) {
+            } else if (params.num_heads * params.batch_size <= 40) {
                 constexpr int  Dh_TILE_NUM = 2;
                 constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
                 if (params.cache_indir == nullptr) {

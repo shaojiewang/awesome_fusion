@@ -516,6 +516,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     const auto timesteps_per_block = params.timesteps_per_block;
 
+
     // Pick a number of keys to make sure all the threads of a warp enter (due to shfl_sync).
     int ti_end = MULTI_BLOCK_FLAG ? div_up(timesteps_per_block, K_PER_WARP) * K_PER_WARP :
                                     div_up(tlength - first_step, K_PER_WARP) * K_PER_WARP
