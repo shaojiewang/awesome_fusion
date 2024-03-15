@@ -55,6 +55,8 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
     int            tlength            = (DO_CROSS_ATTENTION) ? params.memory_max_len : params.max_timestep;
 
     const int kv_cache_quant_mode = params.kv_cache_quant_mode;
+    size_t seq_len_tile = mmha::multi_block_grid_setup<T, Dh, false, SPLIT_KV_CACHE>(                              
+        params, THDS_PER_VALUE, THDS_PER_BLOCK, params.max_timestep, DO_MULTI_BLOCK);                                           
     const bool do_multi_block = params.enable_multi_block;
     // printf("tlength, CROSS_ATTENTION, multi_block = %d, %d, %d\n", tlength, DO_CROSS_ATTENTION, do_multi_block);
     if (kv_cache_quant_mode == 0) {

@@ -26,6 +26,8 @@
 #include "hip_bf16_wrapper.h"
 #endif
 
+#define MAX_SEQLEN_TILE 64
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define CHECK_CUDA(call)                                                                                               \
@@ -189,7 +191,7 @@ struct Multihead_attention_params_base {
 
     mutable int timesteps_per_block        = -1;
     mutable int seq_len_tile               = -1;
-    mutable int max_seq_len_tile           = -1;
+    mutable int max_seq_len_tile           = MAX_SEQLEN_TILE;
     mutable int max_timesteps_per_block    = 8192;
 
     // The partial output buffer. Dimensions max_seq_len_tile x B x D. (for each timestep only seq_len_tile x B x D is

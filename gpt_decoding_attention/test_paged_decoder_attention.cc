@@ -14,6 +14,8 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     int PB = test_args.paged_block_size;
     int heads_per_gqa_group = 1;
 
+    int max_seq_len_tile = MAX_SEQLEN_TILE;
+
     GPUBuf<T> q_T(BS * Dh * H), q_bias_T(Dh * H);
     GPUBuf<T> k_T(BS * Dh * H), k_bias_T(Dh * H);
     GPUBuf<T> v_T(BS * Dh * H), v_bias_T(Dh * H);
@@ -22,6 +24,12 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<T> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
     GPUBuf<T> vcache_T(BS * Dh * H * L);
     GPUBuf<T> out_T(BS * Dh * H);
+
+    // for multi block
+    GPUBuf<T> partial_out_T(BS * Dh * H * max_seq_len_tile);
+    GPUBuf<float> partial_sum_F(BS * H * max_seq_len_tile);
+    GPUBuf<float> partial_max_F(BS * H * max_seq_len_tile);
+    GPUBuf<int> block_counter(BS * H);
 
     size_t num_blocks_per_bs = (L + PB - 1) / PB;
     size_t num_blocks = num_blocks_per_bs * BS;
@@ -132,6 +140,10 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       (Tmha*)kv_blocks.ptr,
                       (size_t**)k_batch_offset.ptr,
                       (size_t**)v_batch_offset.ptr,
+                      (Tmha*)partial_out_T.ptr,
+                      (float*)partial_sum_F.ptr,
+                      (float*)partial_max_F.ptr,
+                      (int*)block_counter.ptr,
                       nullptr,
                       0,
                       BS,

@@ -163,6 +163,10 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
                        T*                                          kv_blocks,
                        size_t**                                    k_cache,
                        size_t**                                    v_cache,
+                       T*                                          partial_out,
+                       float*                                      partial_sum,
+                       float*                                      partial_max,
+                       int*                                        block_counter,
                        const int*                                  cache_indir,
                        int                                         stride,
                        int                                         batch_size,
@@ -217,6 +221,12 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     params.timestep = cur_timesteps;
     params.max_timestep = seq_length + 1;
     params.layer_index = 0;
+
+    // multi block
+    params.partial_out = partial_out;
+    params.partial_sum = partial_sum;
+    params.partial_max = partial_max;
+    params.block_counter = block_counter;
 }
 
 template<typename T>
