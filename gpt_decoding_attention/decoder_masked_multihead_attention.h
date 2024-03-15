@@ -181,15 +181,16 @@ struct Multihead_attention_params_base {
     float rope_theta = 10000.0f;
 
     // Multi-block setups
-    bool enable_multi_block = false;
+    mutable bool enable_multi_block = false;
 
     // Number of streaming processors on the device.
     // Tune block size to maximum occupancy.
-    int multi_processor_count = 1;
+    int multi_processor_count = 104 * 2;
 
-    mutable int timesteps_per_block = -1;
-    mutable int seq_len_tile        = -1;
-    mutable int max_seq_len_tile    = -1;
+    mutable int timesteps_per_block        = -1;
+    mutable int seq_len_tile               = -1;
+    mutable int max_seq_len_tile           = -1;
+    mutable int max_timesteps_per_block    = 8192;
 
     // The partial output buffer. Dimensions max_seq_len_tile x B x D. (for each timestep only seq_len_tile x B x D is
     // needed)

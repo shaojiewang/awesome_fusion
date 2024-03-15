@@ -889,17 +889,24 @@ inline size_t multi_block_grid_setup(const Paged_multihead_attention_params<T, D
     }
 
     // auto constexpr threads_per_value = mmha::threads_per_value<T>(mmha::dh_max(Dh));
+    int balanced_seq_len_tile
+        = divUp(params.multi_processor_count, params.batch_size * params.num_heads);
+
+    const int seq_len_per_kv_loop = mmha::divUp(threads_per_block , threads_per_value) * 1;
+    int max_seq_len_tile = params.max_seq_len_tile;
+    max_seq_len_tile = std::min(divUp(tlength + 1, seq_len_per_kv_loop), max_seq_len_tile);
+
+    // A single CTA can at most compute 8k tokens due to lds size limit
+    int min_seq_len_tile = divUp(tlength + 1, params.max_timesteps_per_block);
 
     // Make sure: seq_len_tile * threads_per_value <= threads_per_block (for multi_block_mode)
-    params.seq_len_tile = std::floor(threads_per_block / threads_per_value);
+    params.seq_len_tile = std::clamp(balanced_seq_len_tile, min_seq_len_tile, max_seq_len_tile);
 
-    assert(params.seq_len_tile <= params.max_seq_len_tile);
+    // assert(params.seq_len_tile <= params.max_seq_len_tile);
 
     params.timesteps_per_block = divUp(tlength, params.seq_len_tile);
 
-#ifndef ENABLE_MULTI_BLOCK_OPTION
-    do_multi_block = false;
-#endif
+    params.enable_multi_block = (params.seq_len_tile > 1);
     // Return the sequence length tile if using multi block modes.
     return params.seq_len_tile;
 }

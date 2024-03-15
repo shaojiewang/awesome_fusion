@@ -1166,7 +1166,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     }
 
 #ifdef ENABLE_MULTI_BLOCK_OPTION
-    if (MULTI_BLOCK_FLAG) {
+    if constexpr(MULTI_BLOCK_FLAG) {
 
         // hip::atomic_ref<int, cuda::thread_scope_device> count_ref{params.block_counter[bhi]};
         bool                                             last_block{false};
@@ -1183,17 +1183,16 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         // by combining all the partial max/sum and outputs
         ////////////////////
         ////////////////////
-        if (__syncthreads_or(last_block)) {
+        if (__syncthreads_or(last_block))
+        {
 
             ////////////////////
             // Find the global max from all partial max -> use CUB BlockReduce
             ////////////////////
 
-            float final_max          = -FLT_MAX;
+            float final_max = -FLT_MAX;
             float thread_partial_max = -FLT_MAX;
-            if (tidx < sample_tile)
-                thread_partial_max = params.partial_max[bhi_seq_len_tile + tidx];
-            // final_max = fmaxf(final_max, thread_partial_max);
+            thread_partial_max = params.partial_max[bhi_seq_len_tile + min(tidx, (int)gridDim.z - 1)];
 
             // Make sure we can start writing to shared memory.
             __syncthreads();
@@ -1204,12 +1203,13 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
             //__shared__ typename BlockReduce::TempStorage temp_storage;
             // Obtain a segment of consecutive items that are blocked across threads (final_max from above)
             // Compute the block-wide max for thread0
-            //final_max = BlockReduce(temp_storage).Reduce(thread_partial_max, cub::Max(), sample_tile);
-            
+            //final_max = BlockReduce(temp_storage).Reduce(thread_partial_max, cub::Max(), gridDim.z);
+
             final_max = blockReduceMax(thread_partial_max);
 
             __shared__ float final_max_smem;
-            if (tidx == 0) {
+            if (tidx == 0)
+            {
                 final_max_smem = final_max;
             }
             __syncthreads();
@@ -1223,8 +1223,9 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
             ////////////////////
 
             float final_sum = 0.f;
-            if (tidx < sample_tile) {
-                thread_partial_max            = params.partial_max[bhi_seq_len_tile + tidx];
+            if (tidx < gridDim.z)
+            {
+                thread_partial_max = params.partial_max[bhi_seq_len_tile + tidx];
                 const auto thread_partial_sum = params.partial_sum[bhi_seq_len_tile + tidx];
                 final_sum += __expf(thread_partial_max - final_max) * thread_partial_sum;
             }
@@ -1240,60 +1241,56 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
             // Shared memory to store partial outputs for each oi. -> size: gridDim.z * Dh * 4 Bytes. Reuse qk_smem.
             T* out_oi_smem = reinterpret_cast<T*>(smem_);
 
-            // Number of threads to utilize: THREADS_PER_VALUE * gridDim.z (THREADS_PER_VALUE for vectorized output
-            // and gridDim.z for all the partial outputs)
-            int threads_boundary = THREADS_PER_VALUE * sample_tile;  // should be smaller than THREADS_PER_BLOCK
-            assert(threads_boundary <= THREADS_PER_BLOCK);
-
             const auto o_idx = chunk_index<T, V_vec_k, THREADS_PER_VALUE>(tidx);
-            // The partial output region this thread takes care of
-            const auto oo = o_idx.x;
+
+            // Init partial out for accumulation.
+            V_vec_k zero_k;
+            zero(zero_k);
+            V_vec_k thread_accumulated_out = zero_k;
+
             // The hidden dimensions computed by this particular thread. (refer to vi)
             const auto oi = o_idx.y;
 
-            // Load partial output
-            int thread_partial_out_offset = oo * params.batch_size * params.num_heads * params.hidden_size_per_head;
-            // Load partial max (different to thread_partial_max since the threadIdx rule changes here)
-            float thread_partial_max_for_out = params.partial_max[bhi_seq_len_tile + oo];
+            // The partial output region this thread takes care of
+            const auto oo = o_idx.x;
 
-            // Load the partial outputs.
-            V_vec_k thread_partial_out =
-                *reinterpret_cast<const V_vec_k*>(&params.partial_out[thread_partial_out_offset + bhi * Dh + oi]);
-
-            if (tidx >= threads_boundary) {
-                zero(thread_partial_out);
-                thread_partial_max_for_out = final_max;
+            // Each thread may handle more than one partial output.
+            for (int tile_idx = o_idx.x; tile_idx < gridDim.z; tile_idx += V_PER_ITER)
+            {
+                // Load partial output
+                int thread_partial_out_offset = tile_idx * params.batch_size * params.num_heads * params.hidden_size_per_head;
+                // Load partial max (different to thread_partial_max since the threadIdx rule changes here)
+                float thread_partial_max_for_out = params.partial_max[bhi_seq_len_tile + tile_idx];
+                // Load the partial outputs.
+                V_vec_k thread_partial_out
+                    = *reinterpret_cast<const V_vec_k*>(&params.partial_out[thread_partial_out_offset + bhi * Dh + oi]);
+                // Apply the correction factor.
+                Tk factor_compute;
+                convert_from_float(&factor_compute, __expf(thread_partial_max_for_out - final_max));
+                thread_partial_out = mul<V_vec_k, Tk, V_vec_k>(factor_compute, thread_partial_out);
+                thread_accumulated_out = add(thread_partial_out, thread_accumulated_out);
             }
 
-            Tk factor_compute;
-            convert_from_float(factor_compute, __expf(thread_partial_max_for_out - final_max));
-
-            thread_partial_out = mul<V_vec_k, Tk, V_vec_k>(factor_compute, thread_partial_out);
-
-            // Make sure we can start writing to shared memory.
-            __syncthreads();
-
-            // The reduction iteration should start with a number which is a power of 2
-            const auto reduction_iteration =
-                static_cast<int>(math::next_power_of_two(static_cast<uint32_t>(sample_tile)));
-
             // Run the final reduction amongst the different groups computing different partial outputs.
-// #pragma unroll
-            for (int active_groups = reduction_iteration; active_groups >= 2; active_groups /= 2) {
+#pragma unroll
+            for (int active_groups = V_PER_ITER; active_groups >= 2; active_groups /= 2)
+            {
 
                 // The midpoint in the number of active groups.
                 int midpoint = active_groups / 2;
 
                 // The upper part of active threads store to shared memory.
-                if (oo >= midpoint && oo < active_groups && (Dh == Dh_MAX || oi < Dh)) {
-                    *reinterpret_cast<V_vec_k*>(&out_oi_smem[(oo - midpoint) * Dh + oi]) = thread_partial_out;
+                if (oo >= midpoint && oo < active_groups && (Dh == Dh_MAX || oi < Dh))
+                {
+                    *reinterpret_cast<V_vec_k*>(&out_oi_smem[(oo - midpoint) * Dh + oi]) = thread_accumulated_out;
                 }
                 __syncthreads();
 
                 // The bottom warps update their values.
-                if (oo < midpoint && (Dh == Dh_MAX || oi < Dh)) {
-                    thread_partial_out =
-                        add(thread_partial_out, *reinterpret_cast<const V_vec_k*>(&out_oi_smem[oo * Dh + oi]));
+                if (oo < midpoint && (Dh == Dh_MAX || oi < Dh))
+                {
+                    thread_accumulated_out
+                        = add(thread_accumulated_out, *reinterpret_cast<const V_vec_k*>(&out_oi_smem[oo * Dh + oi]));
                 }
                 __syncthreads();
             }
@@ -1302,32 +1299,26 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
             // Final output O * inv_sum
             ////////////////////
 
-            if (oo == 0 && (Dh == Dh_MAX || oi < Dh)) {
+            if (oo == 0 && (Dh == Dh_MAX || oi < Dh))
+            {
                 const auto inv_sum = __fdividef(1.f, final_sum + 1.e-6f);
-                Tk         inv_sum_compute;
-                convert_from_float(inv_sum_compute, inv_sum);
 
-                thread_partial_out = mul<V_vec_k, Tk, V_vec_k>(inv_sum_compute, thread_partial_out);
+                Tk inv_sum_compute;
+                convert_from_float(&inv_sum_compute, inv_sum);
 
-                *reinterpret_cast<V_vec_k*>(&params.out[bhi * Dh + oi]) = thread_partial_out;
+                thread_accumulated_out = mul<V_vec_k, Tk, V_vec_k>(inv_sum_compute, thread_accumulated_out);
+                *reinterpret_cast<V_vec_k*>(&params.out[bhi * Dh + oi]) = thread_accumulated_out;
             }
 
             // Reset qk_current_smem and block_counter for the next timestep
-            if (tidx == 0) {
+            if (tidx == 0)
+            {
                 params.block_counter[bhi] = 0;
             }
         }
     }
-#endif  // ENABLE_MULTI_BLOCK_OPTION
-
+#endif // ENABLE_MULTI_BLOCK_OPTION
 }
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-}  // namespace mmha
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template<typename T, int Dh, int Dh_MAX, typename KERNEL_PARAMS_TYPE, bool SPLIT_KV_CACHE = false>
-void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_t& stream);
+}// namespace mmha
 
