@@ -75,7 +75,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 #ifndef MMHA_USE_FP32_ACUM_FOR_LOGITS
     if (sizeof(Tk) != 4) {
         // TODO - change to tlength
-        const int max_timesteps = min(params.max_timestep, params.memory_max_len);
+        const int max_timesteps = min(max_time_step, params.memory_max_len);
         logits_smem_ +=
             (DO_CROSS_ATTENTION) ? div_up(params.memory_max_len + 1, 4) * 16 : div_up(max_timesteps + 1, 4) * 16;
     }
@@ -469,7 +469,12 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         // We don't need to apply the linear position bias here since qi - ki = 0 yields the position bias 0.
 
         qk_max                        = qk;
-        qk_smem[tlength - first_step] = qk;
+        if (MULTI_BLOCK_FLAG) {
+            qk_current_smem[0] = qk;
+        }
+        else {
+            qk_smem[tlength - first_step] = qk;
+        }
     }
 
     // Make sure the data is in shared memory.
@@ -616,6 +621,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
         // asm volatile ("s_waitcnt vmcnt(0)");
         float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
+
+        if (MULTI_BLOCK_FLAG && (ti >= timesteps_per_block || ti_circ >= tlength)) {
+            continue;
+        }
 
         // Store the product to shared memory. There's one qk value per timestep. Update the max.
         if (ti_circ < tlength && tidx % THREADS_PER_KEY == 0) {
