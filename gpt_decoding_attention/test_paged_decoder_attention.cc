@@ -200,7 +200,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     printf("[FP32] ");
     TIMEIT(true, 10, ms, stream, masked_multihead_attention, params_fp32, stream);
     printf("[%s] ", string_rep_t<T>::value.c_str());
-    TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
+    // TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
 
     printf("%s\n", !error ? "." : "X");
     return ms;

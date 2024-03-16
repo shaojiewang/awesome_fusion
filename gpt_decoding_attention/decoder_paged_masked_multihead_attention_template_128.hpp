@@ -696,6 +696,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         qk_smem[ti - first_step] = logit;
     }
 
+    if(tidx==0)
+    {
+        printf("blockIdx.z=%d, qk_max=%f\n", (int)blockIdx.z, qk_max);
+    }
+
     // Compute the sum.
     sum = block_sum<WARPS_PER_BLOCK>(&red_smem[WARPS_PER_BLOCK], sum);
 
@@ -1083,7 +1088,9 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         if (tidx == 0) {
             if (__atomic_fetch_add(&(params.block_counter[bhi]), 1, __ATOMIC_RELAXED) == (sample_tile - 1)) {
                 last_block = true;
+                printf("blockIdx.z=%d, sample_tile=%d, block_counter=%d\n", (int)blockIdx.z, sample_tile, params.block_counter[bhi]);
             }
+            
         }
 
         ////////////////////
@@ -1103,6 +1110,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             float final_max = -FLT_MAX;
             float thread_partial_max = -FLT_MAX;
             thread_partial_max = params.partial_max[bhi_seq_len_tile + min(tidx, (int)gridDim.z - 1)];
+
+            if(tidx == 0)
+            {
+                printf("blockIdx.z=%d, thread_partial_max=%f\n", (int)blockIdx.z, thread_partial_max);
+            }
 
             // Make sure we can start writing to shared memory.
             __syncthreads();

@@ -56,7 +56,7 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
 
     const int kv_cache_quant_mode = params.kv_cache_quant_mode;
     size_t seq_len_tile = mmha::multi_block_grid_setup<T, Dh, false, SPLIT_KV_CACHE>(                              
-        params, THDS_PER_VALUE, THDS_PER_BLOCK, params.max_timestep, DO_MULTI_BLOCK);                                           
+        params, 16, 256, params.max_timestep, true);                                           
     const bool do_multi_block = params.enable_multi_block;
     // printf("tlength, CROSS_ATTENTION, multi_block = %d, %d, %d\n", tlength, DO_CROSS_ATTENTION, do_multi_block);
     if (kv_cache_quant_mode == 0) {
@@ -137,7 +137,8 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
                     T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
             } else {
                 PAGED_MMHA_LAUNCH_KERNEL(
-                    T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+                    T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+                printf("seq_len_tile=%d\n", seq_len_tile);
             }
         }
     } else {

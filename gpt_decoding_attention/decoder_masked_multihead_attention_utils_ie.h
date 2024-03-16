@@ -892,7 +892,7 @@ inline size_t multi_block_grid_setup(const Paged_multihead_attention_params<T, D
     int balanced_seq_len_tile
         = divUp(params.multi_processor_count, params.batch_size * params.num_heads);
 
-    const int seq_len_per_kv_loop = mmha::divUp(threads_per_block , threads_per_value) * 1;
+    const int seq_len_per_kv_loop = mmha::divUp(threads_per_block , threads_per_value) * 8;
     int max_seq_len_tile = params.max_seq_len_tile;
     max_seq_len_tile = std::min(divUp(tlength + 1, seq_len_per_kv_loop), max_seq_len_tile);
 
