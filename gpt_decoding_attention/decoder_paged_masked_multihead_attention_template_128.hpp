@@ -537,7 +537,8 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     const int  tile_offset                      = MULTI_BLOCK_FLAG ? c_tile_times_timesteps_per_block : 0;
 
     for (int ti = first_step + ko; ti < ti_end; ti += K_PER_ITER) {
-        const int ti_circ = ti % params.memory_max_len;
+        const int ti_circ = MULTI_BLOCK_FLAG ? (ti + c_tile_times_timesteps_per_block) % params.memory_max_len :
+                                               ti % params.memory_max_len;
         const int valid_ti_circ = min(ti_circ, tlength - 1);
         Tcache*   k_cache       = get_kv_cache_ptr<Tcache>(kv_blocks,
                                                    kcache_bt_offset,
@@ -684,30 +685,43 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     // Compute the logits and start the sum.
     float sum = 0.f;
-    for (int ti = first_step + tidx; ti <= tlength; ti += THREADS_PER_BLOCK) {
-        bool is_mask = (SPLIT_KV_CACHE) ?
+
+    const int logit_loop_end = MULTI_BLOCK_FLAG ? timesteps_per_block : tlength;
+    for (int ti = first_step + tidx; ti <= logit_loop_end; ti += THREADS_PER_BLOCK) {
+        const int time_now = MULTI_BLOCK_FLAG ? ti + c_tile_times_timesteps_per_block : ti;
+        bool      is_mask  = (SPLIT_KV_CACHE) ?
                            false :
                            (params.masked_tokens != nullptr) && params.masked_tokens[bi_seq_len_offset + ti];
+        if (!MULTI_BLOCK_FLAG) {
 #ifdef FP8_MHA
-        float logit = 0.f;
-        if (FP8_MHA_KERNEL) {
-            logit = is_mask ? 0.f :
-                              __expf((qk_smem[ti - first_step] - qk_max) * params.query_weight_output_scale[0]
-                                     * params.query_weight_output_scale[0]);
+            float logit = 0.f;
+            if (FP8_MHA_KERNEL) {
+                logit = is_mask ? 0.f :
+                                  __expf((qk_smem[ti - first_step] - qk_max) * params.query_weight_output_scale[0]
+                                         * params.query_weight_output_scale[0]);
+            }
+            else {
+                logit = is_mask ? 0.f : __expf(qk_smem[ti - first_step] - qk_max);
+            }
+#else
+            float logit = is_mask ? 0.f : __expf(qk_smem[ti - first_step] - qk_max);
+#endif
+            sum += logit;
+            qk_smem[ti - first_step] = logit;
         }
         else {
-            logit = is_mask ? 0.f : __expf(qk_smem[ti - first_step] - qk_max);
+            // Not supported yet: multi-block mode with FP8_MHA
+            if (time_now < tlength && ti != timesteps_per_block) {
+                float logit = __expf(qk_smem[ti] - qk_max);
+                sum += logit;
+                qk_smem[ti] = logit;
+            }
+            else if (time_now == tlength) {
+                float logit = __expf(qk_current_smem[0] - qk_max);
+                sum += logit;
+                qk_current_smem[0] = logit;
+            }
         }
-#else
-        float logit       = is_mask ? 0.f : __expf(qk_smem[ti - first_step] - qk_max);
-#endif
-        sum += logit;
-        qk_smem[ti - first_step] = logit;
-    }
-
-    if(tidx==0)
-    {
-        printf("blockIdx.z=%d, qk_max=%f\n", (int)blockIdx.z, qk_max);
     }
 
     // Compute the sum.
@@ -719,12 +733,25 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         params.is_return_cross_attentions ?
             bhi * params.max_decoder_seq_len * params.memory_max_len + params.max_timestep * params.memory_max_len :
             0;
-    for (int ti = first_step + tidx; ti <= tlength; ti += THREADS_PER_BLOCK) {
-        float logit = qk_smem[ti - first_step] * inv_sum;
-        if (params.is_return_cross_attentions) {
-            params.cross_attention_out[cross_attention_out_offset + ti] = logit;
+    const int normlization_loop_end = MULTI_BLOCK_FLAG ? timesteps_per_block : tlength;
+    for (int ti = first_step + tidx; ti <= normlization_loop_end; ti += THREADS_PER_BLOCK) {
+        const int time_now = MULTI_BLOCK_FLAG ? ti + c_tile_times_timesteps_per_block : ti;
+        if (!MULTI_BLOCK_FLAG) {
+            float logit = qk_smem[ti - first_step] * inv_sum;
+            if (params.is_return_cross_attentions) {
+                params.cross_attention_out[cross_attention_out_offset + ti] = logit;
+            }
+            convert_from_float(logits_smem[ti - first_step], logit);
         }
-        convert_from_float(logits_smem[ti - first_step], logit);
+        else {
+            // no scaling factor inv_sum applied here, will apply the scaling factor after all blocks finished
+            if (time_now < tlength && ti != timesteps_per_block) {
+                convert_from_float(logits_smem[ti - first_step], qk_smem[ti - first_step]);
+            }
+            else if (time_now == tlength) {
+                convert_from_float(logits_current_smem[0], qk_current_smem[0]);
+            }
+        }
     }
 
     // Put Values part below so we leverage __syncthreads
@@ -753,7 +780,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 // Trigger the loads from the V bias buffer.
                 if (params.v_bias != nullptr) {
                     v_bias = vec_conversion<V_vec_k, V_vec_m>(
-                        ldg(reinterpret_cast<const V_vec_m*>(&params.v_bias[hi * Dh + vi])));
+                        *reinterpret_cast<const V_vec_m*>(&params.v_bias[hi / params.heads_per_gqa_group * Dh + vi]));
                 }
                 if (DO_CROSS_ATTENTION) {
                     *reinterpret_cast<V_vec_m*>(&bias_smem[vi]) = vec_conversion<V_vec_m, V_vec_k>(v_bias);
@@ -1097,7 +1124,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         if (tidx == 0) {
             if (__atomic_fetch_add(&(params.block_counter[bhi]), 1, __ATOMIC_RELAXED) == (sample_tile - 1)) {
                 last_block = true;
-                printf("blockIdx.z=%d, sample_tile=%d, block_counter=%d\n", (int)blockIdx.z, sample_tile, params.block_counter[bhi]);
             }
             
         }
@@ -1119,11 +1145,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             float final_max = -FLT_MAX;
             float thread_partial_max = -FLT_MAX;
             thread_partial_max = params.partial_max[bhi_seq_len_tile + min(tidx, (int)gridDim.z - 1)];
-
-            if(tidx == 0)
-            {
-                printf("blockIdx.z=%d, thread_partial_max=%f\n", (int)blockIdx.z, thread_partial_max);
-            }
 
             // Make sure we can start writing to shared memory.
             __syncthreads();
