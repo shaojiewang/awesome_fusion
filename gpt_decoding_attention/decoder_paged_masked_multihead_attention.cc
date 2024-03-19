@@ -138,15 +138,89 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
             {
                 PAGED_MMHA_LAUNCH_KERNEL(
                     T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
-                // printf("seq_tile = %d\n", seq_len_tile);
             } 
-            //else {
-            //    PAGED_MMHA_LAUNCH_KERNEL(
-            //        T, T, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
-            //}
         }
     } else {
-        assert(false);
+        if (!do_multi_block) {
+            if (params.num_heads * params.batch_size <= 16) {
+                constexpr int  Dh_TILE_NUM = 4;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
+                }
+            } else if (params.num_heads * params.batch_size <= 40) {
+                constexpr int  Dh_TILE_NUM = 2;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
+                }
+            } else {
+                constexpr int  Dh_TILE_NUM = 1;
+                constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+                if (params.cache_indir == nullptr) {
+                    if (tlength < 32) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 128, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else if (tlength < 512) {
+                        PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                    }
+                    else {
+                        if(params.batch_size * params.num_heads > 208) {
+                            PAGED_MMHA_LAUNCH_KERNEL(T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        } else {
+                            PAGED_MMHA_LAUNCH_KERNEL(
+                                T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 1024, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, false, stream);
+                        }
+                    }
+                }
+                else {
+                    assert(false);
+                }
+            }
+        } else {
+            constexpr int Dh_TILE_NUM = 1;
+            constexpr int  THREADS_PER_VALUE  = threads_per_value_t<T, Dh_MAX / Dh_TILE_NUM>::value;
+            if (tlength < 32) 
+            {
+                PAGED_MMHA_LAUNCH_KERNEL(
+                    T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 4, THREADS_PER_VALUE, 64, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+            } 
+            else // if (tlength < 256) 
+            {
+                PAGED_MMHA_LAUNCH_KERNEL(
+                    T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+            } 
+        }
     }
 }
 

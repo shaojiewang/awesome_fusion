@@ -163,6 +163,9 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
                        T*                                          kv_blocks,
                        size_t**                                    k_cache,
                        size_t**                                    v_cache,
+                       float**                                     k_scale_bs_table,
+                       float**                                     v_scale_bs_table,
+                       int                                         int8_mode,
                        T*                                          partial_out,
                        float*                                      partial_sum,
                        float*                                      partial_max,
@@ -223,10 +226,17 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     params.layer_index = 0;
 
     // multi block
-    params.partial_out = partial_out;
-    params.partial_sum = partial_sum;
-    params.partial_max = partial_max;
+    params.partial_out   = partial_out;
+    params.partial_sum   = partial_sum;
+    params.partial_max   = partial_max;
     params.block_counter = block_counter;
+
+    // int8 quant
+    params.k_scale_cache_ptr   = k_scale_bs_table;
+    params.v_scale_cache_ptr   = v_scale_bs_table;
+    params.int8_mode           = int8_mode;
+    params.kv_cache_quant_mode = int8_mode;
+    
 }
 
 template<typename T>
@@ -437,6 +447,8 @@ template<>
 const std::string string_rep_t<half>::value{"FP16"};
 template<>
 const std::string string_rep_t<__nv_bfloat16>::value{"BF16"};
+template<>
+const std::string string_rep_t<int8_t>::value{"INT8"};
 
 template<typename T>
 struct mha_type_t {

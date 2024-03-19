@@ -212,7 +212,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     zero(q);
     if (!is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh)) {
         if (params.int8_mode == 2 || params.int8_mode == 3) {
-#if ENABLE_INT8
             using Packed_Int8_t  = typename packed_type<int8_t, num_elems<Qk_vec_m>::value>::type;
             using Packed_Float_t = typename packed_type<float, num_elems<Qk_vec_m>::value>::type;
             const auto q_scaling = params.qkv_scale_out[0];
@@ -220,7 +219,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 *reinterpret_cast<const Packed_Int8_t*>(&reinterpret_cast<const int8_t*>(params.q)[q_offset]);
 
             convert_from_float(q, mul<Packed_Float_t, float>(q_scaling, float_from_int8(q_quant)));
-#endif
         }
         else {
             q = vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.q[q_offset])));
@@ -366,7 +364,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     }
 
     if (handle_kv && ENABLE_8BITS_CACHE && hi % heads_per_gqa_group == 0) {
-#if ENABLE_INT8
         k_local_max = mmha::fabs_max(k);
         k_local_max = blockDim.x <= 32 ? warpReduceMax(k_local_max) : blockReduceMax(k_local_max);
 
@@ -375,7 +372,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             k_scale_f                 = 127 / k_s_max;
             k_scale_ptr[tlength_circ] = 1.0 / k_scale_f;
         }
-#endif
     }
     __syncthreads();
 
@@ -423,12 +419,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                     *reinterpret_cast<Qk_vec_m*>(cur_k_cache_ptr) = vec_conversion<Qk_vec_m, Qk_vec_k>(k);
                 }
                 else {
-#if ENABLE_INT8
                     T_scale scaleOrigQuant;
                     mmha::convert_from_float(&scaleOrigQuant, k_scale_f);
                     // Store 8bits kv cache
                     mmha::store_8bits_kv_cache_vec(cur_k_cache_ptr, k, 0, scaleOrigQuant);
-#endif
                 }
             }
         }
@@ -857,13 +851,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                     ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + ti_circ % tokens_per_block * Dh])));
             }
             else {
-#if ENABLE_INT8
                 float   v_scale_f   = v_scale_ptr[ti_circ];
                 T_scale v_scale_quant_orig;
                 mmha::convert_from_float(&v_scale_quant_orig, v_scale_f);
                 mmha::load_8bits_kv_cache_vec(
                     &v, v_cache, beam_offset + ti_circ % tokens_per_block * Dh, v_scale_quant_orig);
-#endif
             }
             if (DO_CROSS_ATTENTION && cur_timestep == 0) {
                 assert(false);  // TODO: support cross attention
@@ -972,12 +964,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 vec_conversion<V_vec_m, V_vec_k>(v);
         }
         else if (ENABLE_8BITS_CACHE) {
-#if ENABLE_INT8
             T_scale v_scaleOrigQuant;
             mmha::convert_from_float(&v_scaleOrigQuant, v_scale_f);
             // Store 8bits kv cache.
             mmha::store_8bits_kv_cache_vec(v_cache, v, tlength_circ % tokens_per_block * Dh, v_scaleOrigQuant);
-#endif
         }
     }
 

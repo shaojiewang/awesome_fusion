@@ -13,16 +13,18 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     int R  = test_args.rotary_dimension;
     int PB = test_args.paged_block_size;
     int heads_per_gqa_group = 1;
+    
+    int int8_mode;
 
     int max_seq_len_tile = MAX_SEQLEN_TILE;
 
     GPUBuf<T> q_T(BS * Dh * H), q_bias_T(Dh * H);
     GPUBuf<T> k_T(BS * Dh * H), k_bias_T(Dh * H);
     GPUBuf<T> v_T(BS * Dh * H), v_bias_T(Dh * H);
-    GPUBuf<Tcache> kcache_T_transpose(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
-    GPUBuf<Tcache> vcache_T_transpose(BS * Dh * H * L);
-    GPUBuf<Tcache> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
-    GPUBuf<Tcache> vcache_T(BS * Dh * H * L);
+    GPUBuf<T> kcache_T_transpose(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
+    GPUBuf<T> vcache_T_transpose(BS * Dh * H * L);
+    GPUBuf<T> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
+    GPUBuf<T> vcache_T(BS * Dh * H * L);
     GPUBuf<T> out_T(BS * Dh * H);
 
     // for multi block
@@ -30,6 +32,16 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<float> partial_sum_F(BS * H * max_seq_len_tile);
     GPUBuf<float> partial_max_F(BS * H * max_seq_len_tile);
     GPUBuf<int> block_counter(BS * H);
+
+    // for kvcache quant scale
+    GPUBuf<float> k_scale(BS * H * L);
+    GPUBuf<float> v_scale(BS * H * L);
+    GPUBuf<size_t> k_scale_bs_table(BS);
+    GPUBuf<size_t> v_scale_bs_table(BS);
+
+    invokeSetPageBlockOffset(k_scale_bs_table.ptr, H * L, __builtin_bit_cast(size_t, k_scale.ptr), BS);
+    invokeSetPageBlockOffset(v_scale_bs_table.ptr, H * L, __builtin_bit_cast(size_t, v_scale.ptr), BS);
+    check_cuda_error(hipDeviceSynchronize());
 
     size_t num_blocks_per_bs = (L + PB - 1) / PB;
     size_t num_blocks = num_blocks_per_bs * BS;
@@ -51,7 +63,6 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<int> seq_lengths(BS);
     seq_lengths.set((std::vector<int>(BS, L * 4 / 4)).data());
 
-#if 1
     invokeTranspose4dBatchMajor(
         kcache_T_transpose.ptr,
         vcache_T_transpose.ptr,
@@ -64,23 +75,49 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
         H,
         (hipStream_t)(0)
     );
-    invokeTranspose4dBatchMajorWithKVCachePtr(
-        reinterpret_cast<T*>(kv_blocks.ptr),
-        reinterpret_cast<size_t**>(k_batch_offset.ptr),
-        reinterpret_cast<size_t**>(v_batch_offset.ptr),
-        reinterpret_cast<Tcache*>(kcache_T.ptr),
-        reinterpret_cast<Tcache*>(vcache_T.ptr),
-        reinterpret_cast<int*>(seq_lengths.ptr),
-        PB,
-        0,
-        BS,
-        L - 1,
-        L,
-        Dh,
-        H,
-        (hipStream_t)(0)
-    );
-#endif        
+    if constexpr(std::is_same<Tcache, int8_t>::value)
+    {
+        invokeTranspose4dBatchMajorWithKVCachePtrQuant(
+            reinterpret_cast<Tcache*>(kv_blocks.ptr),
+            reinterpret_cast<size_t**>(k_batch_offset.ptr),
+            reinterpret_cast<size_t**>(v_batch_offset.ptr),
+            reinterpret_cast<float**>(k_scale_bs_table.ptr), 
+            reinterpret_cast<float**>(v_scale_bs_table.ptr), 
+            reinterpret_cast<T*>(kcache_T.ptr),
+            reinterpret_cast<T*>(vcache_T.ptr),
+            reinterpret_cast<int*>(seq_lengths.ptr),
+            PB,
+            0,
+            BS,
+            L - 1,
+            L,
+            Dh,
+            H,
+            (hipStream_t)(0)
+        );
+        int8_mode = 1;
+    } 
+    else
+    {
+        invokeTranspose4dBatchMajorWithKVCachePtr(
+            reinterpret_cast<T*>(kv_blocks.ptr),
+            reinterpret_cast<size_t**>(k_batch_offset.ptr),
+            reinterpret_cast<size_t**>(v_batch_offset.ptr),
+            reinterpret_cast<Tcache*>(kcache_T.ptr),
+            reinterpret_cast<Tcache*>(vcache_T.ptr),
+            reinterpret_cast<int*>(seq_lengths.ptr),
+            PB,
+            0,
+            BS,
+            L - 1,
+            L,
+            Dh,
+            H,
+            (hipStream_t)(0)
+        );
+        int8_mode = 0;
+    }
+
     check_cuda_error(hipDeviceSynchronize());
     
     GPUBuf<int> cur_timesteps(BS);
@@ -140,6 +177,9 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       (Tmha*)kv_blocks.ptr,
                       (size_t**)k_batch_offset.ptr,
                       (size_t**)v_batch_offset.ptr,
+                      (float**)k_scale_bs_table.ptr,
+                      (float**)v_scale_bs_table.ptr,
+                      int8_mode,
                       (Tmha*)partial_out_T.ptr,
                       (float*)partial_sum_F.ptr,
                       (float*)partial_max_F.ptr,
@@ -199,7 +239,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     float ms = 0.0f;
     printf("[FP32] ");
     TIMEIT(true, 10, ms, stream, masked_multihead_attention, params_fp32, stream);
-    printf("[%s] ", string_rep_t<T>::value.c_str());
+    printf("[%s] ", string_rep_t<Tcache>::value.c_str());
     TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
 
     printf("%s\n", !error ? "." : "X");
@@ -223,10 +263,11 @@ int main(int argc, char** argv)
     check_cuda_error(hipGetDeviceProperties(&prop, 0));
     printf("Using device %s\n", prop.name);
 
-    float total_time_fp16 = 0.0f, total_time_bf16 = 0.0f;
+    float total_time_fp16 = 0.0f, total_time_bf16 = 0.0f, total_time_int8 = 0.0f;
     for(int i = 0; i < test_args.max_output_len - 1; i++){
         total_time_fp16 += test_paged_masked_multihead_attention<half, half>(test_args);
         total_time_bf16 += test_paged_masked_multihead_attention<__nv_bfloat16, __nv_bfloat16>(test_args);
+        total_time_int8 += test_paged_masked_multihead_attention<__nv_bfloat16, int8_t>(test_args);
         test_args.max_seq_len ++;
     }
 
