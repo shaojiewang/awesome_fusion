@@ -109,6 +109,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // static_assert(Dh_MAX / QK_VEC_SIZE <= WARP_SIZE, "");
     // The number of vectors per warp.
     constexpr int QK_VECS_PER_WARP = Dh_MAX / QK_VEC_SIZE;
+    static_assert(THREADS_PER_BLOCK >= QK_VECS_PER_WARP);
 
     // The layout of the cache is [B, H, Dh/x, L, x] with x == 4/8/16 for FP32/FP16/FP8. Since each thread
     // owns x elements, we have to decompose the linear index into chunks of x values and the posi-
@@ -140,7 +141,8 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // The thread in the block.
     const int tidx = threadIdx.x;
     // Layer stride in the block of KV Cache.
-    const int layer_stride = params.num_heads * params.hidden_size_per_head * params.tokens_per_block;
+    const int layer_stride =
+        params.num_heads / params.heads_per_gqa_group * params.hidden_size_per_head * params.tokens_per_block;
     // Head stride in the block of KV Cache.
     const int head_stride         = params.hidden_size_per_head * params.tokens_per_block;
     const int tokens_per_block    = params.tokens_per_block;
@@ -158,7 +160,8 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     float qk = 0.0F;
 
-    int qkv_base_offset = (params.stride == 0) ? bhi * Dh : bi * params.stride + hi * Dh;
+    int q_base_offset  = (params.stride == 0) ? bhi * Dh : bi * params.stride + hi * Dh;
+    int kv_base_offset = (params.stride == 0) ? bhi * Dh : bi * params.stride + hi / params.heads_per_gqa_group * Dh;
 
     const size_t bi_seq_len_offset = bi * params.memory_max_len;
 
@@ -181,9 +184,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     const bool is_masked = tidx >= QK_VECS_PER_WARP;
 
     // The offset in the Q and K buffer also accounts for the batch.
-    int qk_offset = qkv_base_offset + tidx * QK_VEC_SIZE;
+    int q_offset = q_base_offset + tidx * QK_VEC_SIZE;
+    int k_offset = kv_base_offset + tidx * QK_VEC_SIZE;
     // The offset in the bias buffer.
-    int qk_bias_offset = hi * Dh + tidx * QK_VEC_SIZE;
+    int q_bias_offset = hi * Dh + tidx * QK_VEC_SIZE;
+    int k_bias_offset = hi / params.heads_per_gqa_group * Dh + tidx * QK_VEC_SIZE;
 
     const bool do_ia3      = handle_kv && params.ia3_tasks != nullptr;
     const int  ia3_task_id = do_ia3 ? params.ia3_tasks[bbi] : 0;
@@ -214,14 +219,13 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             using Packed_Float_t = typename packed_type<float, num_elems<Qk_vec_m>::value>::type;
             const auto q_scaling = params.qkv_scale_out[0];
             const auto q_quant =
-                *reinterpret_cast<const Packed_Int8_t*>(&reinterpret_cast<const int8_t*>(params.q)[qk_offset]);
+                *reinterpret_cast<const Packed_Int8_t*>(&reinterpret_cast<const int8_t*>(params.q)[q_offset]);
 
             convert_from_float(q, mul<Packed_Float_t, float>(q_scaling, float_from_int8(q_quant)));
 #endif
         }
         else {
-            // q = vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q[qk_offset]));
-            q = vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.q[qk_offset])));
+            q = vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.q[q_offset])));
         }
     }
 
@@ -258,16 +262,13 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             using Packed_Float_t = typename packed_type<float, num_elems<Qk_vec_m>::value>::type;
             const auto k_scaling = params.qkv_scale_out[1];
             const auto k_quant =
-                *reinterpret_cast<const Packed_Int8_t*>(&reinterpret_cast<const int8_t*>(params.k)[qk_offset]);
+                *reinterpret_cast<const Packed_Int8_t*>(&reinterpret_cast<const int8_t*>(params.k)[k_offset]);
 
             convert_from_float(k, mul<Packed_Float_t, float>(k_scaling, float_from_int8(k_quant)));
         }
         else {
-            // k = !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ?
-            //         vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.k[qk_offset])) :
-            //         k;
             k = !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ?
-                    vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.k[qk_offset]))) :
+                    vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.k[k_offset]))) :
                     k;
         }
     }
@@ -276,7 +277,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     Qk_vec_k q_bias;
     zero(q_bias);
     q_bias = (!is_masked && Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
-                 vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[qk_bias_offset])) :
+                 vec_conversion<Qk_vec_k, Qk_vec_m>(*reinterpret_cast<const Qk_vec_m*>(&params.q_bias[q_bias_offset])) :
                  q_bias;
 
     Qk_vec_k k_bias;
@@ -284,7 +285,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     if (handle_kv) {
         k_bias =
             !is_masked && (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.k_bias != nullptr ?
-                vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.k_bias[qk_bias_offset]))) :
+                vec_conversion<Qk_vec_k, Qk_vec_m>(ldg(reinterpret_cast<const Qk_vec_m*>(&params.k_bias[k_bias_offset]))) :
                 k_bias;
     }
 
@@ -366,16 +367,15 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         __syncthreads();
     }
 
-    if (handle_kv && ENABLE_8BITS_CACHE) {
+    if (handle_kv && ENABLE_8BITS_CACHE && hi % heads_per_gqa_group == 0) {
 #if ENABLE_INT8
-        float* k_cache_scale = params.k_scale_cache_ptr[bi] + hi * params.memory_max_len;
-        k_local_max          = mmha::fabs_max(k);
-        k_local_max          = blockDim.x <= 32 ? warpReduceMax(k_local_max) : blockReduceMax(k_local_max);
+        k_local_max = mmha::fabs_max(k);
+        k_local_max = blockDim.x <= 32 ? warpReduceMax(k_local_max) : blockReduceMax(k_local_max);
 
         if (threadIdx.x == 0) {
-            k_s_max                     = k_local_max;
-            k_scale_f                   = 127 / k_s_max;
-            k_cache_scale[tlength_circ] = 1.0 / k_scale_f;
+            k_s_max                   = k_local_max;
+            k_scale_f                 = 127 / k_s_max;
+            k_scale_ptr[tlength_circ] = 1.0 / k_scale_f;
         }
 #endif
     }
@@ -482,9 +482,14 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     // The type of queries and keys for the math in the Q*K^T product.
     using K_vec_k = typename K_vec_k_<T, THREADS_PER_KEY>::Type;
-    using K_vec_m = typename K_vec_m_<T, THREADS_PER_KEY>::Type;
+    using K_vec_m = typename packed_type<Tcache, num_elems<K_vec_k>::value>::type;
+#ifdef MMHA_USE_FP32_ACUM_FOR_FMA
+    using K_vec_acum = typename Qk_vec_acum_fp32_<K_vec_k>::Type;
+#else
+    using K_vec_acum = K_vec_k;
+#endif
     // The number of elements per vector.
-    constexpr int K_VEC_SIZE = sizeof(K_vec_m) / sizeof(T);
+    constexpr int K_VEC_SIZE = sizeof(K_vec_m) / sizeof(Tcache);
     // Make sure the hidden size per head is a multiple of the vector size.
     static_assert(Dh_MAX % K_VEC_SIZE == 0, "");
     // The number of elements per thread.
@@ -500,10 +505,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     static_assert(Dh_MAX == THREADS_PER_KEY * K_VEC_SIZE * K_VECS_PER_THREAD);
 
     // Load the Q values from shared memory. The values are reused during the loop on K.
-    K_vec_k q_vec[K_VECS_PER_THREAD];
+    K_vec_acum q_vec[K_VECS_PER_THREAD];
 #pragma unroll
     for (int ii = 0; ii < K_VECS_PER_THREAD; ++ii) {
-        q_vec[ii] = *reinterpret_cast<const K_vec_k*>(&q_smem[ki + ii * THREADS_PER_KEY * K_VEC_SIZE]);
+        q_vec[ii] = vec_conversion<K_vec_acum, K_vec_k>(
+            *reinterpret_cast<const K_vec_k*>(&q_smem[ki + ii * THREADS_PER_KEY * K_VEC_SIZE]));
     }
 
     K_vec_k k_bias_vec[DO_CROSS_ATTENTION ? K_VECS_PER_THREAD : 1];
