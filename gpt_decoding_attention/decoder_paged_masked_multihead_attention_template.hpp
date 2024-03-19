@@ -3,6 +3,85 @@
 #include "decoder_masked_multihead_attention_template.hpp"
 
 namespace mmha {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<typename K_vec_k, int THREADS_PER_KEY, typename Q_vec, typename K_vec, int N>
+inline __device__ float qk_dot_(const Q_vec (&q)[N], const K_vec (&k)[N])
+{
+#ifdef MMHA_USE_FP32_ACUM_FOR_FMA
+    using K_vec_accum = typename K_vec_acum_fp32_<K_vec>::Type;
+#else
+    using K_vec_accum = typename K_vec_acum_<K_vec>::Type;
+#endif
+    // Compute the parallel products for Q*K^T (treat vector lanes separately).
+    K_vec_accum qk_vec = mul<K_vec_accum, Q_vec, K_vec>(q[0], k[0]);
+#pragma unroll
+    for (int ii = 1; ii < N; ++ii) {
+        qk_vec = fma(q[ii], k[ii], qk_vec);
+    }
+
+    // Finalize the reduction across lanes.
+    float qk = sum(qk_vec);
+#pragma unroll
+    for (int mask = THREADS_PER_KEY / 2; mask >= 1; mask /= 2) {
+        qk += __shfl_xor(qk, mask);
+    }
+    return qk;
+}
+
+template<typename K_vec_k, int THREADS_PER_KEY, typename Q_vec, typename K_vec, int N>
+inline __device__ float qk_scale_dot_(const Q_vec (&q)[N], const K_vec (&k)[N], const float k_scale)
+{
+#ifdef MMHA_USE_FP32_ACUM_FOR_FMA
+    using K_vec_accum = typename K_vec_acum_fp32_<K_vec>::Type;
+#else
+    using K_vec_accum = typename K_vec_acum_<K_vec>::Type;
+#endif
+    // Compute the parallel products for Q*K^T (treat vector lanes separately).
+    K_vec_accum k_vec  = mul<K_vec_accum, float, K_vec>(k_scale, k[0]);
+    K_vec_accum qk_vec = mul<K_vec_accum, Q_vec, K_vec_accum>(q[0], k_vec);
+#pragma unroll
+    for (int ii = 1; ii < N; ++ii) {
+        K_vec_accum k_vec = mul<K_vec_accum, float, K_vec>(k_scale, k[ii]);
+        qk_vec            = fma(q[ii], k_vec, qk_vec);
+    }
+
+    // Finalize the reduction across lanes.
+    float qk = sum(qk_vec);
+#pragma unroll
+    for (int mask = THREADS_PER_KEY / 2; mask >= 1; mask /= 2) {
+        qk += __shfl_xor(qk, mask);
+    }
+    return qk;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<typename T, typename K_vec_k, int THREADS_PER_KEY>
+struct Qk_dot {
+    template<typename Q_vec, typename K_vec, int N>
+    static inline __device__ float dot(const Q_vec (&q)[N], const K_vec (&k)[N])
+    {
+        return qk_dot_<K_vec_k, THREADS_PER_KEY>(q, k);
+    }
+
+    template<typename Q_vec, typename K_vec, int N>
+    static inline __device__ float scale_dot(const Q_vec (&q)[N], const K_vec (&k)[N], const float k_scale)
+    {
+#ifdef MMHA_USE_HMMA
+        static_assert("HMMA doesn't support k scales");
+#endif  // MMHA_USE_HMMA
+        return qk_scale_dot_<K_vec_k, THREADS_PER_KEY>(q, k, k_scale);
+    }
+
+    template<int WARP_SIZE = 32>
+    static inline __device__ bool is_leader(const int tidx)
+    {
+        return (tidx % THREADS_PER_KEY) == 0;
+    }
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<typename T, bool DO_CROSS_ATTENTION, bool SPLIT_KV_CACHE = false, bool DO_MULTI_BLOCK = false>
@@ -706,7 +785,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
         //
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
         // asm volatile ("s_waitcnt vmcnt(0)");
-        float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
+        float qk = Qk_dot_<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
 
         // Store the product to shared memory. There's one qk value per timestep. Update the max.
         if (ti_circ < tlength && tidx % THREADS_PER_KEY == 0) {

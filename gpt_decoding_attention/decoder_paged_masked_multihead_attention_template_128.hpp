@@ -193,7 +193,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     const bool do_ia3      = handle_kv && params.ia3_tasks != nullptr;
     const int  ia3_task_id = do_ia3 ? params.ia3_tasks[bbi] : 0;
 
-#if ENABLE_INT8
     using T_scale = typename mmha::kv_cache_scale_type_t<T, Tcache>::Type;
     __shared__ float k_s_max, k_scale_f;
     __shared__ float v_s_max, v_scale_f;
@@ -207,7 +206,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         k_scale_ptr = params.k_scale_cache_ptr[bi] + hi / heads_per_gqa_group * params.memory_max_len;
         v_scale_ptr = params.v_scale_cache_ptr[bi] + hi / heads_per_gqa_group * params.memory_max_len;
     }
-#endif
 
     // Trigger the loads from the Q and K buffers.
     Qk_vec_k q;
@@ -562,62 +560,33 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                            (params.masked_tokens != nullptr) && params.masked_tokens[bi_seq_len_offset + ti];
 
         // The keys loaded from the key cache.
-        K_vec_k k[K_VECS_PER_THREAD];
+        K_vec_m k[K_VECS_PER_THREAD];
         K_vec_k k_vec_zero;
         zero(k_vec_zero);
+        float k_scale_f = 0.f;
+        float qk        = 0.f;
+        if (ENABLE_8BITS_CACHE) {
+            k_scale_f = k_scale_ptr[valid_ti_circ];
+        }
+
 #pragma unroll
         for (int ii = 0; ii < K_VECS_PER_THREAD; ++ii) {
-            int        jj            = ii * params.memory_max_len + ti_circ;
+            int        jj            = ii * params.memory_max_len + valid_ti_circ;
             const bool within_bounds = (Dh == Dh_MAX || jj * QK_ELTS_IN_16B < Dh * params.memory_max_len);
-            if (ti < tlength) {
+            if ((!MULTI_BLOCK_FLAG && ti < tlength) || (MULTI_BLOCK_FLAG && ti < timesteps_per_block)) {
                 if (!within_bounds) {
-                    k[ii] = k_vec_zero;
+                    k[ii] = vec_conversion<K_vec_m, K_vec_k>(k_vec_zero);
                 }
                 else {
                     if (HAS_BEAMS) {
                         assert(false);  // TODO: support beam size > 1
                         const int beam_offset = beam_indices[ti_circ] * params.num_heads * params.memory_max_len * Dh;
-                        k[ii]                 = vec_conversion<K_vec_k, K_vec_m>(
-                            (ldg(reinterpret_cast<const K_vec_m*>(&k_cache[beam_offset + jj * QK_ELTS_IN_16B]))));
+                        k[ii] = *reinterpret_cast<const K_vec_m*>(&k_cache[beam_offset + jj * QK_ELTS_IN_16B]);
                     }
                     else {
-                        if (!ENABLE_8BITS_CACHE) {
-                            // get (layer_index, hi, ii, ti_circ, ki) of k_cache
-                            k[ii] = vec_conversion<K_vec_k, K_vec_m>((ldg(reinterpret_cast<const K_vec_m*>(
-                                &k_cache[ii * tokens_per_block * QK_ELTS_IN_16B
-                                         + valid_ti_circ % params.tokens_per_block * QK_ELTS_IN_16B]))));
-                        }
-                        else {
-#if ENABLE_INT8
-                            float*  k_scale_ptr = params.k_scale_cache_ptr[bi] + hi * params.memory_max_len;
-                            float   k_scale_f   = k_scale_ptr[ti_circ];
-                            T_scale k_scale_quant_orig;
-                            mmha::convert_from_float(&k_scale_quant_orig, k_scale_f);
-                            mmha::load_8bits_kv_cache_vec(&k[ii],
-                                                          k_cache,
-                                                          ii * tokens_per_block * QK_ELTS_IN_16B
-                                                              + ti_circ % params.tokens_per_block * QK_ELTS_IN_16B,
-                                                          k_scale_quant_orig);
-#endif
-                        }
-                    }
-                }
-                // add bias and update k_cache
-                if (DO_CROSS_ATTENTION && cur_timestep == 0) {
-                    assert(false);  // TODO: support cross attention
-                    k[ii] = add(k[ii], k_bias_vec[ii]);
-
-                    if (do_ia3) {
-                        k[ii] = mul<K_vec_k, K_vec_k, K_vec_k>(
-                            k[ii],
-                            vec_conversion<K_vec_k, K_vec_m>(ldg(reinterpret_cast<const K_vec_m*>(
-                                &params.ia3_key_weights[(ia3_task_id * params.num_heads + hi) * Dh + ki
-                                                        + ii * THREADS_PER_KEY * K_VEC_SIZE]))));
-                    }
-
-                    if (Dh == Dh_MAX || jj * QK_ELTS_IN_16B < Dh * params.memory_max_len) {
-                        *reinterpret_cast<K_vec_m*>(&k_cache[jj * QK_ELTS_IN_16B]) =
-                            vec_conversion<K_vec_m, K_vec_k>(k[ii]);
+                        k[ii] = (ldg(reinterpret_cast<const K_vec_m*>(
+                            &k_cache[ii * tokens_per_block * QK_ELTS_IN_16B
+                                     + valid_ti_circ % params.tokens_per_block * QK_ELTS_IN_16B])));
                     }
                 }
             }
@@ -627,7 +596,12 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         //
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
         // asm volatile ("s_waitcnt vmcnt(0)");
-        float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
+        if (!ENABLE_8BITS_CACHE) {
+            qk = Qk_dot<T, K_vec_k, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
+        }
+        else {
+            qk = Qk_dot<T, K_vec_k, THREADS_PER_KEY>::scale_dot(q_vec, k, k_scale_f) * params.inv_sqrt_dh;
+        }
 
         if (MULTI_BLOCK_FLAG && (ti >= timesteps_per_block || ti_circ >= tlength)) {
             continue;
@@ -639,7 +613,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 qk = add(qk,
                          params.relative_attention_bias[hi * params.relative_attention_bias_stride
                                                             * params.relative_attention_bias_stride
-                                                        + tlength * params.relative_attention_bias_stride + ti_circ]);
+                                                        + tlength * params.relative_attention_bias_stride + ti]);
             }
             if (params.linear_bias_slopes != nullptr) {
                 // Apply the linear position bias: (ki - qi) * slope[hi].
@@ -651,7 +625,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 int   max_context_length = params.max_prefix_prompt_length + params.max_input_length;
                 float dist               = (ti_circ < max_context_length ? ti_circ + padd_len : ti_circ) - tlength;
 
-                qk += mul<float, T, float>(params.linear_bias_slopes[hi], dist);
+                qk += params.linear_bias_slopes[hi] * dist;
             }
             qk_max                   = is_mask ? qk_max : fmaxf(qk_max, qk);
             qk_smem[ti - first_step] = qk;
@@ -664,7 +638,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 // group so it's not needed to run the reduction inside the group (again).
 #pragma unroll
     for (int mask = WARP_SIZE / 2; mask >= THREADS_PER_KEY; mask /= 2) {
-        qk_max = fmaxf(qk_max, __shfl_xor( qk_max, mask));
+        qk_max = fmaxf(qk_max, __shfl_xor(qk_max, mask));
     }
 
     // Decompose the thread index into warp and lane.
@@ -767,7 +741,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     constexpr int V_VEC_SIZE = Dh_TILE_SIZE / THREADS_PER_VALUE;
     // A vector of V elements for the current timestep.
     using V_vec_k = typename V_vec_k_<T, V_VEC_SIZE>::Type;
-    using V_vec_m = typename V_vec_m_<T, V_VEC_SIZE>::Type;
+    using V_vec_m = typename packed_type<Tcache, num_elems<V_vec_k>::value>::type;
 
     // The value computed by this thread.
     int vo = tidx / THREADS_PER_VALUE;
@@ -815,7 +789,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         // Separate the ti < memory_max_len and ti > memory_max_len
         // to prevent ti % memory_len when ti < memory_len, and
         // the compiler cannot optimize the codes automatically.
-        const int min_length = min(tlength, params.memory_max_len);
+        const int min_length         = min(tlength, params.memory_max_len);
         int       context_v_loop_end = MULTI_BLOCK_FLAG ? timesteps_per_block : min_length;
         int       time_now           = 0;
         float     v_scale_f          = 1.0f;
@@ -838,15 +812,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + time_now] : 0;
             const int beam_offset = HAS_BEAMS ? beam_src * params.num_heads * params.memory_max_len * Dh : 0;
             // get (layer_index, hi, ti, vi) of v_cache.
-            V_vec_k v;
-            if (!ENABLE_8BITS_CACHE) {
-                v = vec_conversion<V_vec_k, V_vec_m>(
-                    ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh])));
-            }
-            else {
-#if ENABLE_INT8
-                v_scale_f   = v_scale_ptr[time_now];
-#endif
+            V_vec_m v;
+            v = *reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh]);
+            if (ENABLE_8BITS_CACHE) {
+                v_scale_f = v_scale_ptr[time_now];
             }
 
             int        local_time_idx = ti;
@@ -943,7 +912,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         }
         else {
             // Trigger the loads from the V buffer.
-            const auto v_offset = qkv_base_offset + vi;
+            const auto v_offset = kv_base_offset + vi;
             if (params.int8_mode == 2 || params.int8_mode == 3) {
                 using Packed_Int8_t  = typename packed_type<int8_t, num_elems<V_vec_k>::value>::type;
                 using Packed_Float_t = typename packed_type<float, num_elems<V_vec_k>::value>::type;
@@ -954,7 +923,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 convert_from_float(v, mul<Packed_Float_t, float>(v_scaling, float_from_int8(v_quant)));
             }
             else {
-                v = vec_conversion<V_vec_k, V_vec_m>(ldg(reinterpret_cast<const V_vec_m*>(&params.v[v_offset])));
+                v = ldg(reinterpret_cast<const V_vec_k*>(&params.v[v_offset]));
             }
             // Trigger the loads from the V bias buffer.
             // V_vec v_bias = *reinterpret_cast<const V_vec*>(&params.v_bias[hi*Dh + vi]);
@@ -974,16 +943,13 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     }
 
     if (handle_kv && (Dh == Dh_MAX || vi < Dh) && (!MULTI_BLOCK_FLAG || last_tile) && ENABLE_8BITS_CACHE) {
-#if ENABLE_INT8
-        v_local_max          = mmha::fabs_max(v);
-        v_local_max          = blockDim.x <= 32 ? warpReduceMax(v_local_max) : blockReduceMax(v_local_max);
-        float* v_cache_scale = params.v_scale_cache_ptr[bi] + hi * params.memory_max_len;
-        if (threadIdx.x == 0) {
-            v_s_max                     = v_local_max;
-            v_scale_f                   = 127 / v_s_max;
-            v_cache_scale[tlength_circ] = 1.0 / v_scale_f;
+        v_local_max = mmha::fabs_max(v);
+        v_local_max = blockDim.x <= 32 ? warpReduceMax(v_local_max) : blockReduceMax(v_local_max);
+        if (threadIdx.x == 0 && hi % heads_per_gqa_group == 0) {
+            v_s_max                   = v_local_max;
+            v_scale_f                 = 127 / v_s_max;
+            v_scale_ptr[tlength_circ] = 1.0 / v_scale_f;
         }
-#endif
     }
     __syncthreads();
 
@@ -1050,8 +1016,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
     // Make sure we can start writing to shared memory.
     __syncthreads();
 
-    const auto bhi_seq_len_tile = bhi * params.max_seq_len_tile;
-
     // Run the final reduction amongst the different groups computing different partial outputs.
     if (Dh == Dh_MAX || vi < Dh) {
 #pragma unroll
@@ -1077,6 +1041,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         }
     }
 
+    const auto bhi_seq_len_tile = bhi * params.max_seq_len_tile;
     // Output the final values.
     if (vo == 0 && (Dh == Dh_MAX || vi < Dh)) {
 #ifdef MMHA_USE_FP32_ACUM_FOR_OUT

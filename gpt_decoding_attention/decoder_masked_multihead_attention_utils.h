@@ -848,6 +848,75 @@ inline __device__ Float8_ fma(__nv_bfloat16 a, bf16_8_t b, Float8_ fc)
     fd.w = fma(s, b.w, fc.w);
     return fd;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ float fma(__nv_bfloat16 a, float fb, float fc)
+{
+    float fa = __bfloat162float(a);
+    return fa * fb + fc;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ float2 fma(__nv_bfloat162 a, float2 fb, float2 fc)
+{
+    float2 fa = bf1622float2(a);
+    return fma(fa, fb, fc);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ float2 fma(__nv_bfloat16 a, float2 fb, float2 fc)
+{
+    float fa = __bfloat162float(a);
+    return fma(fa, fb, fc);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float4_ fma(bf16_4_t a, Float4_ fb, Float4_ fc)
+{
+    Float4_ fd;
+    fd.x = fma(a.x, fb.x, fc.x);
+    fd.y = fma(a.y, fb.y, fc.y);
+    return fd;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float4_ fma(__nv_bfloat16 a, Float4_ fb, Float4_ fc)
+{
+    Float4_ fd;
+    fd.x = fma(a, fb.x, fc.x);
+    fd.y = fma(a, fb.y, fc.y);
+    return fd;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float8_ fma(bf16_8_t a, Float8_ fb, Float8_ fc)
+{
+    Float8_ fd;
+    fd.x = fma(a.x, fb.x, fc.x);
+    fd.y = fma(a.y, fb.y, fc.y);
+    fd.z = fma(a.z, fb.z, fc.z);
+    fd.w = fma(a.w, fb.w, fc.w);
+    return fd;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline __device__ Float8_ fma(__nv_bfloat16 a, Float8_ fb, Float8_ fc)
+{
+    Float8_ fd;
+    fd.x = fma(a, fb.x, fc.x);
+    fd.y = fma(a, fb.y, fc.y);
+    fd.z = fma(a, fb.z, fc.z);
+    fd.w = fma(a, fb.w, fc.w);
+    return fd;
+}
+
 #endif  // ENABLE_BF16
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

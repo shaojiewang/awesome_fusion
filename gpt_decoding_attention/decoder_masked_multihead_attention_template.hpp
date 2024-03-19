@@ -526,7 +526,7 @@ inline __device__ float qk_dot_(const K_vec (&q)[N], const K_vec (&k)[N])
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<typename T, int THREADS_PER_KEY>
-struct Qk_dot {
+struct Qk_dot_ {
     template<typename K_vec, int N>
     static inline __device__ float dot(const K_vec (&q)[N], const K_vec (&k)[N])
     {
@@ -584,7 +584,7 @@ inline __device__ float qk_hmma_dot_(const uint32_t (&q)[N], const uint32_t (&k)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<>
-struct Qk_dot<uint16_t, 4> {
+struct Qk_dot_<uint16_t, 4> {
     template<int N>
     static inline __device__ float dot(const uint32_t (&q)[N], const uint32_t (&k)[N])
     {
@@ -1437,7 +1437,7 @@ __global__ void masked_multihead_attention_kernel(Multihead_attention_params<T, 
         // Perform the dot product and normalize qk.
         //
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
-        float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
+        float qk = Qk_dot_<T, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
 
         // Store the product to shared memory. There's one qk value per timestep. Update the max.
         // if( ti < params.timestep && tidx % THREADS_PER_KEY == 0 ) {
