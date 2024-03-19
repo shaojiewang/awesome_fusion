@@ -225,8 +225,8 @@ int main(int argc, char** argv)
 
     float total_time_fp16 = 0.0f, total_time_bf16 = 0.0f;
     for(int i = 0; i < test_args.max_output_len - 1; i++){
-        total_time_fp16 += test_paged_masked_multihead_attention<half>(test_args);
-        total_time_bf16 += test_paged_masked_multihead_attention<__nv_bfloat16>(test_args);
+        total_time_fp16 += test_paged_masked_multihead_attention<half, half>(test_args);
+        total_time_bf16 += test_paged_masked_multihead_attention<__nv_bfloat16, __nv_bfloat16>(test_args);
         test_args.max_seq_len ++;
     }
 

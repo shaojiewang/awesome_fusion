@@ -180,7 +180,7 @@ __device__ inline constexpr uint2 chunk_index(unsigned tidx)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+#if 0
 template<
     // The type of the inputs. Supported types: float and half.
     typename T,
@@ -1398,6 +1398,7 @@ paged_masked_multihead_attention_kernel(Paged_multihead_attention_params<T, DO_C
     }
 #endif // ENABLE_MULTI_BLOCK_OPTION
 }
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 }// namespace mmha
 
