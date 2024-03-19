@@ -1,6 +1,6 @@
 #include "attention_test_common.h"
 
-template<typename T>
+template<typename T, typename Tcache>
 float test_paged_masked_multihead_attention(const test_args_t& test_args)
 {
     using Tmha                    = typename mha_type_t<T>::Type;
@@ -19,10 +19,10 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<T> q_T(BS * Dh * H), q_bias_T(Dh * H);
     GPUBuf<T> k_T(BS * Dh * H), k_bias_T(Dh * H);
     GPUBuf<T> v_T(BS * Dh * H), v_bias_T(Dh * H);
-    GPUBuf<T> kcache_T_transpose(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
-    GPUBuf<T> vcache_T_transpose(BS * Dh * H * L);
-    GPUBuf<T> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
-    GPUBuf<T> vcache_T(BS * Dh * H * L);
+    GPUBuf<Tcache> kcache_T_transpose(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
+    GPUBuf<Tcache> vcache_T_transpose(BS * Dh * H * L);
+    GPUBuf<Tcache> kcache_T(BS * Dh * H * L);  // read as [BS, H, Dh/x, L, x]
+    GPUBuf<Tcache> vcache_T(BS * Dh * H * L);
     GPUBuf<T> out_T(BS * Dh * H);
 
     // for multi block
@@ -34,7 +34,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     size_t num_blocks_per_bs = (L + PB - 1) / PB;
     size_t num_blocks = num_blocks_per_bs * BS;
 
-    GPUBuf<T> kv_blocks(4 * BS * Dh * H * num_blocks_per_bs * PB);
+    GPUBuf<Tcache> kv_blocks(4 * BS * Dh * H * num_blocks_per_bs * PB);
 
     GPUBuf<size_t> k_block_offset(num_blocks);
     GPUBuf<size_t> k_batch_offset(BS);
@@ -68,8 +68,8 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
         reinterpret_cast<T*>(kv_blocks.ptr),
         reinterpret_cast<size_t**>(k_batch_offset.ptr),
         reinterpret_cast<size_t**>(v_batch_offset.ptr),
-        reinterpret_cast<T*>(kcache_T.ptr),
-        reinterpret_cast<T*>(vcache_T.ptr),
+        reinterpret_cast<Tcache*>(kcache_T.ptr),
+        reinterpret_cast<Tcache*>(vcache_T.ptr),
         reinterpret_cast<int*>(seq_lengths.ptr),
         PB,
         0,
@@ -89,7 +89,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<float> q_fp32(q_T), q_bias_fp32(q_bias_T);
     GPUBuf<float> k_fp32(k_T), k_bias_fp32(k_bias_T);
     GPUBuf<float> v_fp32(v_T), v_bias_fp32(v_bias_T);
-    GPUBuf<float> kcache_fp32(reshape_key_cache(kcache_T_transpose, BS, H, Dh, L, 16 / sizeof(T), 16 / sizeof(float)));
+    GPUBuf<float> kcache_fp32(reshape_key_cache(kcache_T_transpose, BS, H, Dh, L, 16 / sizeof(Tcache), 16 / sizeof(float)));
     GPUBuf<float> vcache_fp32(vcache_T_transpose);
     GPUBuf<float> out_fp32(BS * Dh * H);
 
