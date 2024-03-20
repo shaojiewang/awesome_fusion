@@ -165,7 +165,7 @@ struct Multihead_attention_params_base {
     const T* relative_attention_bias        = nullptr;
     int      relative_attention_bias_stride = 0;
     // The slope per head of linear position bias to attention score (H).
-    const T* linear_bias_slopes = nullptr;
+    const float* linear_bias_slopes = nullptr;
 
     const T*   ia3_key_weights   = nullptr;
     const T*   ia3_value_weights = nullptr;

@@ -273,6 +273,7 @@ int main(int argc, char** argv)
 
     printf("fp16 avg time = %f\n", total_time_fp16 / (test_args.max_output_len - 1));
     printf("bf16 avg time = %f\n", total_time_bf16 / (test_args.max_output_len - 1));
+    printf("int8 avg time = %f\n", total_time_int8 / (test_args.max_output_len - 1));
     
 }
 

@@ -346,6 +346,22 @@ template<>
 struct K_vec_acum_<bf16_8_t> {
     using Type = Float8_;
 };
+template<>
+struct K_vec_acum_<int8_t> {
+    using Type = float;
+};
+template<>
+struct K_vec_acum_<int16_t> {
+    using Type = float2;
+};
+template<>
+struct K_vec_acum_<int32_t> {
+    using Type = Float4_;
+};
+template<>
+struct K_vec_acum_<int64_t> {
+    using Type = Float8_;
+};
 #ifdef MMHA_USE_FP32_ACUM_FOR_FMA
 template<typename T>
 struct Qk_vec_acum_fp32_ {
@@ -620,7 +636,7 @@ Logit_value_fma(V_vec_accum& out, const Tk* logits_smem, const V_vec_m& v_vec, c
         out = fma(logit, cast_to_float(v_vec), out);
     }
 #else  // MMHA_USE_FP32_ACUM_FOR_LOGITS
-    Tk logit = is_mask ? Tk(0.f) : logits_smem[0];
+    Tk logit = is_mask ? type_convert<Tk, float>(0.f) : logits_smem[0];
     if constexpr (INT8_KV_CACHE) {
         V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
         out                = fma(logit, v_vec_, out);

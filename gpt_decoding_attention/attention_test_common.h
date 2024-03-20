@@ -234,7 +234,7 @@ void set_params_struct(Paged_masked_multihead_attention_params<T>& params,
     // int8 quant
     params.k_scale_cache_ptr   = k_scale_bs_table;
     params.v_scale_cache_ptr   = v_scale_bs_table;
-    params.int8_mode           = int8_mode;
+    params.int8_mode           = 0;
     params.kv_cache_quant_mode = int8_mode;
     
 }

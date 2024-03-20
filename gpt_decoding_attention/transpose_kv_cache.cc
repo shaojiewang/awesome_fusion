@@ -1,5 +1,6 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
+#include "hip_type_utils.cuh"
 
 template<typename T>
 __global__ void transpose_4d_batch_major_k_cache(
@@ -94,4 +95,4 @@ void invokeTranspose4dBatchMajor(T*           k_dst,
                                               hipStream_t stream)
 INSTANTIATETRANSPOSE4DBATCHMAJOR(float);
 INSTANTIATETRANSPOSE4DBATCHMAJOR(half);
-INSTANTIATETRANSPOSE4DBATCHMAJOR(short);
+INSTANTIATETRANSPOSE4DBATCHMAJOR(__nv_bfloat16);

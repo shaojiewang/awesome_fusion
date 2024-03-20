@@ -569,7 +569,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             const bool within_bounds = (Dh == Dh_MAX || jj * QK_ELTS_IN_16B < Dh * params.memory_max_len);
             if ((!MULTI_BLOCK_FLAG && ti < tlength) || (MULTI_BLOCK_FLAG && ti < timesteps_per_block)) {
                 if (!within_bounds) {
-                    k[ii] = vec_conversion<K_vec_m, K_vec_k>(k_vec_zero);
+                    zero(k[ii]);// k[ii] = vec_conversion<K_vec_m, K_vec_k>(k_vec_zero);
                 }
                 else {
                     if (HAS_BEAMS) {
@@ -753,11 +753,10 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             if (vo == tlength % V_PER_ITER) {
                 // Trigger the loads from the V bias buffer.
                 if (params.v_bias != nullptr) {
-                    v_bias = vec_conversion<V_vec_k, V_vec_m>(
-                        *reinterpret_cast<const V_vec_m*>(&params.v_bias[hi / params.heads_per_gqa_group * Dh + vi]));
+                    v_bias = *reinterpret_cast<const V_vec_k*>(&params.v_bias[hi / params.heads_per_gqa_group * Dh + vi]);
                 }
                 if (DO_CROSS_ATTENTION) {
-                    *reinterpret_cast<V_vec_m*>(&bias_smem[vi]) = vec_conversion<V_vec_m, V_vec_k>(v_bias);
+                    *reinterpret_cast<V_vec_k*>(&bias_smem[vi]) = v_bias;
                 }
             }
         }
@@ -807,7 +806,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             const int beam_offset = HAS_BEAMS ? beam_src * params.num_heads * params.memory_max_len * Dh : 0;
             // get (layer_index, hi, ti, vi) of v_cache.
             V_vec_m v;
-            v = *reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh]);
+            v = ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh]));
             if (ENABLE_8BITS_CACHE) {
                 v_scale_f = v_scale_ptr[time_now];
             }
@@ -828,13 +827,14 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                 continue;
             }
             assert(false);
-            const int ti_circ = ti % params.memory_max_len;
+#if 0
+            const int time_now = ti % params.memory_max_len;
             Tcache*   v_cache = get_kv_cache_ptr<Tcache>(kv_blocks,
                                                        vcache_bt_offset,
                                                        bi,
                                                        layer_index,
                                                        hi,
-                                                       ti_circ,
+                                                       time_now,
                                                        tokens_per_block,
                                                        layer_stride,
                                                        head_stride,
@@ -842,23 +842,20 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                                                        heads_per_gqa_group);
 
             // Fetch offset based on cache_indir when beam sampling
-            const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + ti_circ] : 0;
+            const int beam_src    = HAS_BEAMS ? params.cache_indir[bi_seq_len_offset + time_now] : 0;
             const int beam_offset = HAS_BEAMS ? beam_src * params.num_heads * params.memory_max_len * Dh : 0;
             // get (layer_index, hi, ti_circ, vi) of v_cache.
-            V_vec_k v;
-            if (!ENABLE_8BITS_CACHE) {
-                v = vec_conversion<V_vec_k, V_vec_m>(
-                    ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + ti_circ % tokens_per_block * Dh])));
+            V_vec_m v;
+            v = ldg(reinterpret_cast<const V_vec_m*>(&v_cache[beam_offset + time_now % tokens_per_block * Dh]));
+            if constexpr (ENABLE_8BITS_CACHE) 
+            {
+                v_scale_f = v_scale_ptr[time_now];
             }
-            else {
-                float   v_scale_f   = v_scale_ptr[ti_circ];
-                T_scale v_scale_quant_orig;
-                mmha::convert_from_float(&v_scale_quant_orig, v_scale_f);
-                mmha::load_8bits_kv_cache_vec(
-                    &v, v_cache, beam_offset + ti_circ % tokens_per_block * Dh, v_scale_quant_orig);
-            }
+
+            
             if (DO_CROSS_ATTENTION && cur_timestep == 0) {
                 assert(false);  // TODO: support cross attention
+#if 0
                 v = add(v, vec_conversion<V_vec_k, V_vec_m>(*reinterpret_cast<V_vec_m*>(&bias_smem[vi])));
                 if (do_ia3) {
                     v = mul<V_vec_k, V_vec_k, V_vec_k>(
@@ -867,6 +864,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                             &params.ia3_value_weights[(ia3_task_id * params.num_heads + hi) * Dh + vi])));
                 }
                 *reinterpret_cast<V_vec_m*>(&v_cache[ti * Dh]) = vec_conversion<V_vec_m, V_vec_k>(v);
+#endif
             }
             // Load the logits from shared memory.
 #if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
@@ -890,6 +888,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
             out      = fma(logit, v, out);
 #endif  // FP8_MHA
 #endif  // MMHA_USE_FP32_ACUM_FOR_LOGITS
+#endif
         }
     }
 
@@ -959,11 +958,11 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
                                                vi,
                                                heads_per_gqa_group);
     if (handle_kv && (Dh == Dh_MAX || vi < Dh) && vo == tlength % V_PER_ITER && (!MULTI_BLOCK_FLAG || last_tile)) {
-        if (!ENABLE_8BITS_CACHE) {
+        if constexpr(!ENABLE_8BITS_CACHE) {
             *reinterpret_cast<V_vec_m*>(&v_cache[tlength_circ % tokens_per_block * Dh]) =
                 vec_conversion<V_vec_m, V_vec_k>(v);
         }
-        else if (ENABLE_8BITS_CACHE) {
+        else {
             T_scale v_scaleOrigQuant;
             mmha::convert_from_float(&v_scaleOrigQuant, v_scale_f);
             // Store 8bits kv cache.

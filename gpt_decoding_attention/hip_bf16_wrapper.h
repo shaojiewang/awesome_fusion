@@ -6,8 +6,21 @@
 #include <cuda_bf16.h>
 #else
 
-using __nv_bfloat16 = short;
-using bhalf_t = short;
+struct bfloat16_t
+{
+    short x;
+#if 0
+    __host__ __device__ bfloat16_t() : x(0) {} 
+    __host__ __device__ bfloat16_t(float val) 
+    {
+        int val_i = __builtin_bit_cast(int, val);
+        x = (short)(val_i >> 16);
+    }
+#endif 
+};
+
+using __nv_bfloat16 = bfloat16_t;
+using bhalf_t = bfloat16_t;
 
 // vector_type
 template <typename T, int N>
@@ -64,11 +77,6 @@ struct vector_type<T, 8>
 
     __host__ __device__ constexpr vector_type(type v) : data_{v} {}
 };
-
-// bf16
-using bhalf2_t  = typename vector_type<bhalf_t, 2>::type;
-using bhalf4_t  = typename vector_type<bhalf_t, 4>::type;
-using bhalf8_t  = typename vector_type<bhalf_t, 8>::type;
 
 // TODO: tmp solution of bf162 for ft code
 #if defined (__HIPCC__)
@@ -135,7 +143,7 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
     u.int32 += flag0 ? 0x7fff + ((u.int32 >> 16) & 1) : 0; // Round to nearest, round to even
     u.int32 |= flag1 ? 0x10000 : 0x0;                      // Preserve signaling NaN
 
-    return uint16_t(u.int32 >> 16);
+    return __builtin_bit_cast(bhalf_t, uint16_t(u.int32 >> 16));
 }
 
 // Convert X to Y
@@ -155,9 +163,17 @@ inline __host__ __device__ constexpr float type_convert<float, bhalf_t>(bhalf_t 
     {
         uint32_t int32;
         float fp32;
-    } u = {uint32_t(x) << 16};
+    } u = {uint32_t(x.x) << 16};
 
     return u.fp32;
+}
+
+// convert fp32 to bf16
+template <>
+inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, float>(float x)
+{
+    int val_i = __builtin_bit_cast(int, x);
+    return __builtin_bit_cast(bhalf_t, uint16_t(val_i >> 16));
 }
 
 #if defined(__HIPCC__)
@@ -250,7 +266,7 @@ inline __device__ __nv_bfloat16 bf16hmul(const __nv_bfloat16 x, const __nv_bfloa
 
 inline __device__ __nv_bfloat16 bf16abs(const __nv_bfloat16 x)
 {
-	return (x | 0x8000);
+	return __builtin_bit_cast(__nv_bfloat16, (short)(x.x | 0x8000));
 }
 
 inline __device__ __nv_bfloat162 bf16abs2(const __nv_bfloat162 x)

@@ -365,7 +365,7 @@ template<typename To, typename Ti> __device__ inline To cuda_max(Ti val)
 
 template<> __device__ inline half cuda_max(half2 val) { return (val.x > val.y) ? val.x : val.y; }
 #ifdef ENABLE_BF16
-template<> __device__ inline __nv_bfloat16 cuda_max(__nv_bfloat162 val) { return (val.x > val.y) ? val.x : val.y; }
+template<> __device__ inline __nv_bfloat16 cuda_max(__nv_bfloat162 val) { return (val.x.x > val.y.x) ? val.x : val.y; }
 #endif
 
 // Binary maximum: compute the max of two scalar types
