@@ -1130,6 +1130,22 @@ inline __device__ float2 mul(float a, float2 b)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<>
+inline __device__ float2 mul(float a, int16_t b)
+{
+    float2 c;
+    union {
+        int16_t int16;
+        int8_t  int8[2];
+    };
+    int16 = b;
+    c.x = a * int8[0];
+    c.y = a * int8[1];
+    return c;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<>
 inline __device__ float4 mul(float4 a, float4 b)
 {
     float4 c;
@@ -1150,6 +1166,34 @@ inline __device__ float4 mul(float a, float4 b)
     c.y = a * b.y;
     c.z = a * b.z;
     c.w = a * b.w;
+    return c;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<> 
+inline __device__ Float4_ mul(float a, Float4_ b)
+{
+    Float4_ c;
+    c.x = mul<float2, float, float2>(a, b.x);
+    c.y = mul<float2, float, float2>(a, b.y);
+    return c;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<>
+inline __device__ Float4_ mul(float a, int32_t b)
+{
+    union {
+        int32_t int32;
+        int8_t  int8[4];
+    };
+    int32 = b;
+    Float4_ c;
+    c.x = mul<float2, float, float2>(a, make_float2(int8[0], int8[1]));
+    c.y = mul<float2, float, float2>(a, make_float2(int8[2], int8[3]));
+
     return c;
 }
 
@@ -1442,6 +1486,15 @@ inline __device__ float2 mul(__nv_bfloat162 a, __nv_bfloat162 b)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<>
+inline __device__ float2 mul(__nv_bfloat162 a, float2 b)
+{
+    float2 fa = bf1622float2(a);
+    return mul<float2, float2, float2>(fa, b);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<>
 inline __device__ float2 mul(__nv_bfloat16 a, __nv_bfloat162 b)
 {
     return mul<float2, __nv_bfloat162, __nv_bfloat162>(bf162bf162(a), b);
@@ -1455,6 +1508,17 @@ inline __device__ Float4_ mul(bf16_4_t a, bf16_4_t b)
     Float4_ fc;
     fc.x = mul<float2, __nv_bfloat162, __nv_bfloat162>(a.x, b.x);
     fc.y = mul<float2, __nv_bfloat162, __nv_bfloat162>(a.y, b.y);
+    return fc;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<>
+inline __device__ Float4_ mul(bf16_4_t a, Float4_ b)
+{
+    Float4_ fc;
+    fc.x = mul<float2, __nv_bfloat162, float2>(a.x, b.x);
+    fc.y = mul<float2, __nv_bfloat162, float2>(a.y, b.y);
     return fc;
 }
 

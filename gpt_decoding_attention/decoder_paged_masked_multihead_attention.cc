@@ -219,6 +219,7 @@ void paged_mmha_launch_kernel(const KERNEL_PARAMS_TYPE& params, const hipStream_
             {
                 PAGED_MMHA_LAUNCH_KERNEL(
                     T, int8_t, Dh, Dh_MAX, Dh_TILE_NUM, 2, THREADS_PER_VALUE, 256, DO_CROSS_ATTENTION, false, SPLIT_KV_CACHE, true, stream);
+                printf("seq_len_tile=%zu\n", seq_len_tile);
             } 
         }
     }

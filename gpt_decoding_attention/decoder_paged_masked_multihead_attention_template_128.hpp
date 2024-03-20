@@ -415,7 +415,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         if (handle_kv && hi % heads_per_gqa_group == 0) {
             // Trigger the stores to global memory.
             if (Dh == Dh_MAX || co < Dh / QK_ELTS_IN_16B) {
-                if (!ENABLE_8BITS_CACHE) {
+                if constexpr(!ENABLE_8BITS_CACHE) {
                     *reinterpret_cast<Qk_vec_m*>(cur_k_cache_ptr) = vec_conversion<Qk_vec_m, Qk_vec_k>(k);
                 }
                 else {
@@ -519,7 +519,6 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
 
     const auto timesteps_per_block = params.timesteps_per_block;
 
-
     // Pick a number of keys to make sure all the threads of a warp enter (due to shfl_sync).
     int ti_end = MULTI_BLOCK_FLAG ? div_up(timesteps_per_block, K_PER_WARP) * K_PER_WARP :
                                     div_up(tlength - first_step, K_PER_WARP) * K_PER_WARP
@@ -590,7 +589,7 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         //
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
         // asm volatile ("s_waitcnt vmcnt(0)");
-        if (!ENABLE_8BITS_CACHE) {
+        if constexpr(!ENABLE_8BITS_CACHE) {
             qk = Qk_dot<T, K_vec_k, THREADS_PER_KEY>::dot(q_vec, k) * params.inv_sqrt_dh;
         }
         else {
