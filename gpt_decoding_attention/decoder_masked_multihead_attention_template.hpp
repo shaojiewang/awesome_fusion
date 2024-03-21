@@ -640,13 +640,6 @@ Logit_value_fma(V_vec_accum& out, const Tk* logits_smem, const V_vec_m& v_vec, c
     if constexpr (INT8_KV_CACHE) {
         V_vec_accum v_vec_ = mul<V_vec_accum, float, V_vec_m>(v_scale, v_vec);
         out                = fma(logit, v_vec_, out);
-        if(threadIdx.x==0)
-        {
-            if constexpr(std::is_same<V_vec_accum, Float8_>::value)
-            {
-                printf("bidz=%d, v_vec=%f\n", (int)blockIdx.z, v_vec_.x.x);
-            }
-        }
     }
     else if constexpr (FP8_KV_CACHE) {
 #ifdef MMHA_FP8_SCALE_P_INSTEAD_OF_V

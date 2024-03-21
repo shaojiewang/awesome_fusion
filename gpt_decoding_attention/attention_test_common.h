@@ -260,7 +260,7 @@ __global__ void cuda_random_uniform_kernel<__nv_bfloat16>(__nv_bfloat16* buffer,
 #if !INT_INIT    
 		buffer[index] = __float2bfloat16(hiprand_uniform(&local_state) * 0.2f - 0.1f);
 #else
-        buffer[index] = __float2bfloat16(round(hiprand_uniform(&local_state) * 10) - 5);
+        buffer[index] = __float2bfloat16(round(hiprand_uniform(&local_state) * 2) - 1);
 #endif
     }
 }

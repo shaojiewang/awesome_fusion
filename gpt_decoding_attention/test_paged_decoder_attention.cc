@@ -126,7 +126,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     GPUBuf<float> q_fp32(q_T), q_bias_fp32(q_bias_T);
     GPUBuf<float> k_fp32(k_T), k_bias_fp32(k_bias_T);
     GPUBuf<float> v_fp32(v_T), v_bias_fp32(v_bias_T);
-    GPUBuf<float> kcache_fp32(reshape_key_cache(kcache_T_transpose, BS, H, Dh, L, 16 / sizeof(Tcache), 16 / sizeof(float)));
+    GPUBuf<float> kcache_fp32(reshape_key_cache(kcache_T_transpose, BS, H, Dh, L, 16 / sizeof(T), 16 / sizeof(float)));
     GPUBuf<float> vcache_fp32(vcache_T_transpose);
     GPUBuf<float> out_fp32(BS * Dh * H);
 
@@ -151,7 +151,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       Dh,
                       R,
                       L - 1,
-                      1.0, // / sqrtf(Dh),
+                      1.0 / sqrtf(Dh),
                       seq_lengths.ptr,
                       L / 4,
                       (const float*)nullptr,
@@ -194,14 +194,14 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
                       Dh,
                       R,
                       L - 1,
-                      1.0, // / sqrtf(Dh),
+                      1.0 / sqrtf(Dh),
                       seq_lengths.ptr,
                       L,
                       (const Tmha*)nullptr,
                       0,
                       PB,
                       (int*)cur_timesteps.ptr);
-    printf("params.memory_max_len=%d\n", params_T.memory_max_len);
+    // printf("params.memory_max_len=%d\n", params_T.memory_max_len);
     paged_masked_multihead_attention(params_T, 0);
     check_cuda_error(hipDeviceSynchronize());
 
@@ -240,7 +240,7 @@ float test_paged_masked_multihead_attention(const test_args_t& test_args)
     printf("[FP32] ");
     TIMEIT(true, 10, ms, stream, masked_multihead_attention, params_fp32, stream);
     printf("[%s] ", string_rep_t<Tcache>::value.c_str());
-    // TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
+    TIMEIT(true, 10, ms, stream, paged_masked_multihead_attention, params_T, stream);
 
     printf("%s\n", !error ? "." : "X");
     return ms;
