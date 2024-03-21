@@ -1213,6 +1213,25 @@ inline __device__ Float8_ mul(float a, Float8_ b)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<>
+inline __device__ Float8_ mul(float a, int64_t b)
+{
+    Float8_ c;
+    union
+    {
+        int64_t int64;
+        int8_t int8[8];
+    };
+    int64 = b;
+    c.x = mul<float2, float, float2>(a, make_float2(int8[0], int8[1]));
+    c.y = mul<float2, float, float2>(a, make_float2(int8[2], int8[3]));
+    c.z = mul<float2, float, float2>(a, make_float2(int8[4], int8[5]));
+    c.w = mul<float2, float, float2>(a, make_float2(int8[6], int8[7]));
+    return c;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template<>
 inline __device__ uint16_t mul(uint16_t a, uint16_t b)
 {
     uint16_t c;

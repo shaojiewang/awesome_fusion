@@ -785,6 +785,12 @@ paged_masked_multihead_attention_128_kernel(Paged_multihead_attention_params<T, 
         int       context_v_loop_end = MULTI_BLOCK_FLAG ? timesteps_per_block : min_length;
         int       time_now           = 0;
         float     v_scale_f          = 1.0f;
+
+        if(threadIdx.x==0)
+        {
+            printf("bidz=%d, ti=%d, context_v_loop_end=%d\n", (int)blockIdx.z, (int)(first_step + vo), context_v_loop_end);
+        }
+
         for (int ti = first_step + vo; ti < context_v_loop_end; ti += V_PER_ITER) {
             int time_now    = ti + tile_offset;
             time_now        = min(time_now, tlength - 1);
