@@ -22,6 +22,22 @@ struct __attribute__((packed)) kargs{
 
 class bfAintBGemmRunner {
 public:
+    bfAintBGemmRunner() {
+        args.ptr_c = nullptr;
+        args.ptr_a = nullptr;
+        args.ptr_b = nullptr;
+        args.ptr_scale = nullptr;
+        args.m = 4;
+        args.n = 4;
+        args.k = 4;
+        args.lda = 4;
+        args.ldb = 4;
+        args.ldc = 4;
+        args.k_per_cta = 4;
+        args.ptr_workspace = nullptr;
+        max_sk_blocks = 4;
+    }
+
     bfAintBGemmRunner(const std::vector<kernel_tunable>& k_vec_,
                       const std::string& hsaco_path,
                       void* ptr_c_,
@@ -60,10 +76,52 @@ public:
             hipFunction_t kernel_func;
             std::string kernel_name = ker.kernel_name;
             std::string hsaco_name = hsaco_path + "/" + ker.kernel_name + ".hsaco";
+            // std::cout << hsaco_name << std::endl;
             GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
             GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
             kernel_func_vec.push_back(kernel_func);
         }
+    }
+
+    void init(const std::vector<kernel_tunable>& k_vec_,
+              const std::string& hsaco_path) {
+        k_ptr = k_vec_.data();
+        k_ptr_len = k_vec_.size();
+        for(auto ker : k_vec_)
+        {
+            hipFunction_t kernel_func;
+            std::string kernel_name = ker.kernel_name;
+            std::string hsaco_name = hsaco_path + "/" + ker.kernel_name + ".hsaco";
+            GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
+            GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
+            kernel_func_vec.push_back(kernel_func);
+        }
+    }
+
+    void update(void* ptr_c_,
+                void* ptr_a_,
+                void* ptr_b_,
+                void* ptr_scale_,
+                uint32_t& m_,
+                uint32_t& n_,
+                uint32_t& k_,
+                uint32_t& lda_,
+                uint32_t& ldb_,
+                uint32_t& ldc_,
+                uint32_t& k_per_cta_,
+                void* ptr_workspace_) {
+        args.ptr_c = ptr_c_;
+        args.ptr_a = ptr_a_;
+        args.ptr_b = ptr_b_;
+        args.ptr_scale = ptr_scale_;
+        args.m = m_;
+        args.n = n_;
+        args.k = k_;
+        args.lda = lda_;
+        args.ldb = ldb_;
+        args.ldc = ldc_;
+        args.k_per_cta = k_per_cta_;
+        args.ptr_workspace = ptr_workspace_;
     }
  
     void run(const kernel_tunable& ker,
@@ -201,4 +259,5 @@ public:
     std::vector<hipFunction_t> kernel_func_vec;
 
 };
+
 
