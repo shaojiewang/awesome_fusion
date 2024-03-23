@@ -85,7 +85,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 4;
+    uint32_t max_sk_blocks = 1;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
