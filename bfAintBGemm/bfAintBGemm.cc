@@ -197,6 +197,11 @@ int main(int argc, char ** argv)
         printf("%dth: Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n", i, ((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
         //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
         //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
+        float fp32_a = ((float*)(a_device_buf.GetBuffer()))[i];
+        uint32_t fp32_a_val_bit =  __builtin_bit_cast(uint32_t, fp32_a);
+        float a_lo = __builtin_bit_cast(float, (fp32_a_val_bit << 16));
+        float a_hi = __builtin_bit_cast(float, (fp32_a_val_bit & 0xffff0000));
+        printf("%dth: Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n", i, ((int*) host_print)[2*i], fp32_a_val_bit, fp32_a_val_bit, fp32_a, a_lo, a_hi);
     }    
 #endif
 

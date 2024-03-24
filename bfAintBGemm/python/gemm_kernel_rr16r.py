@@ -209,8 +209,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             "v_sst_offset_b1" : 1,
             "v_sld_iak0" : 1,
             "v_sld_im" : 1,
-            "v_sld_offset_a0" : 1,
-            "v_sld_offset_a1" : 1,
+            "v_sld_offset_a0" : 2,
+            "v_sld_offset_a1" : 2,
             "v_sld_ibk0" : 1,
             "v_sld_in" : 1,
             "v_sld_offset_b0" : 1,
@@ -551,7 +551,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ;v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_im]
     v_mov_b32 v[v_tmp + 1], {F_smem_a_line_byte}
     v_xor_b32 v[v_tmp + 2], v[v_im], v[v_iak0]
-    .print v_tmp + 2, s_print, s_bx, v_tid, v_tmp + 7
+    ;.print v_tmp+2, s_print, s_bx, v_tid, v_tmp+7
+    ;v_mov_b32 v[v_tmp+2], v[v_im]
     v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_tmp + 2]
     ;v_lshrrev_b32 v[v_tmp + 2], 1, v[v_iak0]
     ;v_and_b32 v[v_tmp + 3], 1, v[v_iak0]
@@ -559,7 +560,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ;v_add_u32 v[v_tmp], v[v_tmp], v[v_tmp + 3]
     v_mad_u32_u24 v[v_sst_offset_a0], v[v_iak0], v[v_tmp + 1], v[v_tmp]
     v_mov_b32 v[v_tmp], 0x8000
-    v_xor_b32 v[v_sst_offset_a1], v[v_tmp], v[v_sst_offset_a0]
+    v_add_u32 v[v_sst_offset_a1], v[v_tmp], v[v_sst_offset_a0]
 """
         smem_ak1 = self.tile.smem_a_k1
         smem_ak1_byte = smem_ak1 * self.a_datatype.data_size
@@ -586,7 +587,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_mov_b32 v[v_tmp], {F_a_smem_size}
     v_add_u32 v[v_sst_offset_b0], v[v_sst_offset_b0], v[v_tmp]
     v_mov_b32 v[v_tmp], 0x8000
-    v_xor_b32 v[v_sst_offset_b1], v[v_tmp], v[v_sst_offset_b0]
+    v_add_u32 v[v_sst_offset_b1], v[v_tmp], v[v_sst_offset_b0]
 """
         cta_n = self.tile.cta_n
         global_bk1 = self.tile.global_bk1
@@ -605,14 +606,21 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; sld_im = lane_id % inst_m + wave_im
     ; sld_offset_a = sld_im * ak1 + sld_iak0
     v_lshrrev_b32 v[v_sld_iak0], {F_log2_inst_m}, v[v_lane_id]
+    v_mov_b32 v[v_tmp + 1], 2
+    v_add_u32 v[v_tmp + 1], v[v_tmp + 1], v[v_sld_iak0]
     v_and_b32 v[v_sld_im], {F_inst_m_minus_1}, v[v_lane_id]
     v_xor_b32 v[v_tmp], v[v_sld_im], v[v_sld_iak0]
+    v_xor_b32 v[v_tmp + 2], v[v_sld_im], v[v_tmp + 1]
+    ;v_mov_b32 v[v_tmp], v[v_sld_im]
     v_mov_b32 v[v_tmp + 1], {F_smem_ak0_stride}
     v_mul_lo_u32 v[v_sld_iak0], v[v_tmp + 1], v[v_sld_iak0] 
     v_add_lshl_u32 v[v_sld_im], v[v_tmp], s[s_wave_im], {F_log2_smem_ak1}
     v_add_lshl_u32 v[v_sld_offset_a0], v[v_sld_iak0], v[v_sld_im], {F_log2_sizeof_dt}
+    v_add_lshl_u32 v[v_sld_im], v[v_tmp + 2], s[s_wave_im], {F_log2_smem_ak1}
+    v_add_lshl_u32 v[v_sld_offset_a0 + 1], v[v_sld_iak0], v[v_sld_im], {F_log2_sizeof_dt}
     v_mov_b32 v[v_tmp], 0x8000
-    v_xor_b32 v[v_sld_offset_a1], v[v_tmp], v[v_sld_offset_a0]
+    v_add_u32 v[v_sld_offset_a1], v[v_tmp], v[v_sld_offset_a0]
+    v_add_u32 v[v_sld_offset_a1 + 1], v[v_tmp], v[v_sld_offset_a0 + 1]
 """
         log2_inst_m = int(math.log2(self.tile.inst_m))
         smem_ak0_stride = (self.tile.cta_m + self.smem_a_padding) * self.tile.smem_a_k1
@@ -640,7 +648,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_mov_b32 v[v_tmp], {F_a_smem_size}
     v_add_u32 v[v_sld_offset_b0], v[v_sld_offset_b0], v[v_tmp]
     v_mov_b32 v[v_tmp], 0x8000
-    v_xor_b32 v[v_sld_offset_b1], v[v_tmp], v[v_sld_offset_b0]
+    v_add_u32 v[v_sld_offset_b1], v[v_tmp], v[v_sld_offset_b0]
 """
         log2_inst_n = int(math.log2(self.tile.inst_n))
         log2_smem_bk0_stride = int(math.log2(self.tile.cta_n * self.tile.smem_b_k1))

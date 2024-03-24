@@ -145,6 +145,7 @@ class MfmaMacro(KernelMacro):
 
     s_waitcnt lgkmcnt(0)
 
+
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b0 + 0 : \\v_sld_b0 + 1], v[\\v_c + 0 : \\v_c + 15]
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 0 : \\v_c + 15], v[\\v_sld_a0 + 2 : \\v_sld_a0 + 3], v[\\v_sld_b0 + 2 : \\v_sld_b0 + 3], v[\\v_c + 0 : \\v_c + 15]
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 16 : \\v_c + 31], v[\\v_sld_a0 + 0 : \\v_sld_a0 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 16 : \\v_c + 31]
@@ -154,10 +155,11 @@ class MfmaMacro(KernelMacro):
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 0 : \\v_sld_a1 + 1], v[\\v_sld_b1 + 0 : \\v_sld_b1 + 1], v[\\v_c + 48 : \\v_c + 63]
     v_mfma_f32_32x32x8bf16_1k v[\\v_c + 48 : \\v_c + 63], v[\\v_sld_a1 + 2 : \\v_sld_a1 + 3], v[\\v_sld_b1 + 2 : \\v_sld_b1 + 3], v[\\v_c + 48 : \\v_c + 63]
 
-    ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a], offset: (128 + 0) * 8 * 2 * 2 * 1
+    ;.print v_c, s_print, s_bx, v_tid, v_tmp+7
+    ds_read_b128 v[\\v_sld_a0 + 0 : \\v_sld_a0 + 3], v[\\v_sld_offset_a + 1], offset: 128 * 8 * 2 * 2 * 1
     ds_read_b128 v[\\v_sld_b0 + 0 : \\v_sld_b0 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1
     ds_read_b128 v[\\v_sld_b1 + 0 : \\v_sld_b1 + 3], v[\\v_sld_offset_b], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 
-    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2
+    ds_read_b128 v[\\v_sld_a1 + 0 : \\v_sld_a1 + 3], v[\\v_sld_offset_a + 1], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2
 
     s_waitcnt lgkmcnt(0)
 
