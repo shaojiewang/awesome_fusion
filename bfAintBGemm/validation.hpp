@@ -1,7 +1,7 @@
 #pragma once
 #include "datatype.hpp"
 
-#define PER_PIXEL_CHECK
+// #define PER_PIXEL_CHECK
 #define ASSERT_ON_FAIL
 
 template <typename T>
