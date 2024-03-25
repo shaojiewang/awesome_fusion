@@ -86,7 +86,7 @@ label_gemm_rrr_loop_begin:
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 48 : v_c + 63], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b1 + 0 : v_sld_b1 + 1], v[v_c + 48 : v_c + 63]
 
-    ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a0], offset: (128 + 0) * 8 * 2 * 2 * 1
+    ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a0 + 1], offset: (128 + 0) * 8 * 2 * 2 * 1
     ds_read_b128 v[v_sld_b0 + 0 : v_sld_b0 + 3], v[v_sld_offset_b0], offset: 128 * 8 * 2 * 2 * 1
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 48 : v_c + 63], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b1 + 2 : v_sld_b1 + 3], v[v_c + 48 : v_c + 63]
@@ -101,7 +101,7 @@ label_gemm_rrr_loop_begin:
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a0 + 0 : v_sld_a0 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 0 : v_c + 15]
 
     ds_read_b128 v[v_sld_b1 + 0 : v_sld_b1 + 3], v[v_sld_offset_b0], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
-    ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a0], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
+    ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a0 + 1], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 0 : v_c + 15], v[v_sld_a0 + 2 : v_sld_a0 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 0 : v_c + 15]
 
@@ -144,7 +144,7 @@ label_gemm_rrr_loop_begin:
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 16 : v_c + 31], v[v_sld_a0 + 2 : v_sld_a0 + 3], v[v_sld_b1 + 2 : v_sld_b1 + 3], v[v_c + 16 : v_c + 31]
 
-    ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a1], offset: (128 + 0) * 8 * 2 * 2 * 1
+    ds_read_b128 v[v_sld_a0 + 0 : v_sld_a0 + 3], v[v_sld_offset_a1 + 1], offset: (128 + 0) * 8 * 2 * 2 * 1
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 32 : v_c + 47], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 32 : v_c + 47]
 
@@ -158,7 +158,7 @@ label_gemm_rrr_loop_begin:
 
 
     ds_read_b128 v[v_sld_b1 + 0 : v_sld_b1 + 3], v[v_sld_offset_b1], offset: 128 * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
-    ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a1], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
+    ds_read_b128 v[v_sld_a1 + 0 : v_sld_a1 + 3], v[v_sld_offset_a1 + 1], offset: (128 + 0) * 8 * 2 * 2 * 1 + 64 * 8 * 2 * 1
 
     s_waitcnt lgkmcnt(2)
 
