@@ -1,6 +1,11 @@
 class Pipeline1x1Interleaved(object):
     def __init__(self):
         self.k_pipeline_src = self.gen_pipeline()
+        self.gld_a
+        self.gld_b
+        self.sst_a
+        self.sst_b
+        self.gemm_tile
 
     def gen_pipeline(self):
         PIPELINE =  """
