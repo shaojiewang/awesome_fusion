@@ -170,7 +170,7 @@ public:
 
         for(int i = 0; i < k_ptr_len; i++)
         {
-            for(int k = 1; k <= max_sk_blocks; k *= 2)
+            for(int k = 1; k <= max_sk_blocks; k++)
             {
                 if(!is_support(k_ptr[i], k))
                 {
@@ -235,7 +235,7 @@ public:
             return false;
         }
 
-        if(k % (ker.wg_tile_k * sk_blocks))
+        if(k % ker.wg_tile_k)
         {
             return false;
         }
