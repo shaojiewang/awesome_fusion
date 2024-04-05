@@ -126,7 +126,7 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice));
     GPU_CHECK_ERROR(hipMemcpy(scale_device_buf.GetBuffer(), scale_host_buf.GetBuffer(), n * 1 * sizeof(ScaleDataType), hipMemcpyHostToDevice));
 
-    int total_loop=10;
+    int total_loop = 10;
     int warm_ups = 10;
 
 // TODO: move this section to a header file

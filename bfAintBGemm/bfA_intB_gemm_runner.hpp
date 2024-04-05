@@ -147,8 +147,9 @@ public:
 
         int k_per_cta = ((args.k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
         args.k_per_cta = k_per_cta;
+        // printf("k_per_cta=%d\n", k_per_cta);
         int ldb_packed = args.n * ker.b_packed_k;
-        args.ldb    = ldb_packed;
+        args.ldb = ldb_packed;
         void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
             &arg_size, HIP_LAUNCH_PARAM_END};
    
@@ -236,6 +237,13 @@ public:
         }
 
         if(k % ker.wg_tile_k)
+        {
+            return false;
+        }
+        
+        int k_per_cta = ((args.k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
+        int actual_sk_blocks = (args.k + k_per_cta - 1) / k_per_cta;
+        if(actual_sk_blocks != sk_blocks)
         {
             return false;
         }
