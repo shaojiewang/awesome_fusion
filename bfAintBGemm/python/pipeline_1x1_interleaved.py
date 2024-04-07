@@ -1,8 +1,10 @@
+from pipeline_traits import PipelineTraits
+
 class Pipeline1x1Interleaved(object):
     def __init__(self):
         self.k_pipeline_src = self.gen_pipeline()
 
-    def gen_pipeline_traits(self, pipeline_traits):
+    def set_pipeline_traits(self, pipeline_traits: PipelineTraits):
         pass
 
     def gen_pipeline(self):
