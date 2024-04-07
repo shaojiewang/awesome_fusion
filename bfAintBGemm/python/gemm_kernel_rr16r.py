@@ -100,9 +100,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             if self.wg_repeat_m == 2 and self.wg_repeat_n == 2:
                 self.pipeline = pipeline_selector.k_pipeline_2x2_interleaved
 
-        #lds size
+        # lds size
         self.single_buffer_lds_size = self.get_a_smem_size() + self.get_b_smem_size()
         self.lds_size = self.get_lds_size()
+
+        # create pipeline traits
+        self.pipeline_traits = self.create_mfma_loop_traits()
 
     def create_mfma_loop_traits(self):
         blockwise_mfma = BlockwiseMfmaTraits(
@@ -786,6 +789,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
     def gen_pipeline(self):
         o_pipeline = self.pipeline.pipeline_select()
+        
         return o_pipeline.k_pipeline_src
 
     def gen_write_out(self):
