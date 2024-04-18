@@ -17,6 +17,9 @@ import pipeline_1x1_interleaved
 import pipeline_2x2_interleaved
 import c_write_out
 
+from pipeline_traits import PipelineTraits
+from blockwise_mfma_traits import BlockwiseMfmaTraits
+
 class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def __init__(self, 
                  a_datatype, 
@@ -97,9 +100,72 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             if self.wg_repeat_m == 2 and self.wg_repeat_n == 2:
                 self.pipeline = pipeline_selector.k_pipeline_2x2_interleaved
 
-        #lds size
+        # lds size
         self.single_buffer_lds_size = self.get_a_smem_size() + self.get_b_smem_size()
         self.lds_size = self.get_lds_size()
+
+        # create pipeline traits
+        self.pipeline_traits = self.create_mfma_loop_traits()
+
+    def create_mfma_loop_traits(self):
+        blockwise_mfma = BlockwiseMfmaTraits(
+            cta_m=self.tile.cta_m,
+            cta_n=self.tile.cta_n,
+            cta_k=self.tile.cta_k,
+            cta_num_m=self.wg_repeat_m,
+            cta_num_n=self.wg_repeat_n,
+            cta_num_k=self.tile.cta_k//self.tile.inst_k,
+            wave_num_m=self.num_wave_m,
+            wave_num_n=self.num_wave_n,
+            inst_m=self.tile.inst_m,
+            inst_n=self.tile.inst_n,
+            inst_k=self.tile.inst_k
+        )
+
+        pl_traits = PipelineTraits(
+            v_gld_a0="v_gld_a0",
+            v_gld_a1="v_gld_a1",
+            v_gld_b0="v_gld_b0",
+            v_gld_b1="v_gld_b1",
+            v_offset_a="v_offset_a",
+            v_offset_b="v_offset_b",
+            s_bs_a="s_bs_a",
+            s_bs_b="s_bs_b",
+            inst_gld_a=self.gen_a_matrix_gld_inst,
+            inst_gld_b=self.gen_b_matrix_gld_inst,
+            inst_dequant_a=self.gen_dequant_a,
+            inst_dequant_b=self.gen_dequant_b,
+            inst_ds_write_a=self.gen_ds_write_a,
+            inst_ds_write_b=self.gen_ds_write_b,
+            inst_ds_read_a=self.gen_ds_read_a,
+            inst_ds_read_b=self.gen_ds_read_b,
+            inst_mfma=self.gen_inst_mfma,
+            blockwise_mfma_traits=blockwise_mfma,
+            double_buffer_lds=True,
+            wavelet_mode=False
+        )
+        return pl_traits
+
+    def gen_dequant_a(self):
+        pass
+
+    def gen_ds_write_a(self):
+        pass
+
+    def gen_dequant_b(self):
+        pass
+
+    def gen_ds_write_b(self):
+        pass
+
+    def gen_ds_read_a(self):
+        pass
+
+    def gen_ds_read_b(self):
+        pass
+
+    def gen_inst_mfma(self):
+        pass
 
     def get_a_smem_size(self) -> int:
         cta_m = self.tile.cta_m
@@ -383,18 +449,20 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     def gen_a_matrix_gld_inst(self, v_gld_a):
         GLDDWORDX4 = """
     buffer_load_dwordx4 v[{F_v_gld_a} + {F_vgpr_b} : {F_v_gld_a} + {F_vgpr_e}], v[v_offset_a], s[s_ptr_a : s_ptr_a + 3], {F_s_offset} offen offset:0"""
-        MOVE_STEP = """
-    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
-"""
         a_gld_src = ""
         t_m = self.thread_vec_a[1]
         for i in range(t_m):
             soff_idx = i - 1
             s_offset = 0 if i == 0 else "s[s_offset_a + {F_soff_idx}]".format(F_soff_idx=soff_idx)
             a_gld_src += GLDDWORDX4.format(F_v_gld_a=v_gld_a, F_vgpr_b=i * 4, F_vgpr_e=i * 4 + 3, F_s_offset=s_offset)
-        a_gld_src += MOVE_STEP
 
         return a_gld_src
+
+    def gen_a_movestep(self):
+        MOVESTEP = """
+    v_add_u32 v[v_offset_a], v[v_offset_a], s[s_bs_a]
+"""
+        return MOVESTEP
 
     def gen_b_matrix_gld_addr(self):
         ADDRCALC = """
@@ -450,12 +518,13 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             s_offset = 0 if i == 0 else "s[s_offset_b + {F_soff_idx}]".format(F_soff_idx=soff_idx)
             gld_src += GLDDWORDX4.format(F_v_gld_b=v_gld_b, F_vpgr_b=i * 4, F_vgpr_e=i * 4 + 3, F_s_offset=s_offset)
 
+        return gld_src
+
+    def gen_b_movestep(self):
         MOVESTEP = """
     v_add_u32 v[v_offset_b], v[v_offset_b], s[s_bs_b]
 """
-        gld_src += MOVESTEP
-
-        return gld_src
+        return MOVESTEP
         
     def gen_c_gst_addr(self):
         COMMENT = """
@@ -720,6 +789,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 
     def gen_pipeline(self):
         o_pipeline = self.pipeline.pipeline_select()
+        
         return o_pipeline.k_pipeline_src
 
     def gen_write_out(self):
@@ -841,6 +911,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         a_gld_load_str = self.gen_a_matrix_gld_inst("v_gld_a0")
         kernel_str += a_gld_load_str
 
+        # move step for A
+        a_movestep = self.gen_a_movestep()
+        kernel_str += a_movestep
+
         # B gld address
         b_gld_addr_str = self.gen_b_matrix_gld_addr()
         kernel_str += b_gld_addr_str
@@ -848,6 +922,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         # B global prefetch
         b_gld_load_str = self.gen_b_matrix_gld_inst("v_gld_b0")
         kernel_str += b_gld_load_str
+
+        # move step for B
+        b_movestep = self.gen_b_movestep()
+        kernel_str += b_movestep
 
         # C global store address
         c_gst_addr_str = self.gen_c_gst_addr()

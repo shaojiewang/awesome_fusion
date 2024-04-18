@@ -1,9 +1,17 @@
+from pipeline_traits import PipelineTraits
+
 class Pipeline1x1Interleaved(object):
     def __init__(self):
         self.k_pipeline_src = self.gen_pipeline()
+        self.k_pipeline_single_lds_src = self.gen_pipeline_single_lds_buffer()
 
-    def gen_pipeline_traits(self, pipeline_traits):
-        pass
+    def set_pipeline_traits(self, pipeline_traits: PipelineTraits):
+        self.pipeline_traits = pipeline_traits
+
+    def gen_pipeline_single_lds_buffer(self):
+        PIPELINE = """
+    {}
+"""
 
     def gen_pipeline(self):
         PIPELINE =  """
