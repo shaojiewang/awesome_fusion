@@ -132,8 +132,8 @@ public:
         size_t arg_size = sizeof(args);
         
         int bdx = ker.wg_size;
-        int gdx = (args.m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
-        int gdy = (args.n + ker.wg_tile_n - 1) / ker.wg_tile_n;
+        int gdy = (args.m + ker.wg_tile_m - 1) / ker.wg_tile_m; 
+        int gdx = (args.n + ker.wg_tile_n - 1) / ker.wg_tile_n;
 
         int gdz = sk_blocks;
         bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);

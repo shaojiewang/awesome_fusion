@@ -299,8 +299,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; m block id: bid x
     ; n block id: bid y
     ; k block id: bid z
-    s_mul_i32 s[s_m_idx], s[s_bx], {}
-    s_mul_i32 s[s_n_idx], s[s_by], {}
+    s_mul_i32 s[s_m_idx], s[s_by], {}
+    s_mul_i32 s[s_n_idx], s[s_bx], {}
     s_mul_i32 s[s_k_idx], s[s_bz], s[s_k_per_cta]
 
 """

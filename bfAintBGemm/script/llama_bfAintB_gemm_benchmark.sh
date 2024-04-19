@@ -18,10 +18,10 @@ then
 fi
 
     echo "llama 175B tp 8"
-    ./build/bfAintBGemm.exe ./build 0 1 $m 4608 12288
-    ./build/bfAintBGemm.exe ./build 0 1 $m 12288 1536
-    ./build/bfAintBGemm.exe ./build 0 1 $m 8192 12288
-    ./build/bfAintBGemm.exe ./build 0 1 $m 12288 4096
+    ./build/bfAintBGemm.exe ./build 0 2 $m 4608 12288
+    ./build/bfAintBGemm.exe ./build 0 2 $m 12288 1536
+    ./build/bfAintBGemm.exe ./build 0 2 $m 8192 12288
+    ./build/bfAintBGemm.exe ./build 0 2 $m 12288 4096
 
 done
 
