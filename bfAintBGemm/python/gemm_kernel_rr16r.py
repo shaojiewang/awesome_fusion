@@ -565,7 +565,12 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
     ; sst_offset_a = sst_iak0 + v_im * {F_smem_ak1}
     v_mov_b32 v[v_tmp + 1], {F_smem_a_line_byte}
-    v_xor_b32 v[v_tmp + 2], v[v_im], v[v_iak0]
+    v_lshrrev_b32 v[v_tmp + 2], {F_shr_bit_iak0}, v[v_im]
+    v_xor_b32 v[v_tmp + 2], v[v_iak0], v[v_tmp + 2]
+    v_lshlrev_b32 v[v_tmp + 2], {F_shr_bit_iak0}, v[v_tmp + 2]
+    v_and_b32 v[v_tmp + 3], {F_iak0_minus_1}, v[v_im]
+    v_add_u32 v[v_tmp + 2], v[v_tmp + 2], v[v_tmp + 3]
+    ; .print v_tmp+2, s_print, s_bx, v_tid, v_tmp+7
     v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_tmp + 2]
     v_mad_u32_u24 v[v_sst_offset_a0], v[v_iak0], v[v_tmp + 1], v[v_tmp]
     v_mov_b32 v[v_tmp], {F_lds_size}
@@ -575,7 +580,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         smem_ak1_byte = smem_ak1 * self.a_datatype.data_size
         log2_smem_ak1_byte = int(math.log2(smem_ak1_byte))
         smem_a_line_byte = (self.tile.cta_m + self.smem_a_padding) * smem_ak1 * self.a_datatype.data_size
-        sst_a_offset_src = SST_A_OFFSET.format(F_smem_ak1=smem_ak1, F_log2_smem_ak1_byte=log2_smem_ak1_byte, F_smem_a_line_byte=smem_a_line_byte, F_lds_size=self.single_buffer_lds_size)
+        ak0 = self.b_ak0 
+        shr_bit_iak0 = int(math.log2(8 // ak0))
+        ak0_minus_1 = 8 // ak0 - 1
+        sst_a_offset_src = SST_A_OFFSET.format(F_smem_ak1=smem_ak1, F_log2_smem_ak1_byte=log2_smem_ak1_byte, F_smem_a_line_byte=smem_a_line_byte, F_lds_size=self.single_buffer_lds_size, F_shr_bit_iak0=shr_bit_iak0, F_iak0_minus_1=ak0_minus_1)
         return sst_a_offset_src
 
     def gen_sst_b_offset(self):
@@ -613,7 +621,11 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; sld_offset_a = sld_im * ak1 + sld_iak0
     v_lshrrev_b32 v[v_sld_iak0], {F_log2_inst_m}, v[v_lane_id]
     v_and_b32 v[v_sld_im], {F_inst_m_minus_1}, v[v_lane_id]
-    v_xor_b32 v[v_tmp], v[v_sld_im], v[v_sld_iak0]
+    v_lshrrev_b32 v[v_tmp + 4], {F_shr_bit_iak0}, v[v_sld_im]
+    v_and_b32 v[v_tmp + 5], {F_iak0_minus_1}, v[v_sld_im]
+    v_xor_b32 v[v_tmp], v[v_tmp + 4], v[v_sld_iak0]
+    v_lshlrev_b32 v[v_tmp], {F_shr_bit_iak0}, v[v_tmp]
+    v_add_u32 v[v_tmp], v[v_tmp], v[v_tmp + 5]
     {F_col_idx_str}
     v_mov_b32 v[v_tmp + {F_availble_tmp}], {F_smem_ak0_stride}
     v_mul_lo_u32 v[v_sld_iak0], v[v_tmp + {F_availble_tmp}], v[v_sld_iak0] 
@@ -628,7 +640,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         COL_IDX_STR = """
     v_mov_b32 v[v_tmp + {F_sld_iak0}], {F_sld_ak0}
     v_add_u32 v[v_tmp + {F_sld_iak0}], v[v_tmp + {F_sld_iak0}], v[v_sld_iak0]
-    v_xor_b32 v[v_tmp + {F_sld_iak0}], v[v_sld_im], v[v_tmp + {F_sld_iak0}]
+    v_xor_b32 v[v_tmp + {F_sld_iak0}], v[v_tmp + 4], v[v_tmp + {F_sld_iak0}]
+    v_lshlrev_b32 v[v_tmp + {F_sld_iak0}], {F_shr_bit_iak0}, v[v_tmp + {F_sld_iak0}]
+    v_add_u32 v[v_tmp + {F_sld_iak0}], v[v_tmp + {F_sld_iak0}], v[v_tmp + 5]
 """
 
         SLD_COL_AK0 = """
@@ -641,6 +655,8 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 """
 
         log2_inst_m = int(math.log2(self.tile.inst_m))
+        ak0_minus_1 = 8 // ak0 - 1
+        shr_bit_iak0 = int(math.log2(8 // ak0))
         smem_ak0_stride = (self.tile.cta_m + self.smem_a_padding) * self.tile.smem_a_k1
         inst_m_minus_1 = self.tile.inst_m - 1
         log2_smem_ak1 = int(math.log2(self.tile.smem_a_k1))
