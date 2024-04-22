@@ -564,15 +564,9 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     ; store A to shared mem offset
     ; sst_iak0 = iak0 * (block_m + pad) * ak1
     ; sst_offset_a = sst_iak0 + v_im * {F_smem_ak1}
-    ;v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_im]
     v_mov_b32 v[v_tmp + 1], {F_smem_a_line_byte}
     v_xor_b32 v[v_tmp + 2], v[v_im], v[v_iak0]
-    ;v_mov_b32 v[v_tmp+2], v[v_im]
     v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_tmp + 2]
-    ;v_lshrrev_b32 v[v_tmp + 2], 1, v[v_iak0]
-    ;v_and_b32 v[v_tmp + 3], 1, v[v_iak0]
-    ;v_lshlrev_b32 v[v_tmp + 3], 3, v[v_tmp + 3]
-    ;v_add_u32 v[v_tmp], v[v_tmp], v[v_tmp + 3]
     v_mad_u32_u24 v[v_sst_offset_a0], v[v_iak0], v[v_tmp + 1], v[v_tmp]
     v_mov_b32 v[v_tmp], {F_lds_size}
     v_add_u32 v[v_sst_offset_a1], v[v_tmp], v[v_sst_offset_a0]
@@ -596,8 +590,6 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_lshlrev_b32 v[v_tmp], {F_log2_smem_b_k1}, v[v_in]
     v_lshlrev_b32 v[v_tmp + 1], {F_log2_smem_bk0_stride}, v[v_ibk0]
     v_add_u32 v[v_sst_offset_b0], v[v_tmp], v[v_tmp + 1]
-    ; v_lshrrev_b32 v[v_tmp], 6, v[v_sst_offset_b]
-    ; v_lshl_add_u32 v[v_sst_offset_b], v[v_tmp], 3, v[v_sst_offset_b] 
     v_lshlrev_b32 v[v_sst_offset_b0], {F_log2_compute_dt_size}, v[v_sst_offset_b0]
     v_mov_b32 v[v_tmp], {F_a_smem_size}
     v_add_u32 v[v_sst_offset_b0], v[v_sst_offset_b0], v[v_tmp]
@@ -623,7 +615,6 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_and_b32 v[v_sld_im], {F_inst_m_minus_1}, v[v_lane_id]
     v_xor_b32 v[v_tmp], v[v_sld_im], v[v_sld_iak0]
     {F_col_idx_str}
-    ;v_mov_b32 v[v_tmp], v[v_sld_im]
     v_mov_b32 v[v_tmp + {F_availble_tmp}], {F_smem_ak0_stride}
     v_mul_lo_u32 v[v_sld_iak0], v[v_tmp + {F_availble_tmp}], v[v_sld_iak0] 
     v_add_lshl_u32 v[v_sld_im], v[v_tmp], s[s_wave_im], {F_log2_smem_ak1}
