@@ -570,7 +570,6 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     v_lshlrev_b32 v[v_tmp + 2], {F_shr_bit_iak0}, v[v_tmp + 2]
     v_and_b32 v[v_tmp + 3], {F_iak0_minus_1}, v[v_im]
     v_add_u32 v[v_tmp + 2], v[v_tmp + 2], v[v_tmp + 3]
-    ; .print v_tmp+2, s_print, s_bx, v_tid, v_tmp+7
     v_lshlrev_b32 v[v_tmp], {F_log2_smem_ak1_byte}, v[v_tmp + 2]
     v_mad_u32_u24 v[v_sst_offset_a0], v[v_iak0], v[v_tmp + 1], v[v_tmp]
     v_mov_b32 v[v_tmp], {F_lds_size}
@@ -655,6 +654,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
 """
 
         log2_inst_m = int(math.log2(self.tile.inst_m))
+        ak0 = self.b_ak0
         ak0_minus_1 = 8 // ak0 - 1
         shr_bit_iak0 = int(math.log2(8 // ak0))
         smem_ak0_stride = (self.tile.cta_m + self.smem_a_padding) * self.tile.smem_a_k1
@@ -666,10 +666,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
         sld_off_ak0 = ""
         availble_tmp = self.num_sld_ak0
         for i in range(1, self.num_sld_ak0, 1):
-            col_idx_str += COL_IDX_STR.format(F_sld_iak0=i, F_sld_ak0=i*self.sld_ak0)
+            col_idx_str += COL_IDX_STR.format(F_sld_iak0=i, F_sld_ak0=i*self.sld_ak0, F_shr_bit_iak0=shr_bit_iak0)
             sld_col_ak0 += SLD_COL_AK0.format(F_sld_iak0=i, F_log2_smem_ak1=log2_smem_ak1, F_log2_sizeof_dt=log2_sizeof_dt)
             sld_off_ak0 += SLD_OFF_AK0.format(F_sld_iak0=i)
-        sld_offfset_src = SLD_A_OFFSET.format(F_log2_inst_m=log2_inst_m, F_smem_ak0_stride=smem_ak0_stride, F_inst_m_minus_1=inst_m_minus_1, F_log2_smem_ak1=log2_smem_ak1, F_log2_sizeof_dt=log2_sizeof_dt, F_col_idx_str=col_idx_str, F_sld_col_ak0=sld_col_ak0, F_availble_tmp=availble_tmp, F_lds_size=self.single_buffer_lds_size, F_sld_off_ak0=sld_off_ak0)
+        sld_offfset_src = SLD_A_OFFSET.format(F_log2_inst_m=log2_inst_m, F_smem_ak0_stride=smem_ak0_stride, F_inst_m_minus_1=inst_m_minus_1, F_log2_smem_ak1=log2_smem_ak1, F_log2_sizeof_dt=log2_sizeof_dt, F_col_idx_str=col_idx_str, F_sld_col_ak0=sld_col_ak0, F_availble_tmp=availble_tmp, F_lds_size=self.single_buffer_lds_size, F_sld_off_ak0=sld_off_ak0, F_shr_bit_iak0=shr_bit_iak0, F_iak0_minus_1=ak0_minus_1)
         return sld_offfset_src
 
     def gen_sld_b_offset(self):
