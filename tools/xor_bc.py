@@ -9,7 +9,7 @@ def check_new_col(row, col):
         res += '\n'
     return res
   
-row = 4
+row = 8
 col = 32
 print(check_new_col(row, col))
 
