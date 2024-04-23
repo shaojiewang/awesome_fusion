@@ -77,12 +77,12 @@ label_gemm_rrr_loop_begin:
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 32 : v_c + 47], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b0 + 0 : v_sld_b0 + 1], v[v_c + 32 : v_c + 47]
 
-    buffer_load_dwordx4 v[v_gld_b1 + 0 : v_gld_b1 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
     ds_write_b128 v[v_sst_offset_b1], v[v_tmp : v_tmp + 3], offset: 128 * 16 * 2 * 0 + 128 * 8 * 2 * 0
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 32 : v_c + 47], v[v_sld_a1 + 2 : v_sld_a1 + 3], v[v_sld_b0 + 2 : v_sld_b0 + 3], v[v_c + 32 : v_c + 47]
 
     .dequant_int8_1x8 v_tmp, v_fp32_base, v_gld_b1 + 2, v_sel_b + 0, v_sub_magic_num, v_scale
+    buffer_load_dwordx4 v[v_gld_b1 + 0 : v_gld_b1 + 3], v[v_offset_b], s[s_ptr_b : s_ptr_b + 3], 0 offen offset:0
 
     v_mfma_f32_32x32x8bf16_1k v[v_c + 48 : v_c + 63], v[v_sld_a1 + 0 : v_sld_a1 + 1], v[v_sld_b1 + 0 : v_sld_b1 + 1], v[v_c + 48 : v_c + 63]
 
