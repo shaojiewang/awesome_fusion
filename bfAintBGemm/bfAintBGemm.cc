@@ -85,7 +85,7 @@ int main(int argc, char ** argv)
             }
         };
 
-    uint32_t max_sk_blocks = 1;
+    uint32_t max_sk_blocks = 16;
     
     SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
     SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
@@ -123,8 +123,8 @@ int main(int argc, char ** argv)
     GPU_CHECK_ERROR(hipMemcpy(b_device_buf.GetBuffer(), b_host_buf_to_device.GetBuffer(), n * k * sizeof(BDataType), hipMemcpyHostToDevice));
     GPU_CHECK_ERROR(hipMemcpy(scale_device_buf.GetBuffer(), scale_host_buf.GetBuffer(), n * 1 * sizeof(ScaleDataType), hipMemcpyHostToDevice));
 
-    int total_loop = 1;
-    int warm_ups = 0;
+    int total_loop = 10;
+    int warm_ups = 10;
 
 // TODO: move this section to a header file
 
