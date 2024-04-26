@@ -13,6 +13,7 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 8192;
 
+using namespace fastertransformer;
 
 int main(int argc, char* argv[])
 {
