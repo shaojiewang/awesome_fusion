@@ -3,7 +3,7 @@
 #include "hip_utils.h"
 #include <hip/hip_runtime.h>
 #include <mpi.h>
-#include <rccl.h>
+#include <rccl/rccl.h>
 #include <stdio.h>
 #include <string>
 

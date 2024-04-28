@@ -15,7 +15,6 @@ template<typename T>
 CustomAllReduceComm<T>::~CustomAllReduceComm()
 {
     hipPointerAttribute_t comm_buffer_attributes, barrier_attributes;
-    printf("rank=%d\n", rank_);
     check_cuda_error(hipPointerGetAttributes(&comm_buffer_attributes, param_.peer_comm_buffer_ptrs[rank_]));
     check_cuda_error(hipPointerGetAttributes(&barrier_attributes, param_.peer_barrier_ptrs[rank_]));
     if (comm_buffer_attributes.type == 2) {
