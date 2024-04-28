@@ -21,6 +21,8 @@ int main(int argc, char* argv[])
     int rank , world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    printf("rank=%d, world_size=%d\n", rank, world_size);
  
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
@@ -92,7 +94,8 @@ int main(int argc, char* argv[])
         printf("[rank %d] check the result : success\n", rank);
     else
         printf("[rank %d] check the result : fail\n", rank);
-    
+   
+    hipDeviceSynchronize(); 
     MPI_Finalize();
     return 0;
 }
