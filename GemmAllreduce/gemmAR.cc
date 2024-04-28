@@ -13,6 +13,9 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 8192;
 
+#define TOTAL_NUM 100
+#define WARM_UP_NUM 10
+
 using namespace fastertransformer;
 
 int main(int argc, char* argv[])
@@ -62,18 +65,31 @@ int main(int argc, char* argv[])
     check_cuda_error(hipMemcpyHtoD(dev_buff, &host_buff, sizeof(uint16_t)*AR_NUM));
     hipDeviceSynchronize(); 
      
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // warm up
+    for (int i = 0; i < WARM_UP_NUM; i++)
+    {
+        if(custom_ar == 1)
+            custom_all_reduce_comms[rank]->customAllReduce(AR_NUM, nullptr);
+        else
+            ftNcclAllReduceSum(dev_buff, dev_buff, AR_NUM, tensor_para, nullptr);
+    }
+
     // perform all reduce
     hipStream_t stream;
     hipStreamCreate(&stream);
     hipEvent_t event_s, event_e;
     hipEventCreate(&event_s);
     hipEventCreate(&event_e);
-    MPI_Barrier(MPI_COMM_WORLD);
     check_cuda_error(hipEventRecord(event_s,stream));
-    if(custom_ar == 1)
-        custom_all_reduce_comms[rank]->customAllReduce(AR_NUM, stream);
-    else
-        ftNcclAllReduceSum(dev_buff, dev_buff, AR_NUM, tensor_para, stream);
+    for (int i = 0; i < TOTAL_NUM; i++)
+    {
+        if(custom_ar == 1)
+            custom_all_reduce_comms[rank]->customAllReduce(AR_NUM, stream);
+        else
+            ftNcclAllReduceSum(dev_buff, dev_buff, AR_NUM, tensor_para, stream);
+    }
     check_cuda_error(hipEventRecord(event_e,stream));
     check_cuda_error(hipEventSynchronize(event_e));
     if(custom_ar == 1)
@@ -82,7 +98,7 @@ int main(int argc, char* argv[])
     // e2e time including cpu time 
     float time_ms;
     check_cuda_error(hipEventElapsedTime(&time_ms,event_s,event_e));
-    printf("[rank %d] ElapsedTime : %f ms , For the real time of communication, please use the profile tool\n", rank, time_ms);
+    printf("[rank %d] ElapsedTime : %f ms , For the real time of communication, please use the profile tool\n", rank, time_ms / TOTAL_NUM);
      
     // check the result
     bool flag = true;

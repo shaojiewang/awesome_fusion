@@ -1,0 +1,3 @@
+"Name","Calls","TotalDurationNs","AverageNs","Percentage"
+"void fastertransformer::oneShotAllReduceKernel<unsigned short>(fastertransformer::AllReduceParams<unsigned short>)",80,2241596,28019,94.30060052795979
+"<barrier packet>",8,135479,16934,5.699399472040217
