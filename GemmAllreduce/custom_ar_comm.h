@@ -9,7 +9,7 @@
 #include "hip_utils.h"
 #include <vector>
 
-namespace fastertransformer {
+namespace AwesomeFusion {
 
 class AbstractCustomComm {
 public:
@@ -57,4 +57,4 @@ struct CustomARCommTypeConverter<half> {
     using Type = uint16_t;
 };
 
-}  // namespace fastertransformer
+}  // namespace AwesomeFusion

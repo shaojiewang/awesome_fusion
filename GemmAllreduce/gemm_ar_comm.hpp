@@ -113,7 +113,7 @@ typedef struct {
     size_t k;
     size_t tp;
     size_t dt;
-} test_arg_t;
+} test_args_t;
 
 
 

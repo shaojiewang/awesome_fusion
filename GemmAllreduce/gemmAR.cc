@@ -6,7 +6,9 @@
 #include <vector>
 #include "nccl.h"
 #include <mpi.h>
+
 #include "custom_ar_comm.h"
+#include "gemm_ar_comm.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -16,7 +18,12 @@ const int AR_NUM = 8192;
 #define TOTAL_NUM 100
 #define WARM_UP_NUM 10
 
-using namespace fastertransformer;
+using namespace AwesomeFusion;
+
+int gemm_ar(const test_args_t& args)
+{
+    
+}
 
 int main(int argc, char* argv[])
 {
@@ -26,6 +33,18 @@ int main(int argc, char* argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     printf("rank=%d, world_size=%d\n", rank, world_size);
+
+    if(argc != 6)
+    {
+        printf("[ERROR] the pass args could be: [m, n, k, tp, dt], "
+               "means [m n k] of gemm, tp means card num, dt means datatype, bf16=0,fp16=1\n"
+               "e.g. test_gemm_ar 1 8192 2048 4 0 \n");
+        MPI_Finalize();
+        return 0;
+    }
+
+    test_args_t test_args{atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5])};
+    gemm_ar(test_args);
  
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
