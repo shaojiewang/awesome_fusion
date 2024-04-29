@@ -38,12 +38,12 @@ struct TGemmTypes<float>
 };
 
 template <>
-struct TGemmTypes<__hip_bfloat16>
+struct TGemmTypes<hip_bfloat16>
 {
     static const rocblas_datatype hipTypeI = rocblas_datatype_bf16_r;
-    using dataTypeI = __hip_bfloat16;
+    using dataTypeI = hip_bfloat16;
     static const rocblas_datatype hipTypeO = rocblas_datatype_bf16_r;
-    using dataTypeO = __hip_bfloat16;
+    using dataTypeO = hip_bfloat16;
     static const rocblas_datatype hipTypeS = rocblas_datatype_f32_r; // scale type
     using dataTypeS = float;
 };

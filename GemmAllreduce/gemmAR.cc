@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    test_args_t test_args{atoi(argv[1]), atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5])};
+    test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
     gemm_ar(test_args);
  
     // initialize custom all reduce 
