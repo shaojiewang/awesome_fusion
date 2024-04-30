@@ -20,9 +20,26 @@ const int AR_NUM = 8192;
 
 using namespace AwesomeFusion;
 
-int gemm_ar(const test_args_t& args)
+int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 {
+    printf("m, n, k, tp, dt=[%d %d %d %d %d]\n",
+        args.m,
+        args.n,
+        args.k,
+        args.tp,
+        args.dt);
     
+    // malloc tensor
+    
+
+    // init tensor on rank 0
+    if (rank == 0)
+    
+    // broadcast rank 0 tensor to the others
+
+    
+
+    return 1;
 }
 
 int main(int argc, char* argv[])
@@ -44,7 +61,7 @@ int main(int argc, char* argv[])
     }
 
     test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
-    gemm_ar(test_args);
+    int res = gemm_ar(test_args, rank, world_size);
  
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
