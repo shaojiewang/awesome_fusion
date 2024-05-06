@@ -31,6 +31,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     
     // malloc tensor
     
+    
 
     // init tensor on rank 0
     if (rank == 0)
