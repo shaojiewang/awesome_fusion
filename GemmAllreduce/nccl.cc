@@ -1,5 +1,5 @@
 #include "nccl.h"
-namespace AwesomeFusion {
+namespace awesome_fusion {
 
 #ifdef BUILD_MULTI_GPU
 template<typename T>
@@ -385,5 +385,5 @@ size_t getLocalBatchSize(const size_t batch_size, const size_t seq_len, const si
     return local_batch_size;
 }
 
-}  // namespace AwesomeFusion
+}  // namespace awesome_fusion
 

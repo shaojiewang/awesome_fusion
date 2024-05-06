@@ -9,6 +9,7 @@
 
 #include "custom_ar_comm.h"
 #include "gemm_ar_comm.hpp"
+#include "gemm_matrix_layout.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -18,7 +19,16 @@ const int AR_NUM = 8192;
 #define TOTAL_NUM 100
 #define WARM_UP_NUM 10
 
-using namespace AwesomeFusion;
+using namespace awesome_fusion;
+
+using Row = awesome_fusion::gemm_layout::gemm::RowMajor;
+using Col = awesome_fusion::gemm_layout::gemm::ColumnMajor;
+
+using ALayout = Row;
+using BLayout = Row;
+using ScaleLayout = Row;
+using CLayout = Row;
+
 
 template <class ADataType, 
           class BDataType,
@@ -36,18 +46,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // assertion
     assert(k % (tp * 64) == 0);
  
-    // malloc tensor
-    
-    
-
-    // init tensor on rank 0
-    if (rank == 0)
-    {
-    }
-    
-    // broadcast rank 0 tensor to the others
-
-    // 
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
     initCustomAllReduceComm<uint16_t>(&custom_all_reduce_comms, custom_ar, world_size);
@@ -67,6 +65,25 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     NcclParam pipeline_para;
     ftNcclInitialize(tensor_para, pipeline_para, world_size, 1);
     
+    // malloc tensor
+    auto f_matrix_space_size = 
+        [](std::size_t nRow, std::size_t nCol, std::size_t stride, auto layout){
+            using Layout = decltype(layout);
+            if constexpr(std::is_same<Layout, Row>::value) {
+                return (nRow - 1) * stride + nCol;
+            } else {
+                return (nCol - 1) * stride + nRow;
+            }
+        };
+    
+
+    // init tensor on rank 0
+    if (rank == 0)
+    {
+    }
+    
+    // broadcast rank 0 tensor to the others
+
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
     hipMalloc((void**)&tmp, AR_NUM*sizeof(uint16_t));

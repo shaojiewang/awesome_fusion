@@ -16,7 +16,7 @@
 #define DEFALUT_ALGO_AR_SIZE_THRESHOLD_INTRA_HIVE (384 * 1024)
 #define DEFALUT_ALGO_AR_SIZE_THRESHOLD_INTER_HIVE (32 * 1024)
 
-namespace AwesomeFusion {
+namespace awesome_fusion {
 
 #ifdef ENABLE_BF16
 typedef struct bf168 {
@@ -45,4 +45,4 @@ void invokeOneOrTwoShotAllReduceKernel(AllReduceParams<T>& param, hipStream_t st
 
 void kernelLaunchConfig(int& blocks_per_grid, int& threads_per_block, size_t elts, int kernel_algo, int tp_rank);
 
-}  // namespace AwesomeFusion
+}  // namespace awesome_fusion

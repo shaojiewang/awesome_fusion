@@ -2,7 +2,7 @@
 #include "custom_ar_kernels.h"
 #include "hip_type_utils.cuh"
 
-namespace AwesomeFusion {
+namespace awesome_fusion {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -392,5 +392,5 @@ void invokeOneOrTwoShotAllReduceKernel(AllReduceParams<T>& param, hipStream_t st
 // Template instantiation
 template void invokeOneOrTwoShotAllReduceKernel<uint16_t>(AllReduceParams<uint16_t>& param, hipStream_t stream);
 template void invokeOneOrTwoShotAllReduceKernel<uint32_t>(AllReduceParams<uint32_t>& param, hipStream_t stream);
-}  // namespace AwesomeFusion
+}  // namespace awesome_fusion
 
