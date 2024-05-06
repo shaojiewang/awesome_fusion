@@ -20,6 +20,10 @@ const int AR_NUM = 8192;
 
 using namespace AwesomeFusion;
 
+template <class ADataType, 
+          class BDataType,
+          class ScaleDataType,
+          class CDataType>
 int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 {
     printf("m, n, k, tp, dt=[%d %d %d %d %d]\n",
@@ -28,42 +32,22 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         args.k,
         args.tp,
         args.dt);
-    
+   
+    // assertion
+    assert(k % (tp * 64) == 0);
+ 
     // malloc tensor
     
     
 
     // init tensor on rank 0
     if (rank == 0)
+    {
+    }
     
     // broadcast rank 0 tensor to the others
 
-    
-
-    return 1;
-}
-
-int main(int argc, char* argv[])
-{
-    MPI_Init(&argc, &argv);
-    int rank , world_size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-    printf("rank=%d, world_size=%d\n", rank, world_size);
-
-    if(argc != 6)
-    {
-        printf("[ERROR] the pass args could be: [m, n, k, tp, dt], "
-               "means [m n k] of gemm, tp means card num, dt means datatype, bf16=0,fp16=1\n"
-               "e.g. test_gemm_ar 1 8192 2048 4 0 \n");
-        MPI_Finalize();
-        return 0;
-    }
-
-    test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
-    int res = gemm_ar(test_args, rank, world_size);
- 
+    // 
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
     initCustomAllReduceComm<uint16_t>(&custom_all_reduce_comms, custom_ar, world_size);
@@ -149,6 +133,32 @@ int main(int argc, char* argv[])
         printf("[rank %d] check the result : fail\n", rank);
    
     hipDeviceSynchronize(); 
+    
+
+    return 1;
+}
+
+int main(int argc, char* argv[])
+{
+    MPI_Init(&argc, &argv);
+    int rank , world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    printf("rank=%d, world_size=%d\n", rank, world_size);
+
+    if(argc != 6)
+    {
+        printf("[ERROR] the pass args could be: [m, n, k, tp, dt], "
+               "means [m n k] of gemm, tp means card num, dt means datatype, bf16=0,fp16=1\n"
+               "e.g. test_gemm_ar 1 8192 2048 4 0 \n");
+        MPI_Finalize();
+        return 0;
+    }
+
+    test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
+    int res = gemm_ar(test_args, rank, world_size);
+ 
     MPI_Finalize();
     return 0;
 }
