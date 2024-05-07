@@ -29,11 +29,14 @@ using BLayout = Row;
 using ScaleLayout = Row;
 using CLayout = Row;
 
+using Half = half;
+using BHalf = hip_bfloat16;
 
 template <class ADataType, 
           class BDataType,
           class ScaleDataType,
-          class CDataType>
+          class CDataType,
+          class ComputeDatatype>
 int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 {
     printf("m, n, k, tp, dt=[%d %d %d %d %d]\n",
@@ -75,6 +78,23 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                 return (nCol - 1) * stride + nRow;
             }
         };
+
+    SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
+    SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
+    SimpleDeviceMem c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}), 1);
+    // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
+    SimpleDeviceMem scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+    
+    SimpleDeviceMem a_device_buf_ref(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
+    SimpleDeviceMem b_device_buf_ref(sizeof(ComputeDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
+    SimpleDeviceMem c_device_buf_ref(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}), 1);
+    // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
+    SimpleDeviceMem scale_device_buf_ref(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+    
+    SimpleHostMem a_host_buf(sizeof(float) * f_matrix_space_size(m, k, lda, ALayout{}));
+    SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb, BLayout{}));
+    SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
 
     // init tensor on rank 0
@@ -174,7 +194,7 @@ int main(int argc, char* argv[])
     }
 
     test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
-    int res = gemm_ar(test_args, rank, world_size);
+    int res = gemm_ar<BHalf, int8_t, float, BHalf>(test_args, rank, world_size);
  
     MPI_Finalize();
     return 0;
