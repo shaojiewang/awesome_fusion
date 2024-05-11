@@ -10,6 +10,7 @@
 #include "custom_ar_comm.h"
 #include "gemm_ar_comm.hpp"
 #include "gemm_matrix_layout.hpp"
+#include "simple_mem_buf.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -18,6 +19,8 @@ const int AR_NUM = 8192;
 
 #define TOTAL_NUM 100
 #define WARM_UP_NUM 10
+
+#define MAX_WORLD_SIZE 8
 
 using namespace awesome_fusion;
 
@@ -36,7 +39,7 @@ template <class ADataType,
           class BDataType,
           class ScaleDataType,
           class CDataType,
-          class ComputeDatatype>
+          class ComputeDataType>
 int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 {
     printf("m, n, k, tp, dt=[%d %d %d %d %d]\n",
@@ -45,10 +48,26 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         args.k,
         args.tp,
         args.dt);
-   
+    
+    // init shape
+    int m = args.m;
+    int n = args.n;
+    int k = args.k;
+    int tp = args.tp;
+    int k_per_card = k / tp;
+
+    int lda = k_per_card;
+    int ldb = n;
+    int ldc = n;
+
+    int lda_ref = k;
+    int ldb_ref = n;
+    int ldc_ref = n;
+    
     // assertion
     assert(k % (tp * 64) == 0);
- 
+    assert(world_size <= MAX_WORLD_SIZE); 
+
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
     initCustomAllReduceComm<uint16_t>(&custom_all_reduce_comms, custom_ar, world_size);
@@ -79,23 +98,42 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             }
         };
 
-    SimpleDeviceMem a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
-    SimpleDeviceMem b_device_buf(sizeof(BDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
-    SimpleDeviceMem c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}), 1);
+    using DeviceMemCached = SimpleDeviceMem<false>;
+    using DeviceMemUncached = SimpleDeviceMem<true>;
+
+    DeviceMemCached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
+    DeviceMemCached b_device_buf(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
+    DeviceMemUncached c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
-    SimpleDeviceMem scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+    DeviceMemCached scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
-    SimpleDeviceMem a_device_buf_ref(sizeof(ADataType) * f_matrix_space_size(m, k, lda, ALayout{}));
-    SimpleDeviceMem b_device_buf_ref(sizeof(ComputeDataType) * f_matrix_space_size(k, n, ldb, BLayout{}));
-    SimpleDeviceMem c_device_buf_ref(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}), 1);
+    DeviceMemCached a_device_buf_ref(sizeof(ADataType) * f_matrix_space_size(m, k, lda_ref, ALayout{}));
+    DeviceMemCached b_device_buf_ref(sizeof(ComputeDataType) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
+    DeviceMemCached c_device_buf_ref(sizeof(CDataType) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
-    SimpleDeviceMem scale_device_buf_ref(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
+    DeviceMemCached scale_device_buf_ref(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
-    SimpleHostMem a_host_buf(sizeof(float) * f_matrix_space_size(m, k, lda, ALayout{}));
-    SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb, BLayout{}));
-    SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    SimpleHostMem a_host_buf(sizeof(float) * f_matrix_space_size(m, k, lda_ref, ALayout{}));
+    SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
+    SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
-    
+   
+    // pointer communication via ipc
+    void* init_a_buff_ptrs[MAX_WORLD_SIZE];
+    void* init_b_buff_ptrs[MAX_WORLD_SIZE];
+    void* init_scale_buff_ptrs[MAX_WORLD_SIZE];
+    void* out_c_buff_ptrs[MAX_WORLD_SIZE];
+    for (int i = 0; i < world_size; i++)
+    {
+        hipIpcMemHandle_t handle;
+        if (rank == i)
+        {
+            init_a_buff_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&handle, init_a_buff_ptrs[i]));
+        }
+        MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buff_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
+    }
 
     // init tensor on rank 0
     if (rank == 0)
@@ -194,7 +232,7 @@ int main(int argc, char* argv[])
     }
 
     test_args_t test_args{static_cast<size_t>(atoi(argv[1])), static_cast<size_t>(atoi(argv[2])), static_cast<size_t>(atoi(argv[3])), static_cast<size_t>(atoi(argv[4])), static_cast<size_t>(atoi(argv[5]))};
-    int res = gemm_ar<BHalf, int8_t, float, BHalf>(test_args, rank, world_size);
+    int res = gemm_ar<BHalf, int8_t, float, BHalf, BHalf>(test_args, rank, world_size);
  
     MPI_Finalize();
     return 0;
