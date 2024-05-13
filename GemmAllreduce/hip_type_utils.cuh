@@ -3,6 +3,8 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
 
+#include "hip_bf16_wrapper.hpp"
+
 template<typename T>
 inline __device__ T ldg(const T* val) {
     return __ldg(val);

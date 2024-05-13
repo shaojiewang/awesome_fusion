@@ -6,6 +6,10 @@
 #include <hip/hip_runtime_api.h>
 #include <hiprand/hiprand_kernel.h>
 
+#include "hip_type_utils.cuh"
+#include "hip_bf16_wrapper.hpp"
+
+
 // cpu random gen
 static inline void rand_vector_2d(float* v, int row, int col, int ld, float min_v = -1, float max_v = 1){
     int r, c;
@@ -95,7 +99,7 @@ __global__ void cuda_random_uniform_kernel(T* buffer, const size_t size, const i
 }
 
 template<>
-__global__ void cuda_random_uniform_kernel<hip_bfloat16>(hip_bfloat16* buffer, const size_t size, const int seq_offset)
+__global__ void cuda_random_uniform_kernel<__nv_bfloat16>(__nv_bfloat16* buffer, const size_t size, const int seq_offset)
 {
     const int     idx = blockIdx.x * blockDim.x + threadIdx.x;
     hiprandState_t local_state;
@@ -119,6 +123,6 @@ void cudaRandomUniform(T* buffer, const size_t size)
 
 template void cudaRandomUniform(float* buffer, const size_t size);
 template void cudaRandomUniform(half* buffer, const size_t size);
-template void cudaRandomUniform(hip_bfloat16* buffer, const size_t size);
+template void cudaRandomUniform(__nv_bfloat16* buffer, const size_t size);
 
 
