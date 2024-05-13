@@ -138,6 +138,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // init tensor on rank 0
     if (rank == 0)
     {
+        
     }
     
     // broadcast rank 0 tensor to the others
