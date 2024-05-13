@@ -11,6 +11,7 @@
 #include "gemm_ar_comm.hpp"
 #include "gemm_matrix_layout.hpp"
 #include "simple_mem_buf.hpp"
+#include "random_gen.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -119,26 +120,59 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
    
     // pointer communication via ipc
-    void* init_a_buff_ptrs[MAX_WORLD_SIZE];
-    void* init_b_buff_ptrs[MAX_WORLD_SIZE];
-    void* init_scale_buff_ptrs[MAX_WORLD_SIZE];
-    void* out_c_buff_ptrs[MAX_WORLD_SIZE];
+    void* init_a_buf_ptrs[MAX_WORLD_SIZE];
+    void* init_a_buf_ref_ptrs[MAX_WORLD_SIZE];
+    void* init_b_buf_ptrs[MAX_WORLD_SIZE];
+    void* init_scale_buf_ptrs[MAX_WORLD_SIZE];
+    void* out_c_buf_ptrs[MAX_WORLD_SIZE];
     for (int i = 0; i < world_size; i++)
     {
-        hipIpcMemHandle_t handle;
+        hipIpcMemHandle_t handle[32];
         if (rank == i)
         {
-            init_a_buff_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
-            check_cuda_error(hipIpcGetMemHandle(&handle, init_a_buff_ptrs[i]));
+            init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&handle[0], init_a_buf_ptrs[i]));
         }
-        MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buff_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
+        MPI_Bcast(&handle[0], sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
+        
+        if (rank == i)
+        {
+            init_a_buf_ref_ptrs[i] = reinterpret_cast<void*>(a_device_buf_ref.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&handle[1], init_a_buf_ref_ptrs[i]));
+        }
+        MPI_Bcast(&handle[1], sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle[1], hipIpcMemLazyEnablePeerAccess));
+
     }
 
     // init tensor on rank 0
     if (rank == 0)
     {
-        
+        cudaRandomUniform<ADataType>(a_device_buf_ref.GetBuffer(), m * k);
+        cudaRandomUniform<ComputeDataType>(a_device_buf_ref.GetBuffer(), n * k);
+        cudaRandomUniform<ScaleDataType>(a_device_buf_ref.GetBuffer(), n);
+    }
+    for (int i =0; i < world_size; i++)
+    {
+        hipMemcpy(init_a_buf_ptrs[i], init_a_buf_ref_ptrs[0] + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
+    }
+
+    // check broadcast res
+    for (int i = 0; i < world_size; i++)
+    {
+        if (rank == 0)
+        {
+            printf("a buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
+                *(int*)(init_a_buf_ref_ptrs[0]),
+                *(int*)(init_a_buf_ref_ptrs[0] + sizeof(ADataType) * m * k_per_card),
+                *(int*)(init_a_buf_ref_ptrs[0] + 2 * sizeof(ADataType) * m * k_per_card),
+                *(int*)(init_a_buf_ref_ptrs[0] + 3 * sizeof(ADataType) * m * k_per_card));
+        }
+        if (i == rank)
+        {
+            printf("a buf is [0x%x]\n", *(int*)(init_a_buf_ptrs[i]));
+        }
     }
     
     // broadcast rank 0 tensor to the others
