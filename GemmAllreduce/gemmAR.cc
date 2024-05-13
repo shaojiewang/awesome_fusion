@@ -7,6 +7,7 @@
 #include "nccl.h"
 #include <mpi.h>
 
+#include "hip_type_utils.cuh"
 #include "custom_ar_comm.h"
 #include "gemm_ar_comm.hpp"
 #include "gemm_matrix_layout.hpp"
@@ -34,7 +35,7 @@ using ScaleLayout = Row;
 using CLayout = Row;
 
 using Half = half;
-using BHalf = hip_bfloat16;
+using BHalf = __nv_bfloat16;
 
 template <class ADataType, 
           class BDataType,
@@ -149,13 +150,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // init tensor on rank 0
     if (rank == 0)
     {
-        cudaRandomUniform<ADataType>(a_device_buf_ref.GetBuffer(), m * k);
-        cudaRandomUniform<ComputeDataType>(a_device_buf_ref.GetBuffer(), n * k);
-        cudaRandomUniform<ScaleDataType>(a_device_buf_ref.GetBuffer(), n);
+        cudaRandomUniform<ADataType>(reinterpret_cast<ADataType*>(a_device_buf_ref.GetBuffer()), m * k);
+        cudaRandomUniform<ComputeDataType>(reinterpret_cast<ComputeDataType*>(a_device_buf_ref.GetBuffer()), n * k);
+        cudaRandomUniform<ScaleDataType>(reinterpret_cast<ScaleDataType*>(a_device_buf_ref.GetBuffer()), n);
     }
     for (int i =0; i < world_size; i++)
     {
-        hipMemcpy(init_a_buf_ptrs[i], init_a_buf_ref_ptrs[0] + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
+        hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
     }
 
     // check broadcast res
@@ -165,9 +166,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         {
             printf("a buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
                 *(int*)(init_a_buf_ref_ptrs[0]),
-                *(int*)(init_a_buf_ref_ptrs[0] + sizeof(ADataType) * m * k_per_card),
-                *(int*)(init_a_buf_ref_ptrs[0] + 2 * sizeof(ADataType) * m * k_per_card),
-                *(int*)(init_a_buf_ref_ptrs[0] + 3 * sizeof(ADataType) * m * k_per_card));
+                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + sizeof(ADataType) * m * k_per_card),
+                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 2 * sizeof(ADataType) * m * k_per_card),
+                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
         }
         if (i == rank)
         {
