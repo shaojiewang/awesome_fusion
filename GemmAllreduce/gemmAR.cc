@@ -132,7 +132,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         if (rank == i)
         {
             // init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
-            
+            check_cuda_error(hipExtMallocWithFlags((void **)&(init_a_buf_ptrs[i]),  1024 * 1024 * 1024, hipDeviceMallocFinegrained));
             check_cuda_error(hipIpcGetMemHandle(&(handle), init_a_buf_ptrs[i]));
         }
         MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
