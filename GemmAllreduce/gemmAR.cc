@@ -103,7 +103,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     using DeviceMemCached = SimpleDeviceMem<false>;
     using DeviceMemUncached = SimpleDeviceMem<true>;
 
-    DeviceMemCached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
+    DeviceMemUncached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
     DeviceMemUncached c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
@@ -128,22 +128,24 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     void* out_c_buf_ptrs[MAX_WORLD_SIZE];
     for (int i = 0; i < world_size; i++)
     {
-        hipIpcMemHandle_t handle[32];
+        hipIpcMemHandle_t handle;
         if (rank == i)
         {
-            init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
-            check_cuda_error(hipIpcGetMemHandle(&handle[0], init_a_buf_ptrs[i]));
+            // init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
+            
+            check_cuda_error(hipIpcGetMemHandle(&(handle), init_a_buf_ptrs[i]));
         }
-        MPI_Bcast(&handle[0], sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
+        MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
         
+        hipIpcMemHandle_t handle1;
         if (rank == i)
         {
             init_a_buf_ref_ptrs[i] = reinterpret_cast<void*>(a_device_buf_ref.GetBuffer());
-            check_cuda_error(hipIpcGetMemHandle(&handle[1], init_a_buf_ref_ptrs[i]));
+            check_cuda_error(hipIpcGetMemHandle(&(handle1), init_a_buf_ref_ptrs[i]));
         }
-        MPI_Bcast(&handle[1], sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle[1], hipIpcMemLazyEnablePeerAccess));
+        MPI_Bcast(&handle1, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle1, hipIpcMemLazyEnablePeerAccess));
 
     }
 
