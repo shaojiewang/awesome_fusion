@@ -162,13 +162,15 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
         cudaRandomUniform<ADataType>(reinterpret_cast<ADataType*>(a_device_buf_ref.GetBuffer()), m * k);
         cudaRandomUniform<ComputeDataType>(reinterpret_cast<ComputeDataType*>(a_device_buf_ref.GetBuffer()), n * k);
         cudaRandomUniform<ScaleDataType>(reinterpret_cast<ScaleDataType*>(a_device_buf_ref.GetBuffer()), n);
+        
     }
-    for (int i =0; i < world_size; i++)
-    {
-        hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
-    }
+        for (int i =0; i < world_size; i++)
+        {
+            if (rank == i)
+            hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
+        }
 
-    hipDeviceSynchronize();
+    // hipDeviceSynchronize();
 
     // check broadcast res
     if (rank == 0)
