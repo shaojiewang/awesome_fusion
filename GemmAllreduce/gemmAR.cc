@@ -68,8 +68,8 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     int ldc_ref = n;
     
     // assertion
-    if (k % (tp * 64) == 0) return 0;
-    if (world_size <= MAX_WORLD_SIZE) return 0; 
+    if (k % (tp * 64) != 0) return 0;
+    if (world_size > MAX_WORLD_SIZE) return 0; 
 
     // pointer communication via ipc
     void* init_a_buf_ptrs[MAX_WORLD_SIZE];
@@ -111,7 +111,7 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     using DeviceMemCached = SimpleDeviceMem<false>;
     using DeviceMemUncached = SimpleDeviceMem<true>;
 
-    DeviceMemUncached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
+    DeviceMemCached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
     DeviceMemUncached c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
@@ -127,7 +127,8 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
-   
+  
+     
     for (int i = 0; i < world_size; i++)
     {
         hipIpcMemHandle_t handle[MAX_HANDLE_NUM];
@@ -148,7 +149,10 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
             check_cuda_error(hipIpcGetMemHandle(&(handle[1]), init_a_buf_ref_ptrs[i]));
         }
         MPI_Bcast(&(handle[1]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle[1], hipIpcMemLazyEnablePeerAccess));
+        if (rank != i)
+        {
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle[1], hipIpcMemLazyEnablePeerAccess));
+        }
 
     }
 
@@ -164,25 +168,27 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
         hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
     }
 
+    hipDeviceSynchronize();
+
     // check broadcast res
+    if (rank == 0)
+    {
+        printf("a buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
+            *(int*)(init_a_buf_ref_ptrs[0]),
+            *(int*)((char*)(init_a_buf_ref_ptrs[0]) + sizeof(ADataType) * m * k_per_card),
+            *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 2 * sizeof(ADataType) * m * k_per_card),
+            *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
+    }
     for (int i = 0; i < world_size; i++)
     {
-        if (rank == 0)
-        {
-            printf("a buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
-                *(int*)(init_a_buf_ref_ptrs[0]),
-                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + sizeof(ADataType) * m * k_per_card),
-                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 2 * sizeof(ADataType) * m * k_per_card),
-                *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
-        }
         if (i == rank)
         {
             printf("a buf is [0x%x]\n", *(int*)(init_a_buf_ptrs[i]));
         }
     }
 
-    exit(0);
-    
+    return 0;
+
     // broadcast rank 0 tensor to the others
 
     // output buff
