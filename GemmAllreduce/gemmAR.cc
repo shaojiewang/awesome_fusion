@@ -22,7 +22,8 @@ const int AR_NUM = 8192;
 #define TOTAL_NUM 100
 #define WARM_UP_NUM 10
 
-#define MAX_WORLD_SIZE 4
+#define MAX_WORLD_SIZE 8
+#define MAX_HANDLE_NUM 8
 
 using namespace awesome_fusion;
 
@@ -67,8 +68,8 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     int ldc_ref = n;
     
     // assertion
-    assert(k % (tp * 64) == 0);
-    assert(world_size <= MAX_WORLD_SIZE); 
+    if (k % (tp * 64) == 0) return 0;
+    if (world_size <= MAX_WORLD_SIZE) return 0; 
 
     // pointer communication via ipc
     void* init_a_buf_ptrs[MAX_WORLD_SIZE];
@@ -76,39 +77,6 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     void* init_b_buf_ptrs[MAX_WORLD_SIZE];
     void* init_scale_buf_ptrs[MAX_WORLD_SIZE];
     void* out_c_buf_ptrs[MAX_WORLD_SIZE];
-
-    // if (rank ==0)
-    {
-        int ranki;
-    MPI_Comm_rank(MPI_COMM_WORLD, &ranki);
-    for (int i = 0; i < 1; i++)
-    {
-        printf("%d, ranki=%d\n", __LINE__, ranki);
-        check_cuda_error(hipSetDevice(i));
-        hipIpcMemHandle_t handle;
-        if (ranki == i)
-        {
-            printf("in [%d]th loop\n", i);
-            // init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
-            check_cuda_error(hipExtMallocWithFlags((void **)&(init_a_buf_ptrs[i]),  1024 * 1024, hipDeviceMallocFinegrained));
-            *(int*)init_a_buf_ptrs[i] = 0x666;
-            check_cuda_error(hipIpcGetMemHandle(&handle, init_a_buf_ptrs[i]));
-        }
-        MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        if (ranki != 0)
-        {
-            check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
-        }
-        printf("%d, ranki=%d\n", __LINE__, ranki);
-        printf("a buf = %p, %p, %p, %p\n",
-            init_a_buf_ptrs[0],
-            init_a_buf_ptrs[1],
-            init_a_buf_ptrs[2],
-            init_a_buf_ptrs[3]);
-        printf("a buf = 0x%x\n", *(int*)init_a_buf_ptrs[0]);
-        exit(0);
-    }
-    }
 
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
@@ -160,30 +128,27 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
    
-    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     for (int i = 0; i < world_size; i++)
     {
-        printf("in [%d]th loop\n", i);
-        check_cuda_error(hipSetDevice(i));
-        hipIpcMemHandle_t handle;
+        hipIpcMemHandle_t handle[MAX_HANDLE_NUM];
         if (rank == i)
         {
             init_a_buf_ptrs[i] = reinterpret_cast<void*>(a_device_buf.GetBuffer());
-            // check_cuda_error(hipExtMallocWithFlags((void **)&(init_a_buf_ptrs[i]),  1024 * 1024, hipDeviceMallocFinegrained));
-            check_cuda_error(hipIpcGetMemHandle(&(handle), init_a_buf_ptrs[i]));
+            check_cuda_error(hipIpcGetMemHandle(&(handle[0]), init_a_buf_ptrs[i]));
         }
-        MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
+        MPI_Bcast(&(handle[0]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        if (rank != i)
+        {
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
+        }
         
-        hipIpcMemHandle_t handle1;
         if (rank == i)
         {
             init_a_buf_ref_ptrs[i] = reinterpret_cast<void*>(a_device_buf_ref.GetBuffer());
-            check_cuda_error(hipIpcGetMemHandle(&(handle1), init_a_buf_ref_ptrs[i]));
+            check_cuda_error(hipIpcGetMemHandle(&(handle[1]), init_a_buf_ref_ptrs[i]));
         }
-        MPI_Bcast(&handle1, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle1, hipIpcMemLazyEnablePeerAccess));
+        MPI_Bcast(&(handle[1]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ref_ptrs[i]), handle[1], hipIpcMemLazyEnablePeerAccess));
 
     }
 
@@ -215,6 +180,8 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
             printf("a buf is [0x%x]\n", *(int*)(init_a_buf_ptrs[i]));
         }
     }
+
+    exit(0);
     
     // broadcast rank 0 tensor to the others
 
