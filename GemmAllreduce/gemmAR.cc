@@ -160,17 +160,16 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     if (rank == 0)
     {
         cudaRandomUniform<ADataType>(reinterpret_cast<ADataType*>(a_device_buf_ref.GetBuffer()), m * k);
-        cudaRandomUniform<ComputeDataType>(reinterpret_cast<ComputeDataType*>(a_device_buf_ref.GetBuffer()), n * k);
-        cudaRandomUniform<ScaleDataType>(reinterpret_cast<ScaleDataType*>(a_device_buf_ref.GetBuffer()), n);
+        cudaRandomUniform<ComputeDataType>(reinterpret_cast<ComputeDataType*>(b_device_buf_ref.GetBuffer()), n * k);
+        cudaRandomUniform<ScaleDataType>(reinterpret_cast<ScaleDataType*>(scale_device_buf_ref.GetBuffer()), n);
         
-    }
         for (int i =0; i < world_size; i++)
         {
-            if (rank == i)
             hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
         }
+    }
 
-    // hipDeviceSynchronize();
+    hipDeviceSynchronize();
 
     // check broadcast res
     if (rank == 0)
@@ -181,11 +180,12 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 2 * sizeof(ADataType) * m * k_per_card),
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
     }
+    MPI_Barrier(MPI_COMM_WORLD);
     for (int i = 0; i < world_size; i++)
     {
         if (i == rank)
         {
-            printf("a buf is [0x%x]\n", *(int*)(init_a_buf_ptrs[i]));
+            printf("in rank [%d], a buf is [0x%x]\n", rank, *(int*)(init_a_buf_ptrs[i]));
         }
     }
 
