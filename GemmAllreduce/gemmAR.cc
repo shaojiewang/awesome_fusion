@@ -45,7 +45,7 @@ template <class ADataType,
           class ComputeDataType>
 int gemm_ar(const test_args_t& args, int rank, const int& world_size)
 {
-    printf("m, n, k, tp, dt=[%d %d %d %d %d]\n",
+    printf("m, n, k, tp, dt=[%zu %zu %zu %zu %zu]\n",
         args.m,
         args.n,
         args.k,
@@ -175,11 +175,11 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
         
         for (int i =0; i < world_size; i++)
         {
-            hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice);
+            check_cuda_error(hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice));
         }
     }
 
-    hipDeviceSynchronize();
+    check_cuda_error(hipDeviceSynchronize());
 
     // check broadcast res
     if (rank == 0)
