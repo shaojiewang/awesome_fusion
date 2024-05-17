@@ -43,7 +43,7 @@ template <class ADataType,
           class ScaleDataType,
           class CDataType,
           class ComputeDataType>
-int gemm_ar(const test_args_t& args, int rank, const int& world_size)
+int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 {
     printf("m, n, k, tp, dt=[%zu %zu %zu %zu %zu]\n",
         args.m,
@@ -205,7 +205,7 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
 
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
-    hipMalloc((void**)&tmp, AR_NUM*sizeof(uint16_t));
+    check_cuda_error(hipMalloc((void**)&tmp, AR_NUM*sizeof(uint16_t)));
     
     if(custom_ar == 1){
         static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = (uint16_t*)tmp;
@@ -220,7 +220,7 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
         host_buff[i] = __float2half(1.0);
     }
     check_cuda_error(hipMemcpyHtoD(dev_buff, &host_buff, sizeof(uint16_t)*AR_NUM));
-    hipDeviceSynchronize(); 
+    check_cuda_error(hipDeviceSynchronize()); 
      
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -235,10 +235,10 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
 
     // perform all reduce
     hipStream_t stream;
-    hipStreamCreate(&stream);
+    check_cuda_error(hipStreamCreate(&stream));
     hipEvent_t event_s, event_e;
-    hipEventCreate(&event_s);
-    hipEventCreate(&event_e);
+    check_cuda_error(hipEventCreate(&event_s));
+    check_cuda_error(hipEventCreate(&event_e));
     check_cuda_error(hipEventRecord(event_s,stream));
     for (int i = 0; i < TOTAL_NUM; i++)
     {
@@ -268,11 +268,15 @@ int gemm_ar(const test_args_t& args, int rank, const int& world_size)
     else
         printf("[rank %d] check the result : fail\n", rank);
    
-    hipDeviceSynchronize(); 
+    check_cuda_error(hipDeviceSynchronize());
     
-
     return 1;
 }
+
+#define INSTANTIATE_GEMM_AR_TEST(TA, TB, TScale, TC, TCompute) \
+    template int gemm_ar<TA, TB, TScale, TC, TCompute>(const test_args_t& args, const int& rank, const int& world_size);
+
+INSTANTIATE_GEMM_AR_TEST(BHalf, int8_t, float, BHalf, BHalf);
 
 int main(int argc, char* argv[])
 {
