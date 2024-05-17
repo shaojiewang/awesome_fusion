@@ -53,19 +53,25 @@ void CustomAllReduceComm<T>::allocateAndExchangePeerAccessPointer(
         if (rank == i){ 
             check_cuda_error(hipExtMallocWithFlags((void **)&(param_.peer_comm_buffer_ptrs[i]), CUSTOM_AR_SIZE_THRESHOLD * sizeof(T), hipDeviceMallocFinegrained));
             //hipMalloc(&(param_.peer_comm_buffer_ptrs[i]), CUSTOM_AR_SIZE_THRESHOLD);
-            hipIpcGetMemHandle(&handle,param_.peer_comm_buffer_ptrs[i]);
+            check_cuda_error(hipIpcGetMemHandle(&handle,param_.peer_comm_buffer_ptrs[i]));
         }   
         MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
-        hipIpcOpenMemHandle((void **)&(param_.peer_comm_buffer_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess);
+        if (rank != i)
+        {
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(param_.peer_comm_buffer_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
+        }
 
         hipIpcMemHandle_t handle2;
         if (rank == i){ 
             check_cuda_error(hipExtMallocWithFlags((void **)&(param_.peer_barrier_ptrs[i]),  rank_size_ * (MAX_ALL_REDUCE_BLOCKS + 1) * sizeof(uint32_t), hipDeviceMallocFinegrained));
             //hipMalloc(&(param_.peer_barrier_ptrs[i]), rank_size_ * (MAX_ALL_REDUCE_BLOCKS + 1) * sizeof(uint32_t));
-            hipIpcGetMemHandle(&handle2, param_.peer_barrier_ptrs[i]);
+            check_cuda_error(hipIpcGetMemHandle(&handle2, param_.peer_barrier_ptrs[i]));
         }
         MPI_Bcast(&handle2, sizeof(hipIpcMemHandle_t) , MPI_CHAR, i, MPI_COMM_WORLD);
-        hipIpcOpenMemHandle((void **)&(param_.peer_barrier_ptrs[i]), handle2, hipIpcMemLazyEnablePeerAccess);
+        if (rank != i)
+        {
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(param_.peer_barrier_ptrs[i]), handle2, hipIpcMemLazyEnablePeerAccess));
+        }
  
         check_cuda_error(
             hipMemset((void*)param_.peer_barrier_ptrs[i], 0, rank_size_ * (MAX_ALL_REDUCE_BLOCKS + 1) * sizeof(uint32_t)));
@@ -87,14 +93,14 @@ void CustomAllReduceComm<T>::enableP2P(int ngpus)
 {
     int peer_access_available = 0;
     for (int i = 0; i < ngpus; i++) {
-        hipSetDevice(i);
+        check_cuda_error(hipSetDevice(i));
         for (int j = 0; j < ngpus; j++) {
             if (i == j) {
                 continue;
             }
-            hipDeviceCanAccessPeer(&peer_access_available, i, j);\
+            check_cuda_error(hipDeviceCanAccessPeer(&peer_access_available, i, j));
             assert(peer_access_available);
-            hipDeviceEnablePeerAccess(j, 0);
+            check_cuda_error(hipDeviceEnablePeerAccess(j, 0));
         }
     }
 }
