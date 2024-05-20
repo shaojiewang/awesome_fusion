@@ -176,6 +176,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         for (int i =0; i < world_size; i++)
         {
             check_cuda_error(hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice));
+            check_cuda_error(hipMemcpy(init_b_buf_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]) + i * sizeof(ComputeDataType) * n * k_per_card, sizeof(BDataType) * n * k_per_card, hipMemcpyDeviceToDevice));
+            check_cuda_error(hipMemcpy(init_scale_buf_ptrs[i], (char*)(init_scale_buf_ref_ptrs[0]), sizeof(ScaleDataType) * n, hipMemcpyDeviceToDevice));
         }
     }
 
@@ -189,6 +191,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + sizeof(ADataType) * m * k_per_card),
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 2 * sizeof(ADataType) * m * k_per_card),
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
+        printf("b buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
+            *(int*)(init_b_buf_ref_ptrs[0]),
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + sizeof(ComputeDataType) * n * k_per_card),
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 2 * sizeof(ComputeDataType) * n * k_per_card),
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 3 * sizeof(ComputeDataType) * n * k_per_card));
+        printf("scale buf ref is [0x%x]\n", 
+            *(int*)(init_scale_buf_ref_ptrs[0]));
     }
     MPI_Barrier(MPI_COMM_WORLD);
     for (int i = 0; i < world_size; i++)
