@@ -205,6 +205,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         if (i == rank)
         {
             printf("in rank [%d], a buf is [0x%x]\n", rank, *(int*)(init_a_buf_ptrs[i]));
+            printf("in rank [%d], b buf is [0x%x]\n", rank, *(int*)(init_b_buf_ptrs[i]));
+            printf("in rank [%d], scale buf is [0x%x]\n", rank, *(int*)(init_scale_buf_ptrs[i]));
         }
     }
 
