@@ -139,7 +139,7 @@ rocblas_status inline rocblasGemmEx(rocblas_handle handle, TGemm<T>& gemm)
    return rocblas_status_success;
 }
 
-
+#define NUM_ITERATIONS 1
 
 template <typename T>
 void call_rocBLAS(TGemm<T>& gemm, T* h_C_rocblas) {
@@ -155,19 +155,19 @@ void call_rocBLAS(TGemm<T>& gemm, T* h_C_rocblas) {
     std::cout << "\nnot support type..." << std::endl;
   }
   
-  device_check_error(hipMemset(gemm.C, 0, gemm.elemC * sizeof(T)));
+  check_cuda_error(hipMemset(gemm.C, 0, gemm.elemC * sizeof(T)));
 
   // float* d_zero;
   // int zero_size = 256 * 1024 * 1024;
-  // device_check_error(hipMalloc((void**)&d_zero,  zero_size));
+  // check_cuda_error(hipMalloc((void**)&d_zero,  zero_size));
 
   rocblas_handle handle;
   ROCBLAS_CHECK(rocblas_create_handle(&handle));
   ROCBLAS_CHECK(rocblasGemmEx(handle, gemm));
 
   hipEvent_t start, stop;
-  device_check_error(hipEventCreate(&start));
-  device_check_error(hipEventCreate(&stop));
+  check_cuda_error(hipEventCreate(&start));
+  check_cuda_error(hipEventCreate(&stop));
 
     // warm up
   for (int i = 0; i < 1; ++i) {
@@ -175,25 +175,25 @@ void call_rocBLAS(TGemm<T>& gemm, T* h_C_rocblas) {
   }
 
   float total_time = 0.0f;
-  device_check_error(hipEventRecord(start));
+  check_cuda_error(hipEventRecord(start));
 
   for (int i = 0; i < NUM_ITERATIONS; ++i) {
-    // device_check_error(hipMemset(d_zero, 0, zero_size));
+    // check_cuda_error(hipMemset(d_zero, 0, zero_size));
     
     ROCBLAS_CHECK(rocblasGemmEx(handle, gemm));
    
   }
-  device_check_error(hipEventRecord(stop));
-  device_check_error(hipEventSynchronize(stop));
-  device_check_error(hipEventElapsedTime(&total_time, start, stop));
+  check_cuda_error(hipEventRecord(stop));
+  check_cuda_error(hipEventSynchronize(stop));
+  check_cuda_error(hipEventElapsedTime(&total_time, start, stop));
 
   printf("rocBLAS time:  %3.4f ms \n", total_time / NUM_ITERATIONS);
 
-  device_check_error(hipMemcpy(h_C_rocblas, gemm.C, gemm.elemC * sizeof(T), hipMemcpyDeviceToHost));
-  device_check_error(hipDeviceSynchronize());
+  check_cuda_error(hipMemcpy(h_C_rocblas, gemm.C, gemm.elemC * sizeof(T), hipMemcpyDeviceToHost));
+  check_cuda_error(hipDeviceSynchronize());
 
-  device_check_error(hipEventDestroy(start));
-  device_check_error(hipEventDestroy(stop));
+  check_cuda_error(hipEventDestroy(start));
+  check_cuda_error(hipEventDestroy(stop));
   ROCBLAS_CHECK(rocblas_destroy_handle(handle));
 }
 

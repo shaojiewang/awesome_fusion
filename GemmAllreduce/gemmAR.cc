@@ -190,7 +190,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipDeviceSynchronize());
 
     // reference result by rocblas
-    
+    if (rank == 0)
+    {
+        TGemm<ADataType> gemm_t(M, N, K, d_A, d_B, d_C, false, false);
+        call_rocBLAS(gemm, reinterpret_cast<CDatatype*>(c_host_buf.GetBuffer()));
+    }
 
     // check broadcast res
     if (rank == 0)
