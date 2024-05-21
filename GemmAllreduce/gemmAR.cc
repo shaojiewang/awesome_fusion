@@ -189,6 +189,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
 
+    // reference result by rocblas
+    
+
     // check broadcast res
     if (rank == 0)
     {
