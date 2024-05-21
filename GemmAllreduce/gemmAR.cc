@@ -192,8 +192,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // reference result by rocblas
     if (rank == 0)
     {
-        TGemm<ADataType> gemm_t(M, N, K, d_A, d_B, d_C, false, false);
-        call_rocBLAS(gemm, reinterpret_cast<CDatatype*>(c_host_buf.GetBuffer()));
+        ADataType* d_A = reinterpret_cast<ADataType*>init_a_buf_ref_ptrs[0].GetBuffer();
+        ADataType* d_B = reinterpret_cast<ADataType*>init_b_buf_ref_ptrs[0].GetBuffer();
+        ADataType* d_C = reinterpret_cast<ADataType*>init_c_buf_ref_ptrs[0].GetBuffer();
+        TGemm<ADataType> gemm_t(m, n, k, d_A, d_B, d_C, false, false);
+        call_rocBLAS(gemm, reinterpret_cast<CDataType*>(c_host_buf.GetBuffer()));
     }
 
     // check broadcast res
