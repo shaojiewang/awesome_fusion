@@ -18,6 +18,7 @@ struct bfloat16_t
 };
 
 using __nv_bfloat16 = bfloat16_t;
+using hip_bfloat16 = bfloat16_t;
 using bhalf_t = bfloat16_t;
 
 // vector_type
