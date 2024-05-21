@@ -178,6 +178,12 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice));
             check_cuda_error(hipMemcpy(init_b_buf_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]) + i * sizeof(ComputeDataType) * n * k_per_card, sizeof(BDataType) * n * k_per_card, hipMemcpyDeviceToDevice));
             check_cuda_error(hipMemcpy(init_scale_buf_ptrs[i], (char*)(init_scale_buf_ref_ptrs[0]), sizeof(ScaleDataType) * n, hipMemcpyDeviceToDevice));
+            if (i != 0)
+            {
+                check_cuda_error(hipMemcpy(init_a_buf_ref_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]), sizeof(ADataType) * m * k, hipMemcpyDeviceToDevice));
+                check_cuda_error(hipMemcpy(init_b_buf_ref_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]), sizeof(ComputeDataType) * n * k, hipMemcpyDeviceToDevice));
+                check_cuda_error(hipMemcpy(init_scale_buf_ref_ptrs[i], (char*)(init_scale_buf_ref_ptrs[0]), sizeof(ScaleDataType) * n, hipMemcpyDeviceToDevice));
+            }
         }
     }
 
@@ -207,12 +213,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             printf("in rank [%d], a buf is [0x%x]\n", rank, *(int*)(init_a_buf_ptrs[i]));
             printf("in rank [%d], b buf is [0x%x]\n", rank, *(int*)(init_b_buf_ptrs[i]));
             printf("in rank [%d], scale buf is [0x%x]\n", rank, *(int*)(init_scale_buf_ptrs[i]));
+            printf("in rank [%d], a buf ref is [0x%x]\n", rank, *(int*)(init_a_buf_res_ptrs[i]));
+            printf("in rank [%d], b buf ref is [0x%x]\n", rank, *(int*)(init_b_buf_res_ptrs[i]));
+            printf("in rank [%d], scale buf ref is [0x%x]\n", rank, *(int*)(init_scale_buf_res_ptrs[i]));
         }
     }
-
-    return 0;
-
-    // broadcast rank 0 tensor to the others
 
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
