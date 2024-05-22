@@ -193,7 +193,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);
     ADataType* d_B = reinterpret_cast<ADataType*>(init_b_buf_ref_ptrs[rank]);
     ADataType* d_C = reinterpret_cast<ADataType*>(c_device_buf_ref.GetBuffer());
-    TGemm<ADataType> gemm_t(m, n, k, d_A, d_B, d_C, false, true);
+    TGemm<ADataType> gemm_t(m, n, k, d_A, d_B, d_C, true, false);
     call_rocBLAS(gemm_t, reinterpret_cast<CDataType*>(c_host_buf.GetBuffer()));
 
     printf("rank %d, c_ref is [0x%x]\n", rank, *(int*)(c_device_buf_ref.GetBuffer()));
