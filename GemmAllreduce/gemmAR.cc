@@ -228,6 +228,10 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         }
     }
 
+    // add matrix transpose code
+    // 1. transpose A matrix
+    
+
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
     check_cuda_error(hipMalloc((void**)&tmp, AR_NUM*sizeof(uint16_t)));
