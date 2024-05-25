@@ -13,6 +13,8 @@
 #include "gemm_matrix_layout.hpp"
 #include "simple_mem_buf.hpp"
 #include "random_gen.hpp"
+#include "matrix_transpose.hpp"
+
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -103,6 +105,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     using DeviceMemCached = SimpleDeviceMem<false>;
     using DeviceMemUncached = SimpleDeviceMem<true>;
+
+    DeviceMemCached a_device_buf_compute(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
+    DeviceMemCached b_device_buf_compute(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
 
     DeviceMemCached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
@@ -230,7 +235,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // add matrix transpose code
     // 1. transpose A matrix
-    
+    invokeMatrixTranspose(a_device_buf_compute.GetBuffer(), a_device_buf.GetBuffer(), m, k_per_card, 0);
+    // 2. transpose and interleave B matrix
+    invokeMatrixInterleave();
 
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
