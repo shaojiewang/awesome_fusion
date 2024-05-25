@@ -116,7 +116,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     DeviceMemCached scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
     DeviceMemCached a_device_buf_ref(sizeof(ADataType) * f_matrix_space_size(m, k, lda_ref, ALayout{}));
-    DeviceMemCached b_device_buf_ref(sizeof(ComputeDataType) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
+    DeviceMemCached b_device_buf_ref(sizeof(BDataType) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
+    DeviceMemCached b_device_buf_ref_compute(sizeof(ComputeDataType) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
     DeviceMemCached c_device_buf_ref(sizeof(CDataType) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
     DeviceMemCached scale_device_buf_ref(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
@@ -126,6 +127,10 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
   
+    // fix compute b ref in bfloat16
+    
+
+
     // pointer communication via ipc
     void* init_a_buf_ptrs[MAX_WORLD_SIZE];
     void* init_a_buf_ref_ptrs[MAX_WORLD_SIZE];
