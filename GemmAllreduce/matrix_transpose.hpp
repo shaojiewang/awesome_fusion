@@ -41,4 +41,5 @@ template void invokeMatrixTranspose(float* dst, const float* src, const int m, c
 template void invokeMatrixTranspose(half* dst, const half* src, const int m, const int n, hipStream_t stream);
 template void invokeMatrixTranspose(hip_bfloat16* dst, const hip_bfloat16* src, const int m, const int n, hipStream_t stream);
 
+
 }

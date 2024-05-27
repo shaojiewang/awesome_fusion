@@ -14,6 +14,7 @@
 #include "simple_mem_buf.hpp"
 #include "random_gen.hpp"
 #include "matrix_transpose.hpp"
+#include "matrix_elementwise.hpp"
 
 
 // whether to use custom kernel[1] or rccl[0]
@@ -127,9 +128,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
   
-    // fix compute b ref in bfloat16
-    
-
 
     // pointer communication via ipc
     void* init_a_buf_ptrs[MAX_WORLD_SIZE];
@@ -186,12 +184,12 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         for (int i =0; i < world_size; i++)
         {
             check_cuda_error(hipMemcpy(init_a_buf_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]) + i * sizeof(ADataType) * m * k_per_card, sizeof(ADataType) * m * k_per_card, hipMemcpyDeviceToDevice));
-            check_cuda_error(hipMemcpy(init_b_buf_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]) + i * sizeof(ComputeDataType) * n * k_per_card, sizeof(BDataType) * n * k_per_card, hipMemcpyDeviceToDevice));
+            check_cuda_error(hipMemcpy(init_b_buf_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]) + i * sizeof(BDataType) * n * k_per_card, sizeof(BDataType) * n * k_per_card, hipMemcpyDeviceToDevice));
             check_cuda_error(hipMemcpy(init_scale_buf_ptrs[i], (char*)(init_scale_buf_ref_ptrs[0]), sizeof(ScaleDataType) * n, hipMemcpyDeviceToDevice));
             if (i != 0)
             {
                 check_cuda_error(hipMemcpy(init_a_buf_ref_ptrs[i], (char*)(init_a_buf_ref_ptrs[0]), sizeof(ADataType) * m * k, hipMemcpyDeviceToDevice));
-                check_cuda_error(hipMemcpy(init_b_buf_ref_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]), sizeof(ComputeDataType) * n * k, hipMemcpyDeviceToDevice));
+                check_cuda_error(hipMemcpy(init_b_buf_ref_ptrs[i], (char*)(init_b_buf_ref_ptrs[0]), sizeof(BDataType) * n * k, hipMemcpyDeviceToDevice));
                 check_cuda_error(hipMemcpy(init_scale_buf_ref_ptrs[i], (char*)(init_scale_buf_ref_ptrs[0]), sizeof(ScaleDataType) * n, hipMemcpyDeviceToDevice));
             }
         }
@@ -199,10 +197,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
 
+    // fix compute b ref in bfloat16
+    invokeMatrixElementwiseScale(b_device_buf_ref_compute.GetBuffer(), b_device_buf_ref.GetBuffer(), scale_device_buf_ref.GetBuffer(), n, k);
+
     // reference result by rocblas
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);
-    ADataType* d_B = reinterpret_cast<ADataType*>(init_b_buf_ref_ptrs[rank]);
-    ADataType* d_C = reinterpret_cast<ADataType*>(c_device_buf_ref.GetBuffer());
+    ComputeDataType* d_B = reinterpret_cast<ComputeDataType*>(b_device_buf_ref_compute.GetBuffer());
+    CDataType* d_C = reinterpret_cast<CDataType*>(c_device_buf_ref.GetBuffer());
     TGemm<ADataType> gemm_t(m, n, k, d_A, d_B, d_C, true, false);
     call_rocBLAS(gemm_t, reinterpret_cast<CDataType*>(c_host_buf.GetBuffer()));
 
