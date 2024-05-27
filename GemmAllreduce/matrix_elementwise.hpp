@@ -3,6 +3,8 @@
 #include "hip_utils.h"
 #include "hip_type_utils.cuh"
 
+namespace awesome_fusion {
+
 template <class TDst, class TSrc, class TSacle>
 __global__ void matrix_elementwise_scale(TDst* dst, TSrc* src, TScale* scale, const int m, const int n)
 {
@@ -25,3 +27,4 @@ void invokeMatrixElementwiseScale(TDst* dst, TSrc* src, TScale* scale, const int
 
 template void invokeMatrixElementwiseScale(BHalf* dst, int8_t* src, float* scale, const int m, const int n);
 
+}

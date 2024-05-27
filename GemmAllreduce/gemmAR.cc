@@ -243,7 +243,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // 1. transpose A matrix
     invokeMatrixTranspose(a_device_buf_compute.GetBuffer(), a_device_buf.GetBuffer(), m, k_per_card, 0);
     // 2. transpose and interleave B matrix
-    invokeMatrixBatchedTranspose();
+    invokeMatrixBatchedTranspose(b_device_buf_compute.GetBuffer(), b_device_buf.GetBuffer(), 16 * k, 16, n / 16, 0);
 
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
