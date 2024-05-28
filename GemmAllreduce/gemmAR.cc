@@ -200,6 +200,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // fix compute b ref in bfloat16
     invokeMatrixElementwiseScale(reinterpret_cast<hip_bfloat16*>(b_device_buf_ref_compute.GetBuffer()), reinterpret_cast<int8_t*>(b_device_buf_ref.GetBuffer()), reinterpret_cast<float*>(scale_device_buf_ref.GetBuffer()), n, k);
 
+    printf("rank %d, before blas\n", rank);
+    
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     // reference result by rocblas
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);
     ComputeDataType* d_B = reinterpret_cast<ComputeDataType*>(b_device_buf_ref_compute.GetBuffer());
@@ -209,6 +214,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     printf("rank %d, c_ref is [0x%x]\n", rank, *(int*)(c_device_buf_ref.GetBuffer()));
 
+    MPI_Barrier(MPI_COMM_WORLD);
     // check broadcast res
     if (rank == 0)
     {
@@ -219,9 +225,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             *(int*)((char*)(init_a_buf_ref_ptrs[0]) + 3 * sizeof(ADataType) * m * k_per_card));
         printf("b buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
             *(int*)(init_b_buf_ref_ptrs[0]),
-            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + sizeof(ComputeDataType) * n * k_per_card),
-            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 2 * sizeof(ComputeDataType) * n * k_per_card),
-            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 3 * sizeof(ComputeDataType) * n * k_per_card));
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + sizeof(BDataType) * n * k_per_card),
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 2 * sizeof(BDataType) * n * k_per_card),
+            *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 3 * sizeof(BDataType) * n * k_per_card));
         printf("scale buf ref is [0x%x]\n", 
             *(int*)(init_scale_buf_ref_ptrs[0]));
     }
