@@ -113,6 +113,17 @@ __global__ void cuda_random_uniform_kernel<__nv_bfloat16>(__nv_bfloat16* buffer,
     }
 }
 
+template<>
+__global__ void cuda_random_uniform_kernel<int8_t>(int8_t* buffer, const size_t size, const int seq_offset)
+{
+    const int     idx = blockIdx.x * blockDim.x + threadIdx.x;
+    hiprandState_t local_state;
+    hiprand_init((float)1337.f, idx + seq_offset, 0, &local_state);
+    for (size_t index = idx; index < size; index += blockDim.x * gridDim.x) {
+        buffer[index] = hiprand(&local_state) % 0xFF;
+    }
+}
+
 template<typename T>
 void cudaRandomUniform(T* buffer, const size_t size)
 {
@@ -124,5 +135,6 @@ void cudaRandomUniform(T* buffer, const size_t size)
 template void cudaRandomUniform(float* buffer, const size_t size);
 template void cudaRandomUniform(half* buffer, const size_t size);
 template void cudaRandomUniform(__nv_bfloat16* buffer, const size_t size);
+template void cudaRandomUniform(int8_t* buffer, const size_t size);
 
 

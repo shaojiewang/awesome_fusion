@@ -200,13 +200,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // fix compute b ref in bfloat16
     invokeMatrixElementwiseScale(reinterpret_cast<hip_bfloat16*>(b_device_buf_ref_compute.GetBuffer()), reinterpret_cast<int8_t*>(b_device_buf_ref.GetBuffer()), reinterpret_cast<float*>(scale_device_buf_ref.GetBuffer()), n, k);
-    check_cuda_error(hipDeviceSynchronize());
-    MPI_Barrier(MPI_COMM_WORLD);
 
     // reference result by rocblas
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);
     ComputeDataType* d_B = reinterpret_cast<ComputeDataType*>(b_device_buf_ref_compute.GetBuffer());
-    printf("in rank %d, b buf compute = 0x%x\n", rank, *(int*)b_device_buf_ref_compute.GetBuffer());
+    // printf("in rank %d, b buf compute = 0x%x\n", rank, *(int*)b_device_buf_ref_compute.GetBuffer());
     CDataType* d_C = reinterpret_cast<CDataType*>(c_device_buf_ref.GetBuffer());
     TGemm<ADataType> gemm_t(m, n, k, d_A, d_B, d_C, true, false);
     call_rocBLAS(gemm_t, reinterpret_cast<CDataType*>(c_host_buf.GetBuffer()));
