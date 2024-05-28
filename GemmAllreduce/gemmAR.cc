@@ -178,7 +178,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     if (rank == 0)
     {
         cudaRandomUniform<ADataType>(reinterpret_cast<ADataType*>(a_device_buf_ref.GetBuffer()), m * k);
-        cudaRandomUniform<ComputeDataType>(reinterpret_cast<ComputeDataType*>(b_device_buf_ref.GetBuffer()), n * k);
+        cudaRandomUniform<BDataType>(reinterpret_cast<BDataType*>(b_device_buf_ref.GetBuffer()), n * k);
         cudaRandomUniform<ScaleDataType>(reinterpret_cast<ScaleDataType*>(scale_device_buf_ref.GetBuffer()), n);
         
         for (int i =0; i < world_size; i++)
@@ -199,10 +199,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // fix compute b ref in bfloat16
     invokeMatrixElementwiseScale(reinterpret_cast<hip_bfloat16*>(b_device_buf_ref_compute.GetBuffer()), reinterpret_cast<int8_t*>(b_device_buf_ref.GetBuffer()), reinterpret_cast<float*>(scale_device_buf_ref.GetBuffer()), n, k);
-
-    printf("rank %d, before blas\n", rank);
-    
-
     MPI_Barrier(MPI_COMM_WORLD);
 
     // reference result by rocblas
