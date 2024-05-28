@@ -15,6 +15,10 @@ __global__ void matrix_elementwise_scale(TDst* dst, TSrc* src, TScale* scale, co
         TScale res = src[i] * scale[i_scale];
         dst[i] = type_convert<TDst, TScale>(res);
     }
+    if(tidx == 0)
+    {
+        printf("src = 0x%x, dst = 0x%x, scale = %f\n", *(int*)src, *(int*)dst, *scale);
+    }
 }
 
 template <class TDst, class TSrc, class TScale>
