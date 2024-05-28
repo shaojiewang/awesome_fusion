@@ -5,7 +5,7 @@
 
 namespace awesome_fusion {
 
-template <class TDst, class TSrc, class TSacle>
+template <class TDst, class TSrc, class TScale>
 __global__ void matrix_elementwise_scale(TDst* dst, TSrc* src, TScale* scale, const int m, const int n)
 {
     int tidx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -17,7 +17,7 @@ __global__ void matrix_elementwise_scale(TDst* dst, TSrc* src, TScale* scale, co
     }
 }
 
-template <class TDst, class TSrc, class TSacle>
+template <class TDst, class TSrc, class TScale>
 void invokeMatrixElementwiseScale(TDst* dst, TSrc* src, TScale* scale, const int m, const int n)
 {
     dim3 grids = {208};
@@ -25,6 +25,6 @@ void invokeMatrixElementwiseScale(TDst* dst, TSrc* src, TScale* scale, const int
     matrix_elementwise_scale<<<grids, blocks>>>(dst, src, scale, m, n);
 }
 
-template void invokeMatrixElementwiseScale(BHalf* dst, int8_t* src, float* scale, const int m, const int n);
+template void invokeMatrixElementwiseScale(hip_bfloat16* dst, int8_t* src, float* scale, const int m, const int n);
 
 }

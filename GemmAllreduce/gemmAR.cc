@@ -198,7 +198,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipDeviceSynchronize());
 
     // fix compute b ref in bfloat16
-    invokeMatrixElementwiseScale(b_device_buf_ref_compute.GetBuffer(), b_device_buf_ref.GetBuffer(), scale_device_buf_ref.GetBuffer(), n, k);
+    invokeMatrixElementwiseScale(reinterpret_cast<hip_bfloat16*>(b_device_buf_ref_compute.GetBuffer()), reinterpret_cast<int8_t*>(b_device_buf_ref.GetBuffer()), reinterpret_cast<float*>(scale_device_buf_ref.GetBuffer()), n, k);
 
     // reference result by rocblas
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);

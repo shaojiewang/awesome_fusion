@@ -72,7 +72,7 @@ void invokeMatrixBatchedTranspose(T* dst, const T* src, const int k, const int n
 {
     dim3 grid(n / 32, k / 32, bsz);
     dim3 block(32, 32);
-    matrix_transpose<<<grid, block, 0, stream>>>(dst, src, k, n, bsz);
+    matrix_batched_transpose<<<grid, block, 0, stream>>>(dst, src, k, n, bsz);
 }
 
 template void invokeMatrixBatchedTranspose(float* dst, const float* src, const int m, const int n, const int bsz, hipStream_t stream);
