@@ -15,7 +15,7 @@
 #include "random_gen.hpp"
 #include "matrix_transpose.hpp"
 #include "matrix_elementwise.hpp"
-
+#include "bfA_intB_gemm_runner.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -249,6 +249,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, 0);
     // 2. transpose and interleave B matrix
     invokeMatrixBatchedTranspose(reinterpret_cast<hip_bfloat16*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(b_device_buf.GetBuffer()), 16 * k, 16, n / 16, 0);
+    
+    // gemm + ar reference
 
     // output buff
     half *dev_buff, host_buff[AR_NUM], *tmp;
