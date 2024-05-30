@@ -56,19 +56,19 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         args.dt);
     
     // init shape
-    int m = args.m;
-    int n = args.n;
-    int k = args.k;
-    int tp = args.tp;
-    int k_per_card = k / tp;
+    uint32_t m = args.m;
+    uint32_t n = args.n;
+    uint32_t k = args.k;
+    uint32_t tp = args.tp;
+    uint32_t k_per_card = k / tp;
 
-    int lda = k_per_card;
-    int ldb = n;
-    int ldc = n;
+    uint32_t lda = k_per_card;
+    uint32_t ldb = n;
+    uint32_t ldc = n;
 
-    int lda_ref = k;
-    int ldb_ref = n;
-    int ldc_ref = n;
+    uint32_t lda_ref = k;
+    uint32_t ldb_ref = n;
+    uint32_t ldc_ref = n;
     
     // assertion
     if (k % (tp * 64) != 0) return 0;
@@ -263,7 +263,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // get kernel list
     std::vector<kernel_tunable> k_list = get_kernel_list();
     std::string hsaco_path = "./build/";
-    int max_sk_blocks = 1;
+    uint32_t max_sk_blocks = 1;
     bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
@@ -289,7 +289,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     hipStream_t compute_stream;
     check_cuda_error(hipStreamCreate(&compute_stream));
 
-    int sol_idx = 0, sk_blocks = 1;
+    uint32_t sol_idx = 0, sk_blocks = 1;
     
     
     float elapsed_ms;
