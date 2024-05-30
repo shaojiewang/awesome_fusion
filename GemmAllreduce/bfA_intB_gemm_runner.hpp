@@ -136,8 +136,8 @@ public:
         int gdx = (args.n + ker.wg_tile_n - 1) / ker.wg_tile_n;
 
         int gdz = sk_blocks;
-        bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);
-        bfloat16* ptr_workspace = reinterpret_cast<bfloat16*>(args.ptr_workspace);
+        // bfloat16* c_ptr = reinterpret_cast<bfloat16*>(args.ptr_c);
+        // bfloat16* ptr_workspace = reinterpret_cast<bfloat16*>(args.ptr_workspace);
 
         // printf("grid=[%d, %d, %d], block=[%d]\n", gdx, gdy, gdz, bdx);
         if (sk_blocks > 1)
@@ -154,8 +154,10 @@ public:
             &arg_size, HIP_LAUNCH_PARAM_END};
    
         GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
-        if (sk_blocks > 1)     
-            tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
+        if (sk_blocks > 1)
+        {
+            // tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
+        }
         // std::cout<<"safe here"<<std::endl;
     }
 
