@@ -291,24 +291,24 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     uint32_t sol_idx = 0, sk_blocks = 1;
     
-    
+    hipEvent_t evt_00, evt_11;
     float elapsed_ms;
     check_cuda_error(hipEventCreate(&evt_00));
     check_cuda_error(hipEventCreate(&evt_11));
     check_cuda_error(hipDeviceSynchronize());
-    check_cuda_error(hipEventRecord(evt_00, c_stream));
+    check_cuda_error(hipEventRecord(evt_00, compute_stream));
 
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], c_stream, sk_blocks);
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
     }
 
     for(int i = 0; i < TOTAL_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], c_stream, sk_blocks);
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
     }
 
-    check_cuda_error(hipEventRecord(evt_11, c_stream));
+    check_cuda_error(hipEventRecord(evt_11, compute_stream));
     check_cuda_error(hipEventSynchronize(evt_11));
     check_cuda_error(hipDeviceSynchronize());
     check_cuda_error(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
@@ -330,15 +330,15 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     }    
 #endif
 
-    float time_per_loop = elapsed_ms / total_loop;
-    float tflops = (float)2 * m * n * k / time_per_loop / (1024 * 1024 * 1024);
-    float bw_gbs = (float)(2 * (m * k + m * n) + n * k) / time_per_loop / (1024 * 1024);
+    float time_per_loop = elapsed_ms / TOTAL_NUM;
+    float tflops = (float)2 * m * n * k_per_card / time_per_loop / (1024 * 1024 * 1024);
+    float bw_gbs = (float)(2 * (m * k_per_card + m * n) + n * k_per_card) / time_per_loop / (1024 * 1024);
     
     printf("best [sol, sk_blocks]: [%d, %d], m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
         sol_idx, sk_blocks,
         m,
         n,
-        k,
+        k_per_card,
         time_per_loop,
         tflops,
         bw_gbs);
