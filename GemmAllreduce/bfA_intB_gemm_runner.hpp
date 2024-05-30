@@ -77,8 +77,8 @@ public:
             std::string kernel_name = ker.kernel_name;
             std::string hsaco_name = hsaco_path + "/" + ker.kernel_name + ".hsaco";
             // std::cout << hsaco_name << std::endl;
-            GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
-            GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
+            check_cuda_error(hipModuleLoad(&module, hsaco_name.c_str()));
+            check_cuda_error(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
             kernel_func_vec.push_back(kernel_func);
         }
     }
@@ -92,8 +92,8 @@ public:
             hipFunction_t kernel_func;
             std::string kernel_name = ker.kernel_name;
             std::string hsaco_name = hsaco_path + "/" + ker.kernel_name + ".hsaco";
-            GPU_CHECK_ERROR(hipModuleLoad(&module, hsaco_name.c_str()));
-            GPU_CHECK_ERROR(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
+            check_cuda_error(hipModuleLoad(&module, hsaco_name.c_str()));
+            check_cuda_error(hipModuleGetFunction(&kernel_func, module, kernel_name.c_str()));
             kernel_func_vec.push_back(kernel_func);
         }
     }
@@ -153,7 +153,7 @@ public:
         void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
             &arg_size, HIP_LAUNCH_PARAM_END};
    
-        GPU_CHECK_ERROR(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
+        check_cuda_error(hipModuleLaunchKernel(kernel_func, gdx,gdy,gdz, bdx,1,1,  0, c_stream, NULL, (void**)&config ));
         if (sk_blocks > 1)
         {
             // tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
@@ -185,10 +185,10 @@ public:
                     run(k_ptr[i], kernel_func_vec[i], c_stream, k);
                 }
 
-                GPU_CHECK_ERROR(hipEventCreate(&evt_00));
-                GPU_CHECK_ERROR(hipEventCreate(&evt_11));
-                GPU_CHECK_ERROR(hipDeviceSynchronize());
-                GPU_CHECK_ERROR(hipEventRecord(evt_00, c_stream));
+                check_cuda_error(hipEventCreate(&evt_00));
+                check_cuda_error(hipEventCreate(&evt_11));
+                check_cuda_error(hipDeviceSynchronize());
+                check_cuda_error(hipEventRecord(evt_00, c_stream));
 
                 // loop
                 for(int l = 0; l < total_loops; l++)
@@ -197,12 +197,12 @@ public:
                 }
 
                 float elapsed_ms;
-                GPU_CHECK_ERROR(hipEventRecord(evt_11, c_stream));
-                GPU_CHECK_ERROR(hipEventSynchronize(evt_11));
-                GPU_CHECK_ERROR(hipDeviceSynchronize());
-                GPU_CHECK_ERROR(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
-                GPU_CHECK_ERROR(hipEventDestroy(evt_00));
-                GPU_CHECK_ERROR(hipEventDestroy(evt_11));
+                check_cuda_error(hipEventRecord(evt_11, c_stream));
+                check_cuda_error(hipEventSynchronize(evt_11));
+                check_cuda_error(hipDeviceSynchronize());
+                check_cuda_error(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
+                check_cuda_error(hipEventDestroy(evt_00));
+                check_cuda_error(hipEventDestroy(evt_11));
 
                 if(elapsed_ms < min_time)
                 {
