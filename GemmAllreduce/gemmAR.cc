@@ -113,6 +113,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     DeviceMemCached a_device_buf(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
     DeviceMemUncached c_device_buf(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
+    DeviceMemCached c_device_buf_out(sizeof(CDataType) * f_matrix_space_size(m, n, ldc, CLayout{}));
     // SimpleDeviceMem c_workspace_device_buf(sizeof(CDataType) * f_matrix_space_size(m * max_sk_blocks, n, ldc, CLayout{}));
     DeviceMemCached scale_device_buf(sizeof(ScaleDataType) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
     
@@ -288,13 +289,16 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // ar init
     if(custom_ar == 1)
     {
-        static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = (uint16_t*);
-        dev_buff = (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank];
+        static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<uint16_t*>(c_device_buf_out.GetBuffer());
+        (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<uint16_t*>(c_device_buf.GetBuffer());
     }
     else
     {
-        dev_buff = tmp;
+        // dev_buff = tmp;
     }
+
+    hipStream_t communication_stream;
+    check_cuda_eroor(hipStreamCtreate(&communication_stream));
 
     hipStream_t compute_stream;
     check_cuda_error(hipStreamCreate(&compute_stream));
@@ -311,11 +315,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
     }
 
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
