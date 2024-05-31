@@ -258,7 +258,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipMalloc(&print, 1024*8));
 #endif
 
-    
     // gemm + ar reference
     // get kernel list
     std::vector<kernel_tunable> k_list = get_kernel_list();
@@ -285,6 +284,17 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            max_sk_blocks
 #endif
                                            );
+
+    // ar init
+    if(custom_ar == 1)
+    {
+        static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = (uint16_t*);
+        dev_buff = (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank];
+    }
+    else
+    {
+        dev_buff = tmp;
+    }
 
     hipStream_t compute_stream;
     check_cuda_error(hipStreamCreate(&compute_stream));
