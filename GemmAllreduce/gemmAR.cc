@@ -298,7 +298,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     }
 
     hipStream_t communication_stream;
-    check_cuda_eroor(hipStreamCtreate(&communication_stream));
+    check_cuda_error(hipStreamCreate(&communication_stream));
 
     hipStream_t compute_stream;
     check_cuda_error(hipStreamCreate(&compute_stream));
