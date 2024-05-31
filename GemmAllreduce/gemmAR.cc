@@ -290,7 +290,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     if(custom_ar == 1)
     {
         static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<uint16_t*>(c_device_buf_out.GetBuffer());
-        (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<uint16_t*>(c_device_buf.GetBuffer());
+        check_cuda_error(hipMemcpyDtoD((half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank], c_device_buf.GetBuffer(), sizeof(CDataType) * m * n));
+        check_cuda_error(hipDeviceSynchronize()); 
+        // (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<uint16_t*>(c_device_buf.GetBuffer());
     }
     else
     {
