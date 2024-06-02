@@ -85,6 +85,8 @@ struct __nv_bfloat162
     __nv_bfloat16 y;
 };
 
+using bf16_2_t = __nv_bfloat162;
+
 struct bf16_4_t {
     __nv_bfloat162 x;
     __nv_bfloat162 y;

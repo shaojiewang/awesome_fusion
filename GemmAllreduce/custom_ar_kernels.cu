@@ -15,6 +15,15 @@ static inline __device__ uint32_t hadd2(const uint32_t& a, const uint32_t& b)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static inline __device__ uint32_t hadd2_bf16(const bf16_2_t& a, const bf16_2_t& b)
+{
+    bf16_2_t c;
+    c = bf16hadd2(a, b);
+    return c;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 static inline __device__ uint32_t fadd(const uint32_t& a, const uint32_t& b)
 {
     uint32_t c;
@@ -46,6 +55,11 @@ struct ARTypeConverter {
 };
 
 
+template<>
+struct ARTypeConverter<hip_bfloat16> {
+    using Type = bf16_8_t;
+};
+
 // add two 128b data
 template<typename T_IN, typename T_COMP>
 inline __device__ T_IN add128b(T_IN a, T_IN b);
@@ -58,6 +72,17 @@ inline __device__ uint4 add128b<uint4, uint16_t>(uint4 a, uint4 b)
     c.y = hadd2(a.y, b.y);
     c.z = hadd2(a.z, b.z);
     c.w = hadd2(a.w, b.w);
+    return c;
+}
+
+template<>
+inline __device__ uint4 add128b<bf16_8_t, hip_bfloat16>(bf16_8_t a, bf16_8_t b)
+{
+    bf16_8_t c;
+    c.x = hadd2_bf16(a.x, b.x);
+    c.y = hadd2_bf16(a.y, b.y);
+    c.z = hadd2_bf16(a.z, b.z);
+    c.w = hadd2_bf16(a.w, b.w);
     return c;
 }
 
