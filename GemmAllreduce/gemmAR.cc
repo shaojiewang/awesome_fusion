@@ -76,7 +76,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // initialize custom all reduce 
     std::vector<std::shared_ptr<AbstractCustomComm>> custom_all_reduce_comms;
-    initCustomAllReduceComm<uint16_t>(&custom_all_reduce_comms, custom_ar, world_size);
+    initCustomAllReduceComm<hip_bfloat16>(&custom_all_reduce_comms, custom_ar, world_size);
     
     // set device
     int device, device_count;
@@ -364,12 +364,12 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
 
     // output buff
-    half *dev_buff, host_buff[AR_NUM], *tmp;
-    check_cuda_error(hipMalloc((void**)&tmp, AR_NUM*sizeof(uint16_t)));
+    hip_bfloat16 *dev_buff, host_buff[AR_NUM], *tmp;
+    check_cuda_error(hipMalloc((void**)&tmp, AR_NUM*sizeof(hip_bfloat16)));
     
     if(custom_ar == 1){
-        static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = (uint16_t*)tmp;
-        dev_buff = (half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank];
+        static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = (hip_bfloat16*)tmp;
+        dev_buff = (half*)static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank];
     }
     else{
         dev_buff = tmp;
@@ -377,9 +377,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // replaced with ops like ffn
     for(int i = 0; i< AR_NUM; i++){
-        host_buff[i] = __float2half(1.0);
+        host_buff[i] = __float2bfloat16(1.0);
     }
-    check_cuda_error(hipMemcpyHtoD(dev_buff, &host_buff, sizeof(uint16_t)*AR_NUM));
+    check_cuda_error(hipMemcpyHtoD(dev_buff, &host_buff, sizeof(hip_bfloat16)*AR_NUM));
     check_cuda_error(hipDeviceSynchronize()); 
      
     MPI_Barrier(MPI_COMM_WORLD);
@@ -410,7 +410,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipEventRecord(event_e,stream));
     check_cuda_error(hipEventSynchronize(event_e));
     if(custom_ar == 1)
-        dev_buff = (half*)(static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr);
+        dev_buff = (hip_bfloat16*)(static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr);
     
     // e2e time including cpu time 
     float time_ms;
@@ -419,9 +419,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
      
     // check the result
     bool flag = true;
-    check_cuda_error(hipMemcpyDtoH(&host_buff, dev_buff, sizeof(uint16_t)*AR_NUM));    
+    check_cuda_error(hipMemcpyDtoH(&host_buff, dev_buff, sizeof(hip_bfloat16)*AR_NUM));    
     for(int i = 0; i< AR_NUM; i++) 
-        if (world_size*1.0 != __half2float(host_buff[i]))
+        if (world_size*1.0 != __bfloat162float(host_buff[i]))
             flag = false;
     if(flag == true)
         printf("[rank %d] check the result : success\n", rank);
