@@ -1,13 +1,14 @@
 #pragma once
 
+#include <vector>
 #include <memory>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
 #include "custom_ar_kernels.h"
+#include "hip_type_utils.cuh"
 #include "hip_utils.h"
-#include <vector>
 
 namespace awesome_fusion {
 
@@ -50,6 +51,11 @@ void initCustomAllReduceComm(std::vector<std::shared_ptr<AbstractCustomComm>>* c
 template<typename T>
 struct CustomARCommTypeConverter {
     using Type = uint32_t;
+};
+
+template<>
+struct CustomARCommTypeConverter<hip_bfloat16> {
+    using Type = hip_bfloat16;
 };
 
 template<>

@@ -141,6 +141,12 @@ bool CustomAllReduceComm<T>::swapInternalBuffer(std::vector<Tensor>* tensor_buff
 
 template class CustomAllReduceComm<uint16_t>;
 template class CustomAllReduceComm<uint32_t>;
+template class CustomAllReduceComm<hip_bfloat16>;
+
+template void
+initCustomAllReduceComm<hip_bfloat16>(std::vector<std::shared_ptr<AbstractCustomComm>>* custom_all_reduce_comms,
+                                      int                                               enable_custom_all_reduce,
+                                      size_t                                            rank_size);
 
 template void
 initCustomAllReduceComm<uint16_t>(std::vector<std::shared_ptr<AbstractCustomComm>>* custom_all_reduce_comms,

@@ -15,7 +15,7 @@ static inline __device__ uint32_t hadd2(const uint32_t& a, const uint32_t& b)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static inline __device__ uint32_t hadd2_bf16(const bf16_2_t& a, const bf16_2_t& b)
+static inline __device__ bf16_2_t hadd2_bf16(const bf16_2_t& a, const bf16_2_t& b)
 {
     bf16_2_t c;
     c = bf16hadd2(a, b);
@@ -76,7 +76,7 @@ inline __device__ uint4 add128b<uint4, uint16_t>(uint4 a, uint4 b)
 }
 
 template<>
-inline __device__ uint4 add128b<bf16_8_t, hip_bfloat16>(bf16_8_t a, bf16_8_t b)
+inline __device__ bf16_8_t add128b<bf16_8_t, hip_bfloat16>(bf16_8_t a, bf16_8_t b)
 {
     bf16_8_t c;
     c.x = hadd2_bf16(a.x, b.x);
@@ -105,6 +105,12 @@ template<>
 inline __device__ uint4 init_packed_type()
 {
     return make_uint4(0u, 0u, 0u, 0u);
+}
+
+template<>
+inline __device__ bf16_8_t init_packed_type()
+{
+    return {{{__float2bfloat16(0.f)}, {__float2bfloat16(0.f)}}, {{__float2bfloat16(0.f)}, {__float2bfloat16(0.f)}}, {{__float2bfloat16(0.f)}, {__float2bfloat16(0.f)}}, {{__float2bfloat16(0.f)}, {__float2bfloat16(0.f)}}};
 }
 
 
@@ -416,6 +422,7 @@ void invokeOneOrTwoShotAllReduceKernel(AllReduceParams<T>& param, hipStream_t st
 
 // Template instantiation
 template void invokeOneOrTwoShotAllReduceKernel<uint16_t>(AllReduceParams<uint16_t>& param, hipStream_t stream);
+template void invokeOneOrTwoShotAllReduceKernel<hip_bfloat16>(AllReduceParams<hip_bfloat16>& param, hipStream_t stream);
 template void invokeOneOrTwoShotAllReduceKernel<uint32_t>(AllReduceParams<uint32_t>& param, hipStream_t stream);
 }  // namespace awesome_fusion
 
