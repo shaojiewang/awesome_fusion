@@ -2,7 +2,7 @@
 #include "hip_utils.h"
 #include "hip_bf16_wrapper.hpp"
 
-// #define PER_PIXEL_CHECK
+#define PER_PIXEL_CHECK
 #define ASSERT_ON_FAIL
 
 // CPU check mode
@@ -32,7 +32,7 @@ static inline bool valid_vector(const T* ref, const T* pred, int n, float nrms =
         if(delta > 1e-1)
         {
 #ifdef ASSERT_ON_FAIL
-            if(pp_err < 100)
+            if(pp_err < 10)
             {
                 printf("diff at %4d, ref:%lf, pred:%lf(0x%04x), d:%lf\n", i, ri, pi, ((uint16_t*)pred)[i], delta);
             }

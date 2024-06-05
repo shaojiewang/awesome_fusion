@@ -311,7 +311,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -324,7 +324,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
@@ -333,6 +333,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipEventElapsedTime(&elapsed_ms, evt_00, evt_11));
     check_cuda_error(hipEventDestroy(evt_00));
     check_cuda_error(hipEventDestroy(evt_11));
+
+    // check bf16 gemm res
+    printf("rank %d, res=%f\n", 
+        rank, 
+        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[0]));
 
 #ifdef ASM_PRINT
     int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
@@ -364,8 +369,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("\n");
 
     // result checker
-    valid_vector<hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer()), 
-                               reinterpret_cast<hip_bfloat16*>(c_device_buf_ref.GetBuffer()),
+    valid_vector<hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf_ref.GetBuffer()), 
+                               reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer()),
                                m * n);
 
 
