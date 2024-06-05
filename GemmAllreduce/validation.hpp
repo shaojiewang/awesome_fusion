@@ -1,0 +1,69 @@
+#pragma once
+#include "hip_utils.h"
+#include "hip_bf16_wrapper.hpp"
+
+// #define PER_PIXEL_CHECK
+#define ASSERT_ON_FAIL
+
+// CPU check mode
+
+template <typename T>
+static inline bool valid_vector(const T* ref, const T* pred, int n, float nrms = 1e-2)
+{    
+    float s0 = 0.0;
+    float s1 = 0.0;
+#ifdef PER_PIXEL_CHECK
+    int pp_err = 0;
+#endif
+    int i_start = 0, i_end = n;
+    
+    for(int i = i_start; i < i_end; ++i )
+    {
+        float ri = type_convert<float, T>ref[i];
+        float pi = type_convert<float, T>(pred[i]);
+        float d = ri - pi;
+        float dd = d * d;
+        float rr = 2.0 * ri * ri;
+        s0 += dd;
+        s1 += rr;
+        
+#ifdef PER_PIXEL_CHECK
+        float delta = std::abs(ri - pi) / std::abs(ri);
+        if(delta > 1e-1)
+        {
+#ifdef ASSERT_ON_FAIL
+            if(pp_err < 100)
+            {
+                printf("diff at %4d, ref:%lf, pred:%lf(0x%04x), d:%lf\n", i, ri, pi, ((uint16_t*)pred)[i], delta);
+            }
+#endif
+            pp_err++;
+        }
+#endif
+    }
+
+#ifdef PER_PIXEL_CHECK
+    int i_num = i_end - i_start;
+    printf("pp_crr:%d, pp_err:%d, crr_ratio:%.3f, nrms:%lf, s0:%lf, s1:%lf\n",
+        i_num - pp_err, 
+        pp_err, 
+        (float)(i_num - pp_err) / (float)i_num, 
+        (float)sqrt((float)(s0 / s1)), 
+        s0, 
+        s1);
+#else
+    printf("nrms:%lf, s0:%lf, s1:%lf\n",
+        (float)sqrt((float)(s0 / s1)), 
+        s0, 
+        s1);
+#endif
+
+    return (sqrt(s0 / s1) < nrms)
+#ifdef PER_PIXEL_CHECK
+        && (pp_err == 0)
+#endif
+    ;
+}
+
+// GPU check mode
+

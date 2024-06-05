@@ -16,6 +16,7 @@
 #include "matrix_transpose.hpp"
 #include "matrix_elementwise.hpp"
 #include "bfA_intB_gemm_runner.hpp"
+#include "validation.hpp"
 
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
@@ -361,6 +362,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         tflops,
         bw_gbs);
     printf("\n");
+
+    // result checker
+    valid_vector<hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer()), 
+                               reinterpret_cast<hip_bfloat16*>(c_device_buf_ref.GetBuffer()),
+                               m * n);
 
 
     // output buff
