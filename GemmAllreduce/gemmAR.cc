@@ -250,7 +250,10 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // 1. transpose A matrix
     invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, 0);
     // 2. transpose and interleave B matrix
-    invokeMatrixBatchedTranspose(reinterpret_cast<hip_bfloat16*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(b_device_buf.GetBuffer()), 16 * k, 16, n / 16, 0);
+    invokeMatrixBatchedTranspose(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), 16 * n, 16, k_per_card / 16, 0);
+
+    // check A transpose
+    printf();
 
 #ifdef ASM_PRINT
     //debug pointer
@@ -268,8 +271,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
-                                           a_device_buf.GetBuffer(),
-                                           b_device_buf.GetBuffer(),
+                                           a_device_buf_compute.GetBuffer(),
+                                           b_device_buf_compute.GetBuffer(),
                                            scale_device_buf.GetBuffer(),
                                            m,
                                            n,
