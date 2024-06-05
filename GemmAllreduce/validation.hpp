@@ -19,7 +19,7 @@ static inline bool valid_vector(const T* ref, const T* pred, int n, float nrms =
     
     for(int i = i_start; i < i_end; ++i )
     {
-        float ri = type_convert<float, T>ref[i];
+        float ri = type_convert<float, T>(ref[i]);
         float pi = type_convert<float, T>(pred[i]);
         float d = ri - pi;
         float dd = d * d;
