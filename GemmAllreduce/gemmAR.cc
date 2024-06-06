@@ -246,15 +246,28 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         }
     }
 
+    hipStream_t communication_stream;
+    check_cuda_error(hipStreamCreate(&communication_stream));
+
+    hipStream_t compute_stream;
+    check_cuda_error(hipStreamCreate(&compute_stream));
+
     // add matrix transpose code
     // 1. transpose A matrix
-    invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, 0);
+    invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, compute_stream);
     // 2. transpose and interleave B matrix
-    invokeMatrixBatchedTranspose<uint8_t>(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), n, 16, k_per_card / 16, 0);
-
+    if (rank == 0)
+    {
+        printf("n = %d, k_per_card / 16 = %d\n", n, k_per_card / 16);
+    // invokeMatrixBatchedTranspose<uint8_t>(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), n, 16, k_per_card / 16, compute_stream);
+    }
+    check_cuda_error(hipDeviceSynchronize());
+    MPI_Barrier(MPI_COMM_WORLD);
     // check A transpose
     printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
     printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
+
+    return 0;
 
 #ifdef ASM_PRINT
     //debug pointer
@@ -303,12 +316,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     {
         // dev_buff = tmp;
     }
-
-    hipStream_t communication_stream;
-    check_cuda_error(hipStreamCreate(&communication_stream));
-
-    hipStream_t compute_stream;
-    check_cuda_error(hipStreamCreate(&compute_stream));
 
     uint32_t sol_idx = 0, sk_blocks = 1;
     
