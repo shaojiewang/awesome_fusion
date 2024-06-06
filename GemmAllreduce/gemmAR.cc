@@ -250,7 +250,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // 1. transpose A matrix
     invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, 0);
     // 2. transpose and interleave B matrix
-    invokeMatrixBatchedTranspose(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), 16 * n, 16, k_per_card / 16, 0);
+    invokeMatrixBatchedTranspose<uint8_t>(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), n, 16, k_per_card / 16, 0);
 
     // check A transpose
     printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
