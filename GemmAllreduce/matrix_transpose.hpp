@@ -32,7 +32,7 @@ __global__ void matrix_transpose(T* dst, const T* src, const int k, const int n)
 template<typename T>
 void invokeMatrixTranspose(T* dst, const T* src, const int k, const int n, hipStream_t stream)
 {
-    dim3 grid(n / 32, k / 32);
+    dim3 grid((n + 31) / 32, (k + 31) / 32);
     dim3 block(32, 32);
     matrix_transpose<<<grid, block, 0, stream>>>(dst, src, k, n);
 }

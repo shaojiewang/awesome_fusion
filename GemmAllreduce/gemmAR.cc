@@ -253,7 +253,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     invokeMatrixBatchedTranspose(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), 16 * n, 16, k_per_card / 16, 0);
 
     // check A transpose
-    printf();
+    printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
+    printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
 
 #ifdef ASM_PRINT
     //debug pointer
