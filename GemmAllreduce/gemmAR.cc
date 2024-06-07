@@ -265,11 +265,21 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
     // check B transpose
     printf("b_device_buf_compute=[%x]\n", reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[0]);
-    printf("b_device_buf=[%x, %x, %x, %x]\n",
+    printf("b_device_buf=[%x, %x, %x, %x, %x, %x, %x]\n",
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[0],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[k_per_card / 4],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[k_per_card / 2],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[k_per_card]);
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 4],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 2],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 4 * 3],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 2],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 3]);
+
+    // check scale 
+    printf("scale buffer=[%f, %f, %f, %f]\n", 
+        reinterpret_cast<float*>(scale_device_buf.GetBuffer())[0], 
+        reinterpret_cast<float*>(scale_device_buf.GetBuffer())[1],
+        reinterpret_cast<float*>(scale_device_buf.GetBuffer())[2],
+        reinterpret_cast<float*>(scale_device_buf.GetBuffer())[3]);
 
 #ifdef ASM_PRINT
     //debug pointer
