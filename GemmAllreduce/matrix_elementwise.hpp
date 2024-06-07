@@ -11,7 +11,7 @@ __global__ void matrix_elementwise_scale(TDst* dst, TSrc* src, TScale* scale, co
     int tidx = blockIdx.x * blockDim.x + threadIdx.x;
     for (int i = tidx; i < m * n; i += blockDim.x * gridDim.x)
     {
-        int i_scale = i / n;
+        int i_scale = i % m;
         TScale res = src[i] * scale[i_scale];
         dst[i] = type_convert<TDst, TScale>(res);
     }
