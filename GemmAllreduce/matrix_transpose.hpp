@@ -65,6 +65,29 @@ __global__ void matrix_batched_transpose(T* dst, const T* src, const int k, cons
     }
 }
 
+// src is [bs, k, n] row-major
+// dst is [bs, n, k] row-major
+template<>
+__global__ void matrix_batched_transpose<uint8_t>(uint8_t* dst, const uint8_t* src, const int k, const int n, const int bsz)
+{
+    __shared__ uint8_t shm[16][17];
+    const int    tidx  = threadIdx.x;
+    const int    tidy  = threadIdx.y;
+    int          n_idx = blockIdx.x * 16 + tidx;
+    int          k_idx = blockIdx.y * 16 + tidy;
+    int          bsz_idx = blockIdx.z;
+    if (n_idx < n && k_idx < k && bsz_idx < bsz) {
+        shm[tidx][tidy] = src[bsz_idx * n * k + k_idx * n + n_idx];
+    }
+
+    __syncthreads();
+    n_idx = blockIdx.x * 16 + tidy;
+    k_idx = blockIdx.y * 16 + tidx;
+    if (n_idx < n && k_idx < k && bsz_idx < bsz) {
+        dst[bsz_idx * n * k + n_idx * k + k_idx] = shm[tidy][tidx] - 128;
+    }
+}
+
 // src is [k, n] row-major
 // dst is [n, k] row-major
 template<typename T>
