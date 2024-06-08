@@ -264,15 +264,24 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
     printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
     // check B transpose
-    printf("b_device_buf_compute=[%x]\n", reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[0]);
+    printf("b_device_buf_compute=[%x, %x, %x, %x, %x, %x, %x, %x]\n", 
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[0],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[4],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 4],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[1],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[2],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[3],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 1]);
+
     printf("b_device_buf=[%x, %x, %x, %x, %x, %x, %x]\n",
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[0],
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 4],
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 2],
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[n / 4 * 3],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 2],
-        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 3]);
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 4],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 8],
+        reinterpret_cast<int*>(b_device_buf.GetBuffer())[n * 12]);
 
     // check scale 
     printf("scale buffer=[%f, %f, %f, %f]\n", 
@@ -395,7 +404,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     valid_vector<hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf_ref.GetBuffer()), 
                                reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer()),
                                m * n);
-
+    return 0;
 
     // output buff
     hip_bfloat16 *dev_buff, host_buff[AR_NUM], *tmp;
