@@ -328,7 +328,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // ar init
     if(custom_ar == 1)
     {
-        // static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<uint16_t*>(c_device_buf_out.GetBuffer());
+        static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<uint16_t*>(c_device_buf_out.GetBuffer());
         // check_cuda_error(hipMemcpyDtoD((half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank], c_device_buf.GetBuffer(), sizeof(CDataType) * m * n));
         check_cuda_error(hipDeviceSynchronize()); 
         // (hip_bfloat16*)static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer());
@@ -337,10 +337,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     {
         // dev_buff = tmp;
     }
-
-    printf("rank %d, res=%f\n", 
-        rank, 
-        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[0]));
 
     uint32_t sol_idx = 0, sk_blocks = 1;
     
