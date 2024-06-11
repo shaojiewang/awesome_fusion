@@ -328,8 +328,25 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // ar init
     if(custom_ar == 1)
     {
+        printf("rank=%d\n", rank);
         static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer());
         static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer());
+        // re-broadcast
+        for (int i = 0; i < world_size; i++)
+        {
+            hipIpcMemHandle_t handle;
+            if (rank == i)
+            {
+                check_cuda_error(hipIpcGetMemHandle(&handle,
+                                                    static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank]));
+            }
+            MPI_Bcast(&handle, sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+            if (rank != i)
+            {
+                check_cuda_error(hipIpcOpenMemHandle((void **)&(static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[i]), handle, hipIpcMemLazyEnablePeerAccess));
+            }
+        }
+        
     }
     else
     {

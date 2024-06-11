@@ -158,8 +158,9 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
             src_d[ii] = params.peer_comm_buffer_ptrs[rank];
             if (threadIdx.x == 0)
             {
-                printf("in rank %d, src = %f\n", 
+                printf("in rank %d, local_rank = %d, src = %f\n", 
                     ii,
+                    params.local_rank,
                     type_convert<float, T>(*(src_d[ii])));
             }
         }
