@@ -23,8 +23,8 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 8192;
 
-#define TOTAL_NUM 100
-#define WARM_UP_NUM 10
+#define TOTAL_NUM 0
+#define WARM_UP_NUM 1
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
@@ -329,21 +329,21 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     if(custom_ar == 1)
     {
         static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer());
-        // check_cuda_error(hipMemcpyDtoD((half*)static_cast<CustomAllReduceComm<uint16_t>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank], c_device_buf.GetBuffer(), sizeof(CDataType) * m * n));
-        check_cuda_error(hipDeviceSynchronize()); 
-        (hip_bfloat16*)static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer());
+        static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer());
     }
     else
     {
         // dev_buff = tmp;
     }
 
+    check_cuda_error(hipDeviceSynchronize());
+    MPI_Barrier(MPI_COMM_WORLD);
     uint32_t sol_idx = 0, sk_blocks = 1;
     
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -356,7 +356,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
