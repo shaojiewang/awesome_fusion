@@ -386,7 +386,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // check bf16 gemm res
     printf("rank %d, res=%f\n", 
         rank, 
-        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[0]));
+        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[29]));
 
 #ifdef ASM_PRINT
     int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;

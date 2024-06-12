@@ -161,7 +161,7 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
                 printf("in rank %d, local_rank = %d, src = %f\n", 
                     ii,
                     params.local_rank,
-                    type_convert<float, T>(*(src_d[ii])));
+                    type_convert<float, T>((src_d[ii])[29]));
             }
         }
 
