@@ -156,6 +156,7 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
         for (int ii = 0; ii < RANKS_PER_HIVE; ++ii) {
             int rank  = (params.local_rank + ii) % RANKS_PER_HIVE;
             src_d[ii] = params.peer_comm_buffer_ptrs[rank];
+#if 0
             if (threadIdx.x == 0)
             {
                 printf("in rank %d, local_rank = %d, src = %f\n", 
@@ -163,6 +164,7 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
                     params.local_rank,
                     type_convert<float, T>((src_d[ii])[29]));
             }
+#endif
         }
 
         // Each block accumulates the values from the different GPUs on the same node.
@@ -338,7 +340,6 @@ void kernelLaunchConfig(
     size_t elts_per_warp   = (16 * WARP_SIZE) / data_type_bytes;
     switch (kernel_algo) {
         case 0: {  // one stage all reduce algo
-            printf("elts=%d, elts_per_warp=%d\n", elts, elts_per_warp);
             assert(elts % elts_per_warp == 0);
             if (elts < (elts_per_thread * DEFAULT_BLOCK_SIZE)) {  // local reduce
                 threads_per_block = ((elts + elts_per_warp - 1) / elts_per_warp) * WARP_SIZE;

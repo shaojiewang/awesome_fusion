@@ -23,8 +23,8 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 8192;
 
-#define TOTAL_NUM 0
-#define WARM_UP_NUM 1
+#define TOTAL_NUM 100
+#define WARM_UP_NUM 10
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
@@ -213,10 +213,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("rank %d, c_ref is [0x%x]\n", rank, *(int*)(c_device_buf_ref.GetBuffer()));
+    // printf("rank %d, c_ref is [0x%x]\n", rank, *(int*)(c_device_buf_ref.GetBuffer()));
 
     MPI_Barrier(MPI_COMM_WORLD);
     // check broadcast res
+#if PRINT_BUFFER
     if (rank == 0)
     {
         printf("a buf ref is [0x%x, 0x%x, 0x%x, 0x%x]\n", 
@@ -245,6 +246,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             printf("in rank [%d], scale buf ref is [0x%x]\n", rank, *(int*)(init_scale_buf_ref_ptrs[i]));
         }
     }
+#endif
 
     hipStream_t communication_stream;
     check_cuda_error(hipStreamCreate(&communication_stream));
@@ -260,6 +262,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
+
+#if PRINT_BUFFER
     // check A transpose
     printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
     printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
@@ -289,6 +293,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         reinterpret_cast<float*>(scale_device_buf.GetBuffer())[1],
         reinterpret_cast<float*>(scale_device_buf.GetBuffer())[2],
         reinterpret_cast<float*>(scale_device_buf.GetBuffer())[3]);
+#endif
 
 #ifdef ASM_PRINT
     //debug pointer
@@ -328,7 +333,6 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // ar init
     if(custom_ar == 1)
     {
-        printf("rank=%d\n", rank);
         static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.local_output_buffer_ptr = reinterpret_cast<hip_bfloat16*>(c_device_buf_out.GetBuffer());
         static_cast<CustomAllReduceComm<hip_bfloat16>*>(custom_all_reduce_comms[rank].get())->param_.peer_comm_buffer_ptrs[rank] = reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer());
         // re-broadcast
@@ -384,9 +388,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipEventDestroy(evt_11));
 
     // check bf16 gemm res
+#if PRINT_BUFFER
     printf("rank %d, res=%f\n", 
         rank, 
         type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[29]));
+#endif
 
 #ifdef ASM_PRINT
     int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
