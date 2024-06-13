@@ -18,10 +18,12 @@
 #include "bfA_intB_gemm_runner.hpp"
 #include "validation.hpp"
 
+#define PRINT_BUFFER 1
+
 // whether to use custom kernel[1] or rccl[0]
 const int custom_ar = 1;
 // num of elements to do all reduce
-const int AR_NUM = 8192;
+const int AR_NUM = 256 * 1024;
 
 #define TOTAL_NUM 100
 #define WARM_UP_NUM 10
@@ -205,6 +207,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // reference result by rocblas
     ADataType* d_A = reinterpret_cast<ADataType*>(init_a_buf_ref_ptrs[rank]);
+    // ADataType* d_A = reinterpret_cast<ADataType*>(a_device_buf_ref.GetBuffer());
     ComputeDataType* d_B = reinterpret_cast<ComputeDataType*>(b_device_buf_ref_compute.GetBuffer());
     // printf("in rank %d, b buf compute = 0x%x\n", rank, *(int*)b_device_buf_ref_compute.GetBuffer());
     CDataType* d_C = reinterpret_cast<CDataType*>(c_device_buf_ref.GetBuffer());
@@ -213,7 +216,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
-    // printf("rank %d, c_ref is [0x%x]\n", rank, *(int*)(c_device_buf_ref.GetBuffer()));
+    printf("rank %d, c_ref is [%f]\n", rank, type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf_ref.GetBuffer())[2]));
 
     MPI_Barrier(MPI_COMM_WORLD);
     // check broadcast res
@@ -265,18 +268,30 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
 #if PRINT_BUFFER
     // check A transpose
-    printf("a_device_buf_compute=[%x]\n", reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[0]);
+    printf("a_device_buf_compute=[%x, %x, %x, %x]\n", 
+        reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[12],
+        reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[13],
+        reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[14],
+        reinterpret_cast<int*>(a_device_buf_compute.GetBuffer())[15]);
     printf("a_device_buf=[%x]\n", reinterpret_cast<int*>(a_device_buf.GetBuffer())[0]);
     // check B transpose
-    printf("b_device_buf_compute=[%x, %x, %x, %x, %x, %x, %x, %x]\n", 
+    printf("b_device_buf_compute=[%x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x, %x]\n", 
         reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[0],
-        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[4],
-        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4],
-        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 4],
         reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[1],
         reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[2],
         reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[3],
-        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 1]);
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 1],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 2],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 4 + 3],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 8],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 8 + 1],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 8 + 2],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 8 + 3],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 12],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 12 + 1],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 12 + 2],
+        reinterpret_cast<int*>(b_device_buf_compute.GetBuffer())[n * 12 + 3]);
 
     printf("b_device_buf=[%x, %x, %x, %x, %x, %x, %x]\n",
         reinterpret_cast<int*>(b_device_buf.GetBuffer())[0],
@@ -364,7 +379,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), nullptr);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -377,7 +392,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n * sizeof(CDataType), compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));

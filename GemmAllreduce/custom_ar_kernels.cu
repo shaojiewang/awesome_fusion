@@ -186,8 +186,10 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
             // Store to the destination buffer.
             reinterpret_cast<PackedType*>(&params.local_output_buffer_ptr[iter_offset])[0] = sums;
         }
-        return;
+        // return;
     }
+
+#if 0
     if (tidx < RANKS_PER_NODE) {
         // The 1st block notifies the other ranks.
         if (bidx == 0) {
@@ -227,6 +229,7 @@ static __global__ void oneShotAllReduceKernel(AllReduceParams<T> params)
         // Store to the destination buffer.
         reinterpret_cast<PackedType*>(&params.local_output_buffer_ptr[iter_offset])[0] = sums;
     }
+#endif
 }
 
 template<typename T, int TP_RANKS>
