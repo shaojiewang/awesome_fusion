@@ -60,7 +60,11 @@ public:
                       uint32_t& ldc_,
                       uint32_t& k_per_cta_,
                       void* ptr_workspace_,
-                      uint32_t& max_sk_blocks_)
+                      uint32_t& max_sk_blocks_,
+                      void* ptr_local_compute_flags_ = nullptr,
+                      void* ptr_world_barrier_ = nullptr,
+                      void* ptr_local_out_ = nullptr,
+                      void* ptr_peer_comm_buffers_ = nullptr)
     {
         k_ptr = k_vec_.data();
         args.ptr_c = ptr_c_;
@@ -75,6 +79,10 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.ptr_local_compute_flags = ptr_local_compute_flags_;
+        args.ptr_world_barrier = ptr_world_barrier_;
+        args.ptr_local_out = ptr_local_out_;
+        args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
 
         k_ptr_len = k_vec_.size();
         max_sk_blocks = max_sk_blocks_;
@@ -117,7 +125,11 @@ public:
                 uint32_t& ldb_,
                 uint32_t& ldc_,
                 uint32_t& k_per_cta_,
-                void* ptr_workspace_) {
+                void* ptr_workspace_, 
+                void* ptr_local_compute_flags_,
+                void* ptr_world_barrier_,
+                void* ptr_local_out_,
+                void* ptr_peer_comm_buffers_) {
         args.ptr_c = ptr_c_;
         args.ptr_a = ptr_a_;
         args.ptr_b = ptr_b_;
@@ -130,6 +142,10 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.ptr_local_compute_flags = ptr_local_compute_flags_;
+        args.ptr_world_barrier = ptr_world_barrier_;
+        args.ptr_local_out = ptr_local_out_;
+        args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
     }
  
     void run(const kernel_tunable& ker,
