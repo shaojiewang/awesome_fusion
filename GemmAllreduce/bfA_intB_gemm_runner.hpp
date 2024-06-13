@@ -18,6 +18,10 @@ struct __attribute__((packed)) kargs{
     unsigned int ldc;
     unsigned int k_per_cta;
     void*  ptr_workspace; // also use this one to be debug pointer
+    void* ptr_local_compute_flags; // flag to indicate whether cta compute is ready
+    void* ptr_world_barrier;
+    void* ptr_local_out;
+    void* ptr_peer_comm_buffers;
 };
 
 class bfAintBGemmRunner {
@@ -35,6 +39,10 @@ public:
         args.ldc = 4;
         args.k_per_cta = 4;
         args.ptr_workspace = nullptr;
+        args.ptr_local_compute_flags = nullptr;
+        args.ptr_world_barrier = nullptr;
+        args.ptr_local_out = nullptr;
+        args.ptr_peer_comm_buffers = nullptr;
         max_sk_blocks = 4;
     }
 
