@@ -102,6 +102,10 @@
 .set k_ldc, 52
 .set k_k_per_cta, 56
 .set k_print, 60
+.set k_local_flag, 68
+.set k_world_barrier, 76
+.set k_local_out, 84
+.set k_peer_comm_buffers, 92
 
 ;sgpr
 .set s_ka, 0
@@ -120,19 +124,23 @@
 .set s_ldc, 29
 .set s_k_per_cta, 30
 .set s_print, 32
-.set s_bs_a, 34
-.set s_bs_b, 35
-.set s_m_blocks, 36
-.set s_m_idx, 37
-.set s_n_idx, 38
-.set s_offset_a, 40
-.set s_offset_b, 44
-.set s_kitr, 45
-.set s_wave_id, 46
-.set s_wave_im, 47
-.set s_wave_in, 48
-.set s_k_idx, 49
-.set s_tmp, 56
+.set s_local_flag, 34
+.set s_world_barrier, 36
+.set s_local_out, 38
+.set s_peer_comm_buffer, 40
+.set s_bs_a, 42
+.set s_bs_b, 43
+.set s_m_blocks, 44
+.set s_m_idx, 45
+.set s_n_idx, 46
+.set s_offset_a, 48
+.set s_offset_b, 52
+.set s_kitr, 53
+.set s_wave_id, 54
+.set s_wave_im, 55
+.set s_wave_in, 56
+.set s_k_idx, 57
+.set s_tmp, 64
 
 ;vgpr
 .set v_c, 0
@@ -194,6 +202,10 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
     s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
     s_load_dwordx2 s[s_print:s_print+1], s[s_ka:s_ka+1], 0+k_print
+    s_load_dwordx2 s[s_local_flag:s_local_flag+1], s[s_ka:s_ka+1], 0+k_local_flag
+    s_load_dwordx2 s[s_world_barrier:s_world_barrier+1], s[s_ka:s_ka+1], 0+k_world_barrier
+    s_load_dwordx2 s[s_local_out:s_local_out+1], s[s_ka:s_ka+1], 0+k_local_out
+    s_load_dwordx2 s[s_peer_comm_buffer:s_peer_comm_buffer+1], s[s_ka:s_ka+1], 0+k_peer_comm_buffer
 
     s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
     s_load_dwordx2 s[s_ldb:s_ldb+1], s[s_ka:s_ka+1], 0+k_ldb
@@ -751,7 +763,7 @@ l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_i
     .amdhsa_system_sgpr_workgroup_id_z 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 116
-    .amdhsa_next_free_sgpr 64
+    .amdhsa_next_free_sgpr 72
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 116
@@ -787,6 +799,10 @@ amdhsa.kernels:
       - { .name k_ldc, .size: 4, .offset: 52, .value_kind: by_value, .value_type: i32} 
       - { .name k_k_per_cta, .size: 4, .offset: 56, .value_kind: by_value, .value_type: i32} 
       - { .name k_print, .size: 8, .offset: 60, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_flag, .size: 8, .offset: 68, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier, .size: 8, .offset: 76, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_out, .size: 8, .offset: 84, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer, .size: 8, .offset: 92, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
 
 ...
 .end_amdgpu_metadata
