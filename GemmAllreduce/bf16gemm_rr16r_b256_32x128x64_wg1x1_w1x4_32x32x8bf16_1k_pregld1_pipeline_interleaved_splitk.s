@@ -758,11 +758,15 @@ l_local_compute_signal:
     v_mov_b32 v[v_offset_flag], 0
     v_mov_b32 v[v_inc], 1
     global_atomic_add v[v_flag], v[v_offset_flag], v[v_inc], s[s_local_flag : s_local_flag + 1] glc
-    s_add_i32 s[s_flag_checker], s[s_m], 31
+    s_add_u32 s[s_flag_checker], s[s_m], 31
     s_lshr_u32 s[s_flag_checker], s[s_flag_checker], 5
     s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
     s_waitcnt vmcnt(0)
-        
+    v_read_firstlane s[s_flag], v[v_flag]
+    s_cmp_eq_u32 s[s_flag], s[s_flag_checker]
+    s_cbranch_scc0 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+
+    ; begin multicard barrier
 
     s_mov_b64 exec -1
     
@@ -795,10 +799,10 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk.kd
-    .sgpr_count: 64
+    .sgpr_count: 72
     .vgpr_count: 116
     .kernarg_segment_align: 8
-    .kernarg_segment_size: 80
+    .kernarg_segment_size: 100
     .group_segment_fixed_size: 40960
     .private_segment_fixed_size: 0
     .wavefront_size: 64
