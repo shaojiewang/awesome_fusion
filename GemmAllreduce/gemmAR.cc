@@ -110,6 +110,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     using DeviceMemCached = SimpleDeviceMem<false>;
     using DeviceMemUncached = SimpleDeviceMem<true>;
 
+    // local flags
+    DeviceMemCached local_compute_flags(sizeof(int) * ((n + 511) / 512 * 512));
+
     DeviceMemCached a_device_buf_compute(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf_compute(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
 
@@ -343,6 +346,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            nullptr,
                                            max_sk_blocks
 #endif
+      ,
+                                           local_compute_flags.GetBuffer()
                                            );
 
     // ar init

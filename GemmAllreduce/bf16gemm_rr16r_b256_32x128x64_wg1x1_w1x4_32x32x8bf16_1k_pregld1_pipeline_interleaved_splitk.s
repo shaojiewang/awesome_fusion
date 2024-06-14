@@ -105,7 +105,7 @@
 .set k_local_flag, 68
 .set k_world_barrier, 76
 .set k_local_out, 84
-.set k_peer_comm_buffers, 92
+.set k_peer_comm_buffer, 92
 
 ;sgpr
 .set s_ka, 0
@@ -140,6 +140,9 @@
 .set s_wave_im, 55
 .set s_wave_in, 56
 .set s_k_idx, 57
+.set s_offset_local_flag, 58
+.set s_flag, 59
+.set s_flag_checker, 60  
 .set s_tmp, 64
 
 ;vgpr
@@ -189,6 +192,12 @@
 .set v_tid, 106
 .set v_wave_id, 107
 .set v_tmp, 108
+; local flag (can reuse the a/b/c vgprs)
+.set v_one, 0
+.set v_flag, 1
+.set v_flag_load, 2
+.set v_offset_flag, 3
+
 
 .text
 .global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
@@ -752,17 +761,17 @@ label_write_out_c:
 
 l_local_compute_signal:
     ; find proper flag
+    v_mov_b32 v[v_one], 1
     s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
-    v_cpmx_ge_u32 v[v_flag_load], 1, v[v_tid]
+    v_cmpx_ge_u32 v[v_one], v[v_tid]
     v_mov_b32 v[v_offset_flag], 0
-    v_mov_b32 v[v_inc], 1
-    global_atomic_add v[v_flag], v[v_offset_flag], v[v_inc], s[s_local_flag : s_local_flag + 1] glc
+    global_atomic_add v[v_flag], v[v_offset_flag], v[v_one], s[s_local_flag : s_local_flag + 1] glc
     s_add_u32 s[s_flag_checker], s[s_m], 31
-    s_lshr_u32 s[s_flag_checker], s[s_flag_checker], 5
+    s_lshr_b32 s[s_flag_checker], s[s_flag_checker], 5
     s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
     s_waitcnt vmcnt(0)
-    v_read_firstlane s[s_flag], v[v_flag]
+    v_readfirstlane_b32 s[s_flag], v[v_flag]
     s_cmp_eq_u32 s[s_flag], s[s_flag_checker]
     s_cbranch_scc0 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
 
@@ -773,6 +782,7 @@ l_local_compute_signal:
 
 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
     ; .print v_offset_a, s_print, s_bx, v_tid, v_tmp + 7
+    s_mov_b64 exec -1
     s_endpgm
 .rodata
 .p2align 6
