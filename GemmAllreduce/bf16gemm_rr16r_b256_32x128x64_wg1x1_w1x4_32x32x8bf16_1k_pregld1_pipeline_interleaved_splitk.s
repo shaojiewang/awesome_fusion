@@ -752,14 +752,19 @@ label_write_out_c:
 
 l_local_compute_signal:
     ; find proper flag
-    s_lshr_b32 s[s_offset_local_flag], s[s_bidy], 2
+    s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
     v_cpmx_ge_u32 v[v_flag_load], 1, v[v_tid]
     v_mov_b32 v[v_offset_flag], 0
     v_mov_b32 v[v_inc], 1
     global_atomic_add v[v_flag], v[v_offset_flag], v[v_inc], s[s_local_flag : s_local_flag + 1] glc
-    
+    s_add_i32 s[s_flag_checker], s[s_m], 31
+    s_lshr_u32 s[s_flag_checker], s[s_flag_checker], 5
+    s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
     s_waitcnt vmcnt(0)
+        
+
+    s_mov_b64 exec -1
     
 
 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
