@@ -110,6 +110,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     using DeviceMemCached = SimpleDeviceMem<false>;
     using DeviceMemUncached = SimpleDeviceMem<true>;
 
+    // local flags
+    DeviceMemCached local_compute_flags(sizeof(int) * ((n + 511) / 512 * 512));
+
     DeviceMemCached a_device_buf_compute(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf_compute(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
 
@@ -343,6 +346,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            nullptr,
                                            max_sk_blocks
 #endif
+      ,
+                                           local_compute_flags.GetBuffer()
                                            );
 
     // ar init
@@ -410,17 +415,20 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
 
 #ifdef ASM_PRINT
-    int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
-    check_cuda_error(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
-    for(int i = 0; i < max_i; i++){
-        // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
-        float fp32_val = ((float*)host_print)[2*i+1];
-        uint32_t fp32_val_bit = __builtin_bit_cast(uint32_t, fp32_val);
-        float bf16_lo = __builtin_bit_cast(float, (fp32_val_bit << 16));
-        float bf16_hi = __builtin_bit_cast(float, (fp32_val_bit & 0xffff0000));
-        printf("%dth: Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n", i, ((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
-        //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
-        //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
+    if (rank == 0)
+    {
+        int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
+        check_cuda_error(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
+        for(int i = 0; i < max_i; i++){
+            // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
+            float fp32_val = ((float*)host_print)[2*i+1];
+            uint32_t fp32_val_bit = __builtin_bit_cast(uint32_t, fp32_val);
+            float bf16_lo = __builtin_bit_cast(float, (fp32_val_bit << 16));
+            float bf16_hi = __builtin_bit_cast(float, (fp32_val_bit & 0xffff0000));
+            printf("%dth: Thread%d, PrintVal:0x%x, %d, %f, [%f, %f]\n", i, ((int*) host_print)[2*i], fp32_val_bit, fp32_val_bit, fp32_val, bf16_lo, bf16_hi);
+            //std::cout<<"Thread"<<((int*) host_print)[2*i]<<", PrintVal1:"<<(((float16*)host_print)[4*i+2])<<
+            //", PrintVal2:"<<( ( (float16*)host_print )[4*i+3] )<<std::endl;
+        }
     }    
 #endif
 
