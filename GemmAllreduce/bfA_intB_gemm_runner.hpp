@@ -84,6 +84,8 @@ public:
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
 
+        check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
+
         k_ptr_len = k_vec_.size();
         max_sk_blocks = max_sk_blocks_;
 

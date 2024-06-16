@@ -777,6 +777,7 @@ l_local_compute_signal:
 
     ; begin multicard barrier
 
+    global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     s_mov_b64 exec -1
     
 
