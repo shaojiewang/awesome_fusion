@@ -764,7 +764,7 @@ l_local_compute_signal:
     v_mov_b32 v[v_one], 1
     s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
-    v_cmpx_ge_u32 v[v_one], v[v_tid]
+    v_cmpx_gt_u32 v[v_one], v[v_tid]
     v_mov_b32 v[v_offset_flag], 0
     global_atomic_add v[v_flag], v[v_offset_flag], v[v_one], s[s_local_flag : s_local_flag + 1] glc
     s_add_u32 s[s_flag_checker], s[s_m], 31
@@ -777,6 +777,7 @@ l_local_compute_signal:
 
     ; begin multicard barrier
 
+    .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     s_mov_b64 exec -1
     
