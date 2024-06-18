@@ -102,11 +102,12 @@
 .set k_ldc, 52
 .set k_k_per_cta, 56
 .set k_print, 60
-.set k_local_flag, 68
-.set k_world_barrier, 76
-.set k_local_out, 84
-.set k_peer_comm_buffer, 92
-.set k_local_rank, 100
+.set k_multigpu_barrier_flag, 68
+.set k_local_flag, 72
+.set k_world_barrier, 80
+.set k_local_out, 88
+.set k_peer_comm_buffer, 96
+.set k_local_rank, 104
 
 ;sgpr
 .set s_ka, 0
@@ -144,6 +145,7 @@
 .set s_offset_local_flag, 58
 .set s_flag, 59
 .set s_flag_checker, 60
+.set s_multigpu_barrier_flag, 61
 .set s_local_rank, 62  
 .set s_tmp, 64
 
@@ -213,6 +215,7 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
     s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
     s_load_dwordx2 s[s_print:s_print+1], s[s_ka:s_ka+1], 0+k_print
+    s_load_dword s[s_multigpu_barrier_flag], s[s_ka:s_ka+1], 0+k_multigpu_barrier_flag
     s_load_dwordx2 s[s_local_flag:s_local_flag+1], s[s_ka:s_ka+1], 0+k_local_flag
     s_load_dwordx2 s[s_world_barrier:s_world_barrier+1], s[s_ka:s_ka+1], 0+k_world_barrier
     s_load_dwordx2 s[s_local_out:s_local_out+1], s[s_ka:s_ka+1], 0+k_local_out
@@ -784,6 +787,8 @@ l_local_compute_signal:
     v_cmpx_ge_u32 v[v_imm], v[v_tid]
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
     global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] off
+    s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
+    s_waitcnt vmcnt(0)
     
 
     .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
@@ -823,7 +828,7 @@ amdhsa.kernels:
     .sgpr_count: 72
     .vgpr_count: 116
     .kernarg_segment_align: 8
-    .kernarg_segment_size: 100
+    .kernarg_segment_size: 112
     .group_segment_fixed_size: 40960
     .private_segment_fixed_size: 0
     .wavefront_size: 64
@@ -842,10 +847,12 @@ amdhsa.kernels:
       - { .name k_ldc, .size: 4, .offset: 52, .value_kind: by_value, .value_type: i32} 
       - { .name k_k_per_cta, .size: 4, .offset: 56, .value_kind: by_value, .value_type: i32} 
       - { .name k_print, .size: 8, .offset: 60, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_flag, .size: 8, .offset: 68, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_world_barrier, .size: 8, .offset: 76, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_out, .size: 8, .offset: 84, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_peer_comm_buffer, .size: 8, .offset: 92, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_multigpu_barrier_flag, .size: 4, .offset: 68, .value_kind: by_value, .value_type: i32} 
+      - { .name k_local_flag, .size: 8, .offset: 72, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier, .size: 8, .offset: 80, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_out, .size: 8, .offset: 88, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer, .size: 8, .offset: 96, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_rank, .size: 8, .offset: 104, .value_kind: by_value, .value_type: i64} 
 
 ...
 .end_amdgpu_metadata
