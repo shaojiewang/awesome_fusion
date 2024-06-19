@@ -788,7 +788,10 @@ l_local_compute_signal:
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
     global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] off
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
+    v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     s_waitcnt vmcnt(0)
+    v_add_co_u32_e32 v[v_barrier_addr], 
+    
     
 
     .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
