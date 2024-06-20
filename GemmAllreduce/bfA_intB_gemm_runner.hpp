@@ -23,6 +23,7 @@ struct __attribute__((packed)) kargs{
     void* ptr_world_barrier;
     void* ptr_local_out;
     void* ptr_peer_comm_buffers;
+    size_t local_rank;
 };
 
 class bfAintBGemmRunner {
@@ -45,6 +46,7 @@ public:
         args.ptr_world_barrier = nullptr;
         args.ptr_local_out = nullptr;
         args.ptr_peer_comm_buffers = nullptr;
+        args.local_rank = 0;
         max_sk_blocks = 4;
     }
 
@@ -67,7 +69,8 @@ public:
                       void* ptr_local_compute_flags_ = nullptr,
                       void* ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
-                      void* ptr_peer_comm_buffers_ = nullptr)
+                      void* ptr_peer_comm_buffers_ = nullptr,
+                      size_t& local_rank_ = (size_t)0)
     {
         k_ptr = k_vec_.data();
         args.ptr_c = ptr_c_;
@@ -87,6 +90,7 @@ public:
         args.ptr_world_barrier = ptr_world_barrier_;
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
+        args.local_rank = local_rank_;
 
         check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
 
@@ -136,7 +140,8 @@ public:
                 void* ptr_local_compute_flags_,
                 void* ptr_world_barrier_,
                 void* ptr_local_out_,
-                void* ptr_peer_comm_buffers_) {
+                void* ptr_peer_comm_buffers_,
+                size_t local_rank_) {
         args.ptr_c = ptr_c_;
         args.ptr_a = ptr_a_;
         args.ptr_b = ptr_b_;
@@ -154,6 +159,7 @@ public:
         args.ptr_world_barrier = ptr_world_barrier_;
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
+        args.local_rank = local_rank_;
     }
  
     void run(const kernel_tunable& ker,

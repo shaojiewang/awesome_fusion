@@ -363,7 +363,10 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
       ,
                                            barrier_flag,
                                            local_compute_flags.GetBuffer(),
-                                           multigpu_barrier_flag_ptrs
+                                           multigpu_barrier_flag_ptrs,
+                                           nullptr,
+                                           nullptr,
+                                           (size_t)rank
                                            );
 
     // ar init
