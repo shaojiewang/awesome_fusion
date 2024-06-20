@@ -32,6 +32,7 @@ const int AR_NUM = 256 * 1024;
 #define MAX_HANDLE_NUM 8
 
 #define BARRIER_FLAG 326
+#define MAX_AR_BLOCKS 8
 
 using namespace awesome_fusion;
 
@@ -115,6 +116,9 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // local flags
     DeviceMemCached local_compute_flags(sizeof(int) * ((n + 511) / 512 * 512));
 
+    // multi gpu flags
+    DeviceMemUncached multigpu_barrier_flags(sizeof(int) * MAX_WORLD_SIZE * (MAX_AR_BLOCKS + 1));
+    
     DeviceMemCached a_device_buf_compute(sizeof(ADataType) * f_matrix_space_size(m, k_per_card, lda, ALayout{}));
     DeviceMemCached b_device_buf_compute(sizeof(BDataType) * f_matrix_space_size(k_per_card, n, ldb, BLayout{}));
 
@@ -136,7 +140,10 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     SimpleHostMem b_host_buf(sizeof(float) * f_matrix_space_size(k, n, ldb_ref, BLayout{}));
     SimpleHostMem c_host_buf(sizeof(float) * f_matrix_space_size(m, n, ldc_ref, CLayout{}));
     SimpleHostMem scale_host_buf(sizeof(float) * f_matrix_space_size(n, 1, 1, ScaleLayout{}));
-  
+
+
+    // pointer for barrier flags
+    void* multigpu_barrier_flag_ptrs[MAX_WORLD_SIZE];
 
     // pointer communication via ipc
     void* init_a_buf_ptrs[MAX_WORLD_SIZE];
@@ -164,6 +171,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcGetMemHandle(&(handle[4]), init_scale_buf_ptrs[i]));
             init_scale_buf_ref_ptrs[i] = reinterpret_cast<void*>(scale_device_buf_ref.GetBuffer());
             check_cuda_error(hipIpcGetMemHandle(&(handle[5]), init_scale_buf_ref_ptrs[i]));
+            multigpu_barrier_flag_ptrs[i] = reinterpret_cast<void*>(multigpu_barrier_flags.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&(handle[6]), multigpu_barrier_flag_ptrs[i]));
         }
         MPI_Bcast(&(handle[0]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[1]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
@@ -171,6 +180,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         MPI_Bcast(&(handle[3]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[4]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[5]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        MPI_Bcast(&(handle[6]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         if (rank != i)
         {
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
@@ -179,6 +189,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_b_buf_ref_ptrs[i]), handle[3], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ptrs[i]), handle[4], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ref_ptrs[i]), handle[5], hipIpcMemLazyEnablePeerAccess));
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(multigpu_barrier_flag_ptrs[i]), handle[6], hipIpcMemLazyEnablePeerAccess));
         }
         
     }
@@ -351,7 +362,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
       ,
                                            barrier_flag,
-                                           local_compute_flags.GetBuffer()
+                                           local_compute_flags.GetBuffer(),
+                                           multigpu_barrier_flag_ptrs
                                            );
 
     // ar init
