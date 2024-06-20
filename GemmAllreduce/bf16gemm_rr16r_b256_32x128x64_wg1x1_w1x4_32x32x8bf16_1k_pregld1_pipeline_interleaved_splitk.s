@@ -128,26 +128,27 @@
 .set s_print, 32
 .set s_local_flag, 34
 .set s_world_barrier, 36
-.set s_local_out, 38
-.set s_peer_comm_buffer, 40
-.set s_bs_a, 42
-.set s_bs_b, 43
-.set s_m_blocks, 44
-.set s_m_idx, 45
-.set s_n_idx, 46
-.set s_offset_a, 48
-.set s_offset_b, 52
-.set s_kitr, 53
-.set s_wave_id, 54
-.set s_wave_im, 55
-.set s_wave_in, 56
-.set s_k_idx, 57
-.set s_offset_local_flag, 58
-.set s_flag, 59
-.set s_flag_checker, 60
-.set s_multigpu_barrier_flag, 61
-.set s_local_rank, 62  
-.set s_tmp, 64
+.set s_local_barrier, 38
+.set s_local_out, 40
+.set s_peer_comm_buffer, 42
+.set s_bs_a, 44
+.set s_bs_b, 45
+.set s_m_blocks, 46
+.set s_m_idx, 47
+.set s_n_idx, 48
+.set s_offset_a, 50
+.set s_offset_b, 54
+.set s_kitr, 55
+.set s_wave_id, 56
+.set s_wave_im, 57
+.set s_wave_in, 58
+.set s_k_idx, 59
+.set s_offset_local_flag, 60
+.set s_flag, 61
+.set s_flag_checker, 62
+.set s_multigpu_barrier_flag, 63
+.set s_local_rank, 64
+.set s_tmp, 80
 
 ;vgpr
 .set v_c, 0
@@ -242,6 +243,12 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     v_cvt_f32_i32 v[v_sub_magic_num + 1], -8388736
 
     s_waitcnt lgkmcnt(0)
+
+    ; load local barrier to do sync
+    s_lshl_b64 s[s_tmp : s_tmp + 1], s[s_local_rank:s_local_rank+1], 3
+    s_add_u32 s[s_tmp], s[s_world_barrier], s[s_tmp]
+    s_addc_u32 s[s_tmp + 1], s[s_world_barrier + 1], s[s_tmp + 1]
+    s_load_dwordx2 s[s_local_barrier : s_local_barrier + 1], s[s_tmp : s_tmp + 1], 0
 
     ; adjust lda/b/c according to the datatypes
     s_lshl_b32 s[s_lda], s[s_lda], 1
@@ -786,14 +793,25 @@ l_local_compute_signal:
     v_mov_b32 v[v_imm], 4
     v_cmpx_ge_u32 v[v_imm], v[v_tid]
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
+    v_lshlrev_b32 v[v_local_barrier_offset], 2, v[v_tid]
     global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] off
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
+    v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
     s_waitcnt vmcnt(0)
-    v_add_co_u32_e32 v[v_barrier_addr], 
-    
+    v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
+    v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1]
+    global_store_dword v[v_barrier_addr : v_barrier_addr + 1]，v[v_barrier_flag], off
+
+l_begin_barrier_check:
+    global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
+    s_waitcnt vmcnt(0) lgkmcnt(0)
+    v_cmp_le_u32 vcc, s[s_barrier_flag], v[v_barrier_flag_check]
+    s_andn2_b64 exec, exec, vcc
+    s_cbranch_execnz l_begin_barrier_check
     
 
+l_end_barrier_check:
     .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     s_mov_b64 exec -1
@@ -814,7 +832,7 @@ l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_i
     .amdhsa_system_sgpr_workgroup_id_z 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 116
-    .amdhsa_next_free_sgpr 72
+    .amdhsa_next_free_sgpr 88
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 116
@@ -828,7 +846,7 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk.kd
-    .sgpr_count: 72
+    .sgpr_count: 88
     .vgpr_count: 116
     .kernarg_segment_align: 8
     .kernarg_segment_size: 112
