@@ -70,7 +70,7 @@ public:
                       void* ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
                       void* ptr_peer_comm_buffers_ = nullptr,
-                      size_t& local_rank_ = (size_t)0)
+                      size_t local_rank_ = (size_t)0)
     {
         k_ptr = k_vec_.data();
         args.ptr_c = ptr_c_;
