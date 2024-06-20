@@ -821,6 +821,8 @@ l_begin_barrier_check:
 l_end_barrier_check:
     .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
+    v_mov_b32 v[v_imm], 0
+    global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_imm], off
     s_mov_b64 exec -1
     
 

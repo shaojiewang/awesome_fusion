@@ -18,6 +18,7 @@ struct __attribute__((packed)) kargs{
     unsigned int ldc;
     unsigned int k_per_cta;
     void*  ptr_workspace; // also use this one to be debug pointer
+    unsigned int multigpu_barrier_flag;
     void* ptr_local_compute_flags; // flag to indicate whether cta compute is ready
     void* ptr_world_barrier;
     void* ptr_local_out;
@@ -39,6 +40,7 @@ public:
         args.ldc = 4;
         args.k_per_cta = 4;
         args.ptr_workspace = nullptr;
+        args.multigpu_barrier_flag = 0;
         args.ptr_local_compute_flags = nullptr;
         args.ptr_world_barrier = nullptr;
         args.ptr_local_out = nullptr;
@@ -61,6 +63,7 @@ public:
                       uint32_t& k_per_cta_,
                       void* ptr_workspace_,
                       uint32_t& max_sk_blocks_,
+                      uint32_t& multigpu_barrier_flag_,
                       void* ptr_local_compute_flags_ = nullptr,
                       void* ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
@@ -79,6 +82,7 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
         args.ptr_world_barrier = ptr_world_barrier_;
         args.ptr_local_out = ptr_local_out_;
@@ -128,6 +132,7 @@ public:
                 uint32_t& ldc_,
                 uint32_t& k_per_cta_,
                 void* ptr_workspace_, 
+                uint32_t multigpu_barrier_flag_,
                 void* ptr_local_compute_flags_,
                 void* ptr_world_barrier_,
                 void* ptr_local_out_,
@@ -144,6 +149,7 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
         args.ptr_world_barrier = ptr_world_barrier_;
         args.ptr_local_out = ptr_local_out_;
@@ -185,6 +191,9 @@ public:
             // tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
         }
         // std::cout<<"safe here"<<std::endl;
+        
+        // update flag
+        // args.multigpu_barrier_flag++;
     }
 
     auto tune(hipStream_t c_stream,

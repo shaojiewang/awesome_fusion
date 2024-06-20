@@ -31,6 +31,8 @@ const int AR_NUM = 256 * 1024;
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
 
+#define BARRIER_FLAG 326
+
 using namespace awesome_fusion;
 
 using Row = awesome_fusion::gemm_layout::gemm::RowMajor;
@@ -326,6 +328,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     std::vector<kernel_tunable> k_list = get_kernel_list();
     std::string hsaco_path = "./build/";
     uint32_t max_sk_blocks = 1;
+    uint32_t barrier_flag = BARRIER_FLAG;
     bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
@@ -347,6 +350,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            max_sk_blocks
 #endif
       ,
+                                           barrier_flag,
                                            local_compute_flags.GetBuffer()
                                            );
 
