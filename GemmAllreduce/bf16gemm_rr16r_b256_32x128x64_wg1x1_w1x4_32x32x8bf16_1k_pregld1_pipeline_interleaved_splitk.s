@@ -148,6 +148,7 @@
 .set s_flag_checker, 62
 .set s_multigpu_barrier_flag, 63
 .set s_local_rank, 64
+.set s_barrier_flag, 66
 .set s_tmp, 80
 
 ;vgpr
@@ -202,6 +203,12 @@
 .set v_flag, 1
 .set v_flag_load, 2
 .set v_offset_flag, 3
+.set v_barrier_offset, 4
+.set v_local_barrier_offset, 5
+.set v_barrier_addr, 6
+.set v_local_rank, 8
+.set v_barrier_flag_check, 9
+.set v_barrier_flag, 10
 
 
 .text
@@ -794,14 +801,14 @@ l_local_compute_signal:
     v_cmpx_ge_u32 v[v_imm], v[v_tid]
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
     v_lshlrev_b32 v[v_local_barrier_offset], 2, v[v_tid]
-    global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] off
+    global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] offset:0
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
     s_waitcnt vmcnt(0)
     v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
-    v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1]
-    global_store_dword v[v_barrier_addr : v_barrier_addr + 1]，v[v_barrier_flag], off
+    v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
+    global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_flag], off
 
 l_begin_barrier_check:
     global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
