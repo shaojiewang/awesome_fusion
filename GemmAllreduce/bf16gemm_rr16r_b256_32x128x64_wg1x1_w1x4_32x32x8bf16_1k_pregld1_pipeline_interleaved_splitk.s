@@ -256,11 +256,13 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     s_lshl_b64 s[s_tmp : s_tmp + 1], s[s_local_rank:s_local_rank+1], 3
     s_add_u32 s[s_tmp], s[s_world_barrier], s[s_tmp]
     s_addc_u32 s[s_tmp + 1], s[s_world_barrier + 1], s[s_tmp + 1]
+    v_mov_b32 v[v_tmp], s[s_world_barrier]
+    .print v_tmp, s_print, s_bx, v_tid, v_tmp + 7
+    s_branch l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     s_load_dwordx2 s[s_local_barrier : s_local_barrier + 1], s[s_tmp : s_tmp + 1], 0
 
     s_waitcnt lgkmcnt(0)
 
-    s_branch l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     ; adjust lda/b/c according to the datatypes
     s_lshl_b32 s[s_lda], s[s_lda], 1
     s_lshl_b32 s[s_ldc], s[s_ldc], 1

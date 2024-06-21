@@ -368,6 +368,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            nullptr,
                                            (size_t)rank
                                            );
+    printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
 
     // ar init
     if(custom_ar == 1)
@@ -434,7 +435,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
 
 #ifdef ASM_PRINT
-    if (rank == 0)
+    if (rank == 1)
     {
         int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
         check_cuda_error(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
