@@ -107,7 +107,7 @@
 .set k_world_barrier, 80
 .set k_local_out, 144
 .set k_peer_comm_buffer, 152
-.set k_local_rank, 216
+.set k_local_rank, 160
 
 ;sgpr
 .set s_ka, 0
@@ -260,8 +260,6 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
 
     s_waitcnt lgkmcnt(0)
 
-    v_mov_b32 v[v_tmp], s[s_world_barrier]
-    .print v_tmp, s_print, s_bx, v_tid, v_tmp + 7
     s_branch l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     ; adjust lda/b/c according to the datatypes
     s_lshl_b32 s[s_lda], s[s_lda], 1
@@ -865,7 +863,7 @@ amdhsa.kernels:
     .sgpr_count: 88
     .vgpr_count: 116
     .kernarg_segment_align: 8
-    .kernarg_segment_size: 112
+    .kernarg_segment_size: 256 
     .group_segment_fixed_size: 40960
     .private_segment_fixed_size: 0
     .wavefront_size: 64
@@ -887,9 +885,9 @@ amdhsa.kernels:
       - { .name k_multigpu_barrier_flag, .size: 4, .offset: 68, .value_kind: by_value, .value_type: i32} 
       - { .name k_local_flag, .size: 8, .offset: 72, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_world_barrier, .size: 8, .offset: 80, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_out, .size: 8, .offset: 88, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_peer_comm_buffer, .size: 8, .offset: 96, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_rank, .size: 8, .offset: 104, .value_kind: by_value, .value_type: i64} 
+      - { .name k_local_out, .size: 8, .offset: 144, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer, .size: 8, .offset: 152, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_rank, .size: 8, .offset: 160, .value_kind: by_value, .value_type: i64} 
 
 ...
 .end_amdgpu_metadata
