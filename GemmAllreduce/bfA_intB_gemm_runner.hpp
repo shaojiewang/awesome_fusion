@@ -5,6 +5,8 @@
 
 #include "kernel_list.hpp"
 
+#define MAX_BARRIER 8
+
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
     void*  ptr_a;
@@ -20,7 +22,7 @@ struct __attribute__((packed)) kargs{
     void*  ptr_workspace; // also use this one to be debug pointer
     unsigned int multigpu_barrier_flag;
     void* ptr_local_compute_flags; // flag to indicate whether cta compute is ready
-    void* ptr_world_barrier;
+    void* ptr_world_barrier[MAX_BARRIER];
     void* ptr_local_out;
     void* ptr_peer_comm_buffers;
     size_t local_rank;
@@ -43,7 +45,7 @@ public:
         args.ptr_workspace = nullptr;
         args.multigpu_barrier_flag = 0;
         args.ptr_local_compute_flags = nullptr;
-        args.ptr_world_barrier = nullptr;
+        // args.ptr_world_barrier = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
         args.ptr_local_out = nullptr;
         args.ptr_peer_comm_buffers = nullptr;
         args.local_rank = 0;
@@ -67,7 +69,7 @@ public:
                       uint32_t& max_sk_blocks_,
                       uint32_t& multigpu_barrier_flag_,
                       void* ptr_local_compute_flags_ = nullptr,
-                      void* ptr_world_barrier_ = nullptr,
+                      void** ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
                       void* ptr_peer_comm_buffers_ = nullptr,
                       size_t local_rank_ = (size_t)0)
@@ -87,7 +89,10 @@ public:
         args.ptr_workspace = ptr_workspace_;
         args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        args.ptr_world_barrier = ptr_world_barrier_;
+        for (int i = 0; i < MAX_BARRIER; i++)
+        {
+            args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+        }
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
         args.local_rank = local_rank_;
@@ -138,7 +143,7 @@ public:
                 void* ptr_workspace_, 
                 uint32_t multigpu_barrier_flag_,
                 void* ptr_local_compute_flags_,
-                void* ptr_world_barrier_,
+                void** ptr_world_barrier_,
                 void* ptr_local_out_,
                 void* ptr_peer_comm_buffers_,
                 size_t local_rank_) {
@@ -156,7 +161,10 @@ public:
         args.ptr_workspace = ptr_workspace_;
         args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        args.ptr_world_barrier = ptr_world_barrier_;
+        for (int i = 0; i < MAX_BARRIER; i++)
+        {
+            args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+        }
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
         args.local_rank = local_rank_;
