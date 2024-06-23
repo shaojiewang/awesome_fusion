@@ -260,7 +260,6 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
 
     s_waitcnt lgkmcnt(0)
 
-    s_branch l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     ; adjust lda/b/c according to the datatypes
     s_lshl_b32 s[s_lda], s[s_lda], 1
     s_lshl_b32 s[s_ldc], s[s_ldc], 1
@@ -783,7 +782,6 @@ label_write_out_c:
 
     s_mov_b64 exec, -1
 
-    s_branch l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
 l_local_compute_signal:
     ; find proper flag
     v_mov_b32 v[v_imm], 1
@@ -803,10 +801,10 @@ l_local_compute_signal:
     ; begin multicard barrier
     s_mov_b64 exec -1
     v_mov_b32 v[v_imm], 4
-    v_cmpx_ge_u32 v[v_imm], v[v_tid]
+    v_cmpx_gt_u32 v[v_imm], v[v_tid]
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
     v_lshlrev_b32 v[v_local_barrier_offset], 2, v[v_tid]
-    global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_world_barrier : s_world_barrier + 1] offset:0
+    global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_ka : s_ka + 1] offset:0+k_world_barrier 
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
