@@ -811,7 +811,9 @@ l_local_compute_signal:
     s_waitcnt vmcnt(0)
     v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
     v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
+    .print v_barrier_addr, s_print, s_bx, v_tid, v_tmp + 7
     global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_flag], off
+
 
 l_begin_barrier_check:
     global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc

@@ -369,7 +369,12 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            (size_t)rank
                                            );
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
-
+    printf("rank: %d, multigpu_barrier_flag=[%p, %p, %p, %p]\n",
+        rank, 
+        bfa_intb_gemm_runner.args.ptr_world_barrier[0], 
+        bfa_intb_gemm_runner.args.ptr_world_barrier[1],
+        bfa_intb_gemm_runner.args.ptr_world_barrier[2],
+        bfa_intb_gemm_runner.args.ptr_world_barrier[3]);
     // ar init
     if(custom_ar == 1)
     {
