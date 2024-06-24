@@ -5,6 +5,8 @@
 
 #include "kernel_list.hpp"
 
+#define MAX_BARRIER 8
+
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
     void*  ptr_a;
@@ -18,10 +20,12 @@ struct __attribute__((packed)) kargs{
     unsigned int ldc;
     unsigned int k_per_cta;
     void*  ptr_workspace; // also use this one to be debug pointer
+    unsigned int multigpu_barrier_flag;
     void* ptr_local_compute_flags; // flag to indicate whether cta compute is ready
-    void* ptr_world_barrier;
+    void* ptr_world_barrier[MAX_BARRIER];
     void* ptr_local_out;
     void* ptr_peer_comm_buffers;
+    size_t local_rank;
 };
 
 class bfAintBGemmRunner {
@@ -39,10 +43,12 @@ public:
         args.ldc = 4;
         args.k_per_cta = 4;
         args.ptr_workspace = nullptr;
+        args.multigpu_barrier_flag = 0;
         args.ptr_local_compute_flags = nullptr;
-        args.ptr_world_barrier = nullptr;
+        // args.ptr_world_barrier = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
         args.ptr_local_out = nullptr;
         args.ptr_peer_comm_buffers = nullptr;
+        args.local_rank = 0;
         max_sk_blocks = 4;
     }
 
@@ -61,10 +67,12 @@ public:
                       uint32_t& k_per_cta_,
                       void* ptr_workspace_,
                       uint32_t& max_sk_blocks_,
+                      uint32_t& multigpu_barrier_flag_,
                       void* ptr_local_compute_flags_ = nullptr,
-                      void* ptr_world_barrier_ = nullptr,
+                      void** ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
-                      void* ptr_peer_comm_buffers_ = nullptr)
+                      void* ptr_peer_comm_buffers_ = nullptr,
+                      size_t local_rank_ = (size_t)0)
     {
         k_ptr = k_vec_.data();
         args.ptr_c = ptr_c_;
@@ -79,10 +87,15 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        args.ptr_world_barrier = ptr_world_barrier_;
+        for (int i = 0; i < MAX_BARRIER; i++)
+        {
+            args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+        }
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
+        args.local_rank = local_rank_;
 
         check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
 
@@ -128,10 +141,12 @@ public:
                 uint32_t& ldc_,
                 uint32_t& k_per_cta_,
                 void* ptr_workspace_, 
+                uint32_t multigpu_barrier_flag_,
                 void* ptr_local_compute_flags_,
-                void* ptr_world_barrier_,
+                void** ptr_world_barrier_,
                 void* ptr_local_out_,
-                void* ptr_peer_comm_buffers_) {
+                void* ptr_peer_comm_buffers_,
+                size_t local_rank_) {
         args.ptr_c = ptr_c_;
         args.ptr_a = ptr_a_;
         args.ptr_b = ptr_b_;
@@ -144,10 +159,15 @@ public:
         args.ldc = ldc_;
         args.k_per_cta = k_per_cta_;
         args.ptr_workspace = ptr_workspace_;
+        args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        args.ptr_world_barrier = ptr_world_barrier_;
+        for (int i = 0; i < MAX_BARRIER; i++)
+        {
+            args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+        }
         args.ptr_local_out = ptr_local_out_;
         args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
+        args.local_rank = local_rank_;
     }
  
     void run(const kernel_tunable& ker,
@@ -185,6 +205,9 @@ public:
             // tensor_reduce(ptr_workspace, c_ptr, sk_blocks, args.m * args.n, c_stream);
         }
         // std::cout<<"safe here"<<std::endl;
+        
+        // update flag
+        // args.multigpu_barrier_flag++;
     }
 
     auto tune(hipStream_t c_stream,

@@ -102,10 +102,12 @@
 .set k_ldc, 52
 .set k_k_per_cta, 56
 .set k_print, 60
-.set k_local_flag, 68
-.set k_world_barrier, 76
-.set k_local_out, 84
-.set k_peer_comm_buffer, 92
+.set k_multigpu_barrier_flag, 68
+.set k_local_flag, 72
+.set k_world_barrier, 80
+.set k_local_out, 144
+.set k_peer_comm_buffer, 152
+.set k_local_rank, 160
 
 ;sgpr
 .set s_ka, 0
@@ -126,24 +128,28 @@
 .set s_print, 32
 .set s_local_flag, 34
 .set s_world_barrier, 36
-.set s_local_out, 38
-.set s_peer_comm_buffer, 40
-.set s_bs_a, 42
-.set s_bs_b, 43
-.set s_m_blocks, 44
-.set s_m_idx, 45
-.set s_n_idx, 46
-.set s_offset_a, 48
-.set s_offset_b, 52
-.set s_kitr, 53
-.set s_wave_id, 54
-.set s_wave_im, 55
-.set s_wave_in, 56
-.set s_k_idx, 57
-.set s_offset_local_flag, 58
-.set s_flag, 59
-.set s_flag_checker, 60  
-.set s_tmp, 64
+.set s_local_barrier, 38
+.set s_local_out, 40
+.set s_peer_comm_buffer, 42
+.set s_bs_a, 44
+.set s_bs_b, 45
+.set s_m_blocks, 46
+.set s_m_idx, 47
+.set s_n_idx, 48
+.set s_offset_a, 50
+.set s_offset_b, 54
+.set s_kitr, 55
+.set s_wave_id, 56
+.set s_wave_im, 57
+.set s_wave_in, 58
+.set s_k_idx, 59
+.set s_offset_local_flag, 60
+.set s_flag, 61
+.set s_flag_checker, 62
+.set s_multigpu_barrier_flag, 63
+.set s_local_rank, 64
+.set s_barrier_flag, 66
+.set s_tmp, 80
 
 ;vgpr
 .set v_c, 0
@@ -193,10 +199,16 @@
 .set v_wave_id, 107
 .set v_tmp, 108
 ; local flag (can reuse the a/b/c vgprs)
-.set v_one, 0
+.set v_imm, 0
 .set v_flag, 1
 .set v_flag_load, 2
 .set v_offset_flag, 3
+.set v_barrier_offset, 4
+.set v_local_barrier_offset, 5
+.set v_barrier_addr, 6
+.set v_local_rank, 8
+.set v_barrier_flag_check, 9
+.set v_barrier_flag, 10
 
 
 .text
@@ -211,10 +223,12 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     s_load_dwordx2 s[s_ptr_b:s_ptr_b+1], s[s_ka:s_ka+1], 0+k_ptr_b
     s_load_dwordx2 s[s_ptr_scale:s_ptr_scale+1], s[s_ka:s_ka+1], 0+k_ptr_scale
     s_load_dwordx2 s[s_print:s_print+1], s[s_ka:s_ka+1], 0+k_print
+    s_load_dword s[s_multigpu_barrier_flag], s[s_ka:s_ka+1], 0+k_multigpu_barrier_flag
     s_load_dwordx2 s[s_local_flag:s_local_flag+1], s[s_ka:s_ka+1], 0+k_local_flag
-    s_load_dwordx2 s[s_world_barrier:s_world_barrier+1], s[s_ka:s_ka+1], 0+k_world_barrier
+    ; s_load_dwordx2 s[s_world_barrier:s_world_barrier+1], s[s_ka:s_ka+1], 0+k_world_barrier
     s_load_dwordx2 s[s_local_out:s_local_out+1], s[s_ka:s_ka+1], 0+k_local_out
     s_load_dwordx2 s[s_peer_comm_buffer:s_peer_comm_buffer+1], s[s_ka:s_ka+1], 0+k_peer_comm_buffer
+    s_load_dwordx2 s[s_local_rank:s_local_rank+1], s[s_ka:s_ka+1], 0+k_local_rank
 
     s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
     s_load_dwordx2 s[s_ldb:s_ldb+1], s[s_ka:s_ka+1], 0+k_ldb
@@ -234,6 +248,15 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
 
     v_cvt_f32_i32 v[v_sub_magic_num + 0], -8388736
     v_cvt_f32_i32 v[v_sub_magic_num + 1], -8388736
+
+    s_waitcnt lgkmcnt(0)
+
+
+    ; load local barrier to do sync
+    s_lshl_b64 s[s_tmp : s_tmp + 1], s[s_local_rank:s_local_rank+1], 3
+    s_add_u32 s[s_tmp], s[s_ka], s[s_tmp]
+    s_addc_u32 s[s_tmp + 1], s[s_ka + 1], s[s_tmp + 1]
+    s_load_dwordx2 s[s_local_barrier : s_local_barrier + 1], s[s_tmp : s_tmp + 1], 0+k_world_barrier
 
     s_waitcnt lgkmcnt(0)
 
@@ -761,12 +784,12 @@ label_write_out_c:
 
 l_local_compute_signal:
     ; find proper flag
-    v_mov_b32 v[v_one], 1
+    v_mov_b32 v[v_imm], 1
     s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
-    v_cmpx_gt_u32 v[v_one], v[v_tid]
     v_mov_b32 v[v_offset_flag], 0
-    global_atomic_add v[v_flag], v[v_offset_flag], v[v_one], s[s_local_flag : s_local_flag + 1] glc
+    v_cmpx_gt_u32 v[v_imm], v[v_tid]
+    global_atomic_add v[v_flag], v[v_offset_flag], v[v_imm], s[s_local_flag : s_local_flag + 1] glc
     s_add_u32 s[s_flag_checker], s[s_m], 31
     s_lshr_b32 s[s_flag_checker], s[s_flag_checker], 5
     s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
@@ -776,10 +799,36 @@ l_local_compute_signal:
     s_cbranch_scc0 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
 
     ; begin multicard barrier
-
-    .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
-    global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     s_mov_b64 exec -1
+    v_mov_b32 v[v_imm], 4
+    v_cmpx_gt_u32 v[v_imm], v[v_tid]
+    v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
+    v_lshlrev_b32 v[v_local_barrier_offset], 2, v[v_tid]
+    global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_ka : s_ka + 1] offset:0+k_world_barrier 
+    s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
+    v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
+    v_mov_b32 v[v_barrier_flag], s[s_multigpu_barrier_flag]
+    s_waitcnt vmcnt(0)
+    v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
+    v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
+    global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_flag], off
+
+l_begin_barrier_check:
+    global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
+    s_waitcnt vmcnt(0) lgkmcnt(0)
+    ; .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
+    v_cmp_le_u32 vcc, s[s_multigpu_barrier_flag], v[v_barrier_flag_check]
+    s_andn2_b64 exec, exec, vcc
+    s_cbranch_execnz l_begin_barrier_check
+    
+    s_mov_b64 exec -1
+
+l_end_barrier_check:
+    v_mov_b32 v[v_imm], 4
+    v_cmpx_gt_u32 v[v_imm], v[v_tid]
+    v_mov_b32 v[v_imm], 0
+    global_store_dword v[v_imm], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
+    global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     
 
 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
@@ -797,7 +846,7 @@ l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_i
     .amdhsa_system_sgpr_workgroup_id_z 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 116
-    .amdhsa_next_free_sgpr 72
+    .amdhsa_next_free_sgpr 88
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 116
@@ -811,10 +860,10 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk.kd
-    .sgpr_count: 72
+    .sgpr_count: 88
     .vgpr_count: 116
     .kernarg_segment_align: 8
-    .kernarg_segment_size: 100
+    .kernarg_segment_size: 256 
     .group_segment_fixed_size: 40960
     .private_segment_fixed_size: 0
     .wavefront_size: 64
@@ -833,10 +882,19 @@ amdhsa.kernels:
       - { .name k_ldc, .size: 4, .offset: 52, .value_kind: by_value, .value_type: i32} 
       - { .name k_k_per_cta, .size: 4, .offset: 56, .value_kind: by_value, .value_type: i32} 
       - { .name k_print, .size: 8, .offset: 60, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_flag, .size: 8, .offset: 68, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_world_barrier, .size: 8, .offset: 76, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_out, .size: 8, .offset: 84, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_peer_comm_buffer, .size: 8, .offset: 92, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_multigpu_barrier_flag, .size: 4, .offset: 68, .value_kind: by_value, .value_type: i32} 
+      - { .name k_local_flag, .size: 8, .offset: 72, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier, .size: 8, .offset: 80, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier1, .size: 8, .offset: 88, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier2, .size: 8, .offset: 96, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier3, .size: 8, .offset: 104, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier4, .size: 8, .offset: 112, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier5, .size: 8, .offset: 120, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier6, .size: 8, .offset: 128, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier7, .size: 8, .offset: 136, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_out, .size: 8, .offset: 144, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer, .size: 8, .offset: 152, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_rank, .size: 8, .offset: 160, .value_kind: by_value, .value_type: i64} 
 
 ...
 .end_amdgpu_metadata
