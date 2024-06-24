@@ -809,11 +809,9 @@ l_local_compute_signal:
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
     s_waitcnt vmcnt(0)
-    .print v_barrier_addr, s_print, s_bx, v_tid, v_tmp + 7
     v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
     v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
     global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_flag], off
-
 
 l_begin_barrier_check:
     global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
@@ -821,7 +819,6 @@ l_begin_barrier_check:
     v_cmp_le_u32 vcc, s[s_barrier_flag], v[v_barrier_flag_check]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_begin_barrier_check
-    
 
 l_end_barrier_check:
     .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
@@ -885,6 +882,13 @@ amdhsa.kernels:
       - { .name k_multigpu_barrier_flag, .size: 4, .offset: 68, .value_kind: by_value, .value_type: i32} 
       - { .name k_local_flag, .size: 8, .offset: 72, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_world_barrier, .size: 8, .offset: 80, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier1, .size: 8, .offset: 88, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier2, .size: 8, .offset: 96, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier3, .size: 8, .offset: 104, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier4, .size: 8, .offset: 112, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier5, .size: 8, .offset: 120, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier6, .size: 8, .offset: 128, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_world_barrier7, .size: 8, .offset: 136, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_local_out, .size: 8, .offset: 144, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_peer_comm_buffer, .size: 8, .offset: 152, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_local_rank, .size: 8, .offset: 160, .value_kind: by_value, .value_type: i64} 

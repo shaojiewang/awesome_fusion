@@ -432,11 +432,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     check_cuda_error(hipEventDestroy(evt_00));
     check_cuda_error(hipEventDestroy(evt_11));
 
-    // check bf16 gemm res
 #if PRINT_BUFFER
+    // check bf16 gemm res
     printf("rank %d, res=%f\n", 
         rank, 
         type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[29]));
+    // check local flags
+    printf("rank %d, local flags = %d\n", rank, rank);
 #endif
 
 #ifdef ASM_PRINT
