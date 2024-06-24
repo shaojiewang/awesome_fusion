@@ -807,7 +807,7 @@ l_local_compute_signal:
     global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_ka : s_ka + 1] offset:0+k_world_barrier 
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
-    v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
+    v_mov_b32 v[v_barrier_flag], s[s_multigpu_barrier_flag]
     s_waitcnt vmcnt(0)
     v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
     v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
@@ -816,16 +816,19 @@ l_local_compute_signal:
 l_begin_barrier_check:
     global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
     s_waitcnt vmcnt(0) lgkmcnt(0)
-    v_cmp_le_u32 vcc, s[s_barrier_flag], v[v_barrier_flag_check]
+    ; .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
+    v_cmp_le_u32 vcc, s[s_multigpu_barrier_flag], v[v_barrier_flag_check]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_begin_barrier_check
+    
+    s_mov_b64 exec -1
 
 l_end_barrier_check:
-    .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
-    global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
+    v_mov_b32 v[v_imm], 4
+    v_cmpx_gt_u32 v[v_imm], v[v_tid]
     v_mov_b32 v[v_imm], 0
-    global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_imm], off
-    s_mov_b64 exec -1
+    global_store_dword v[v_imm], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
+    global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     
 
 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
