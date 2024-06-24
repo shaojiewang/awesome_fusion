@@ -437,8 +437,16 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("rank %d, res=%f\n", 
         rank, 
         type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[29]));
+    MPI_Barrier(MPI_COMM_WORLD);
     // check local flags
-    printf("rank %d, local flags = %d\n", rank, rank);
+    printf("rank %d, local flags=0x%x\n", 
+        rank, 
+        ((int*)(bfa_intb_gemm_runner.args.ptr_local_compute_flags))[0]);
+    MPI_Barrier(MPI_COMM_WORLD);
+    // check global barrier
+    printf("rank %d, global barrier=0x%x\n",
+        rank,
+        ((int*)(bfa_intb_gemm_runner.args.ptr_world_barrier[0]))[0]);
 #endif
 
 #ifdef ASM_PRINT
