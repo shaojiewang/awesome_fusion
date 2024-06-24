@@ -809,9 +809,9 @@ l_local_compute_signal:
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     v_mov_b32 v[v_barrier_flag], s[s_barrier_flag]
     s_waitcnt vmcnt(0)
+    .print v_barrier_addr, s_print, s_bx, v_tid, v_tmp + 7
     v_add_co_u32_e32 v[v_barrier_addr], vcc, s[s_local_rank], v[v_barrier_addr]
     v_addc_co_u32_e32 v[v_barrier_addr + 1], vcc, v[v_local_rank], v[v_barrier_addr + 1], vcc
-    .print v_barrier_addr, s_print, s_bx, v_tid, v_tmp + 7
     global_store_dword v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_flag], off
 
 
