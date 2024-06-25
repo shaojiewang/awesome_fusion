@@ -826,6 +826,13 @@ l_begin_barrier_check:
    
     ; do multi card all reduce 
     s_mov_b64 exec -1
+    s_mov_b32 s[s_im], 0
+    s_lshl_b32 s[s_block_offset], s[s_bx], 8 ; s_bx / 4 * 4 * 128 * sizeof(bf16)
+    v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
+    v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
+    s_lshl_b32 s[loop_step], s[s_n], 2
+    
+    
 
 l_end_barrier_check:
     v_mov_b32 v[v_imm], 4
