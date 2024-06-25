@@ -107,7 +107,7 @@
 .set k_world_barrier, 80
 .set k_local_out, 144
 .set k_peer_comm_buffer, 152
-.set k_local_rank, 160
+.set k_local_rank, 216
 
 ;sgpr
 .set s_ka, 0
@@ -147,9 +147,10 @@
 .set s_flag, 61
 .set s_flag_checker, 62
 .set s_multigpu_barrier_flag, 63
-.set s_local_rank, 64
-.set s_barrier_flag, 66
-.set s_tmp, 80
+.set s_peer_comm_buff_ptr, 64
+.set s_local_rank, 80 
+.set s_barrier_flag, 82
+.set s_tmp, 88
 
 ;vgpr
 .set v_c, 0
@@ -227,9 +228,11 @@ bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interle
     s_load_dwordx2 s[s_local_flag:s_local_flag+1], s[s_ka:s_ka+1], 0+k_local_flag
     ; s_load_dwordx2 s[s_world_barrier:s_world_barrier+1], s[s_ka:s_ka+1], 0+k_world_barrier
     s_load_dwordx2 s[s_local_out:s_local_out+1], s[s_ka:s_ka+1], 0+k_local_out
-    s_load_dwordx2 s[s_peer_comm_buffer:s_peer_comm_buffer+1], s[s_ka:s_ka+1], 0+k_peer_comm_buffer
-    s_load_dwordx2 s[s_local_rank:s_local_rank+1], s[s_ka:s_ka+1], 0+k_local_rank
 
+    s_load_dwordx8 s[s_peer_comm_buff_ptr:s_peer_comm_buff_ptr+7], s[s_ka:s_ka+1], 0+k_peer_comm_buffer
+    s_load_dwordx8 s[s_peer_comm_buff_ptr+8:s_peer_comm_buff_ptr+15], s[s_ka:s_ka+1], 0+k_peer_comm_buffer+32
+
+    s_load_dwordx2 s[s_local_rank:s_local_rank+1], s[s_ka:s_ka+1], 0+k_local_rank
     s_load_dwordx4 s[s_m:s_m+3], s[s_ka:s_ka+1], 0+k_m
     s_load_dwordx2 s[s_ldb:s_ldb+1], s[s_ka:s_ka+1], 0+k_ldb
     s_load_dword s[s_k_per_cta], s[s_ka:s_ka+1], 0+k_k_per_cta
@@ -846,7 +849,7 @@ l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_i
     .amdhsa_system_sgpr_workgroup_id_z 1
     .amdhsa_system_vgpr_workitem_id 0
     .amdhsa_next_free_vgpr 116
-    .amdhsa_next_free_sgpr 88
+    .amdhsa_next_free_sgpr 96
     .amdhsa_ieee_mode 0
     .amdhsa_dx10_clamp 0
     .amdhsa_accum_offset 116
@@ -860,7 +863,7 @@ amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
   - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
     .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk.kd
-    .sgpr_count: 88
+    .sgpr_count: 96
     .vgpr_count: 116
     .kernarg_segment_align: 8
     .kernarg_segment_size: 256 
@@ -894,7 +897,14 @@ amdhsa.kernels:
       - { .name k_world_barrier7, .size: 8, .offset: 136, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_local_out, .size: 8, .offset: 144, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
       - { .name k_peer_comm_buffer, .size: 8, .offset: 152, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
-      - { .name k_local_rank, .size: 8, .offset: 160, .value_kind: by_value, .value_type: i64} 
+      - { .name k_peer_comm_buffer1, .size: 8, .offset: 160, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer2, .size: 8, .offset: 168, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer3, .size: 8, .offset: 176, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer4, .size: 8, .offset: 184, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer5, .size: 8, .offset: 192, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer6, .size: 8, .offset: 200, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_peer_comm_buffer7, .size: 8, .offset: 208, .value_kind: global_buffer, .value_type: f32, .address_space: global, .is_const: false} 
+      - { .name k_local_rank, .size: 8, .offset: 216, .value_kind: by_value, .value_type: i64} 
 
 ...
 .end_amdgpu_metadata

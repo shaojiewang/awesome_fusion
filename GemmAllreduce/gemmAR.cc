@@ -173,6 +173,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcGetMemHandle(&(handle[5]), init_scale_buf_ref_ptrs[i]));
             multigpu_barrier_flag_ptrs[i] = reinterpret_cast<void*>(multigpu_barrier_flags.GetBuffer());
             check_cuda_error(hipIpcGetMemHandle(&(handle[6]), multigpu_barrier_flag_ptrs[i]));
+            out_c_buf_ptrs[i] = reinterpret_cast<void*>(c_device_buf.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&(handle[7]), out_c_buf_ptrs[i]));
         }
         MPI_Bcast(&(handle[0]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[1]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
@@ -181,6 +183,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         MPI_Bcast(&(handle[4]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[5]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[6]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        MPI_Bcast(&(handle[7]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         if (rank != i)
         {
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
@@ -190,6 +193,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ptrs[i]), handle[4], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ref_ptrs[i]), handle[5], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(multigpu_barrier_flag_ptrs[i]), handle[6], hipIpcMemLazyEnablePeerAccess));
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(out_c_buf_ptrs[i]), handle[7], hipIpcMemLazyEnablePeerAccess));
         }
         
     }
@@ -368,8 +372,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            barrier_flag,
                                            local_compute_flags.GetBuffer(),
                                            multigpu_barrier_flag_ptrs,
-                                           nullptr,
-                                           nullptr,
+                                           c_device_buf_out.GetBuffer(),
+                                           out_c_buf_ptrs,
                                            (size_t)rank
                                            );
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
