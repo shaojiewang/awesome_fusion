@@ -823,7 +823,8 @@ l_begin_barrier_check:
     v_cmp_le_u32 vcc, s[s_multigpu_barrier_flag], v[v_barrier_flag_check]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_begin_barrier_check
-    
+   
+    ; do multi card all reduce 
     s_mov_b64 exec -1
 
 l_end_barrier_check:

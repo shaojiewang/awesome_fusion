@@ -259,6 +259,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 3 * sizeof(BDataType) * n * k_per_card));
         printf("scale buf ref is [0x%x]\n", 
             *(int*)(init_scale_buf_ref_ptrs[0]));
+        printf("out c ptrs is [%p, %p, %p, %p]\n",
+            out_c_buf_ptrs[0], out_c_buf_ptrs[1], out_c_buf_ptrs[2], out_c_buf_ptrs[3]);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     for (int i = 0; i < world_size; i++)
@@ -376,6 +378,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            out_c_buf_ptrs,
                                            (size_t)rank
                                            );
+
+#if PRINT_BUFFER
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
     printf("rank: %d, multigpu_barrier_flag=[%p, %p, %p, %p]\n",
         rank, 
@@ -383,6 +387,14 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         bfa_intb_gemm_runner.args.ptr_world_barrier[1],
         bfa_intb_gemm_runner.args.ptr_world_barrier[2],
         bfa_intb_gemm_runner.args.ptr_world_barrier[3]);
+    printf("rank: %d, peer_comm_ptrs=[%p, %p, %p, %p]\n",
+        rank,
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[0],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[1],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[2],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[3]);
+#endif    
+    
     // ar init
     if(custom_ar == 1)
     {
