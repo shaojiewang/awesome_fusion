@@ -826,12 +826,31 @@ l_begin_barrier_check:
    
     ; do multi card all reduce 
     s_mov_b64 exec -1
-    s_mov_b32 s[s_im], 0
+    s_sub_i32 s[s_im], s[m], 1
     s_lshl_b32 s[s_block_offset], s[s_bx], 8 ; s_bx / 4 * 4 * 128 * sizeof(bf16)
     v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
+
+l_loop_multigpu_reduce_begin:
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
-    s_lshl_b32 s[loop_step], s[s_n], 2
     
+    global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] off
+    global_load_dword v[v_peer + 1], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] off
+    global_load_dword v[v_peer + 2], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] off
+    global_load_dword v[v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] off
+
+    s_lshl_b32 s[s_loop_step], s[s_n], 1
+    v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[loop_step]
+    
+    s_waitcnt vmcnt(2)
+    
+    s_waitcnt vmcnt(1)
+
+    s_waitcnt vmcnt(0)
+
+    s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
+    v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
+    s_andn2_b64 exec, exec, vcc
+    s_cbranch_execnz l_loop_multigpu_reduce_begin
     
 
 l_end_barrier_check:
