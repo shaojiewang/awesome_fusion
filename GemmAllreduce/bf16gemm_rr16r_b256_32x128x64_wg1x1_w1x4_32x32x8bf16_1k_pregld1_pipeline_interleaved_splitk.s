@@ -2,8 +2,8 @@
 .macro .print v_val, s_out, s_bx, v_tid, v_offset
     ;s_mov_b64 exec, -1
     s_nop 64
-    s_cmp_lt_u32 s[\s_bx], 8
-    ;s_cbranch_scc0 L_endhere
+    s_cmp_eq_u32 s[\s_bx], 0
+    s_cbranch_scc0 L_endhere
     ;v_cmpx_eq_u32 0, v0
     v_lshlrev_b32 v[\v_offset], 3, v[\v_tid]
     s_waitcnt lgkmcnt(0)
@@ -791,6 +791,7 @@ label_write_out_c:
 
 l_local_compute_signal:
     ; find proper flag
+    v_mov_b32 v[v_flag], 0
     v_mov_b32 v[v_imm], 1
     s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
@@ -800,13 +801,19 @@ l_local_compute_signal:
     s_add_u32 s[s_flag_checker], s[s_m], 31
     s_lshr_b32 s[s_flag_checker], s[s_flag_checker], 5
     s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
+    s_sub_u32 s[s_flag_checker], s[s_flag_checker], 1
     s_waitcnt vmcnt(0)
-    v_readfirstlane_b32 s[s_flag], v[v_flag]
-    s_cmp_eq_u32 s[s_flag], s[s_flag_checker]
-    s_cbranch_scc0 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+    v_cmpx_eq_u32 vcc, v[v_flag], s[s_flag_checker]
+    s_cbranch_execz l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+
+    ; system fence
+    ; buffer_wbl2
+    ; s_waitcnt vmcnt(0) lgkmcnt(0)
+    ; buffer_invl2
+    ; buffer_wbinvl1_vol
 
     ; begin multicard barrier
-    s_mov_b64 exec -1
+    s_mov_b64 exec, -1
     v_mov_b32 v[v_imm], 4
     v_cmpx_gt_u32 v[v_imm], v[v_tid]
     v_lshlrev_b32 v[v_barrier_offset], 3, v[v_tid]
@@ -823,7 +830,6 @@ l_local_compute_signal:
 l_begin_barrier_check:
     global_load_dword v[v_barrier_flag_check], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
     s_waitcnt vmcnt(0) lgkmcnt(0)
-    ; .print v_flag, s_print, s_bx, v_tid, v_tmp + 7
     v_cmp_le_u32 vcc, s[s_multigpu_barrier_flag], v[v_barrier_flag_check]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_begin_barrier_check
@@ -835,6 +841,7 @@ l_begin_barrier_check:
     v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
 
 l_loop_multigpu_reduce_begin:
+    
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
     
     global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
@@ -850,7 +857,7 @@ l_loop_multigpu_reduce_begin:
     s_waitcnt vmcnt(1)
 
     s_waitcnt vmcnt(0)
-
+    
     .print v_peer, s_print, s_bx, v_tid, v_tmp + 7
 
     s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
