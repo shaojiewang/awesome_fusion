@@ -2,7 +2,7 @@
 .macro .print v_val, s_out, s_bx, v_tid, v_offset
     ;s_mov_b64 exec, -1
     s_nop 64
-    s_cmp_eq_u32 s[\s_bx], 0
+    s_cmp_lt_u32 s[\s_bx], 8
     ;s_cbranch_scc0 L_endhere
     ;v_cmpx_eq_u32 0, v0
     v_lshlrev_b32 v[\v_offset], 3, v[\v_tid]
@@ -12,7 +12,7 @@
     global_store_dword v[\v_offset], v[\v_val], s[\s_out:\s_out+1], offset:0x0004
     s_waitcnt vmcnt(0)
     ;s_mov_b64 exec, -1
-;L_endhere:
+L_endhere:
     s_endpgm  
 .endm
 
@@ -794,7 +794,7 @@ l_local_compute_signal:
     v_mov_b32 v[v_imm], 1
     s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
-    v_mov_b32 v[v_offset_flag], 0
+    v_mov_b32 v[v_offset_flag], s[s_offset_local_flag]
     v_cmpx_gt_u32 v[v_imm], v[v_tid]
     global_atomic_add v[v_flag], v[v_offset_flag], v[v_imm], s[s_local_flag : s_local_flag + 1] glc
     s_add_u32 s[s_flag_checker], s[s_m], 31
@@ -828,7 +828,8 @@ l_begin_barrier_check:
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_begin_barrier_check
    
-    ; do multi card all reduce 
+    ; do multi card all reduce
+    s_barrier 
     s_mov_b64 exec -1
     s_lshl_b32 s[s_block_offset], s[s_bx], 8 ; s_bx / 4 * 4 * 128 * sizeof(bf16)
     v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
@@ -836,7 +837,7 @@ l_begin_barrier_check:
 l_loop_multigpu_reduce_begin:
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
     
-    global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] offset: 0
+    global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
     global_load_dword v[v_peer + 1], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] offset: 0
     global_load_dword v[v_peer + 2], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
     global_load_dword v[v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0

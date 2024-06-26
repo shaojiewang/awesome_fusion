@@ -95,7 +95,7 @@ __global__ void cuda_random_uniform_kernel(T* buffer, const size_t size, const i
         buffer[index] = (T)(hiprand_uniform(&local_state) * 0.2f - 0.1f);
 #else
         buffer[index] = (T)(round(hiprand_uniform(&local_state) * 2) - 1);
-        // buffer[index] = 1;
+        buffer[index] = 1;
 #endif
     }
 }
@@ -111,7 +111,7 @@ __global__ void cuda_random_uniform_kernel<__nv_bfloat16>(__nv_bfloat16* buffer,
         buffer[index] = __float2bfloat16(hiprand_uniform(&local_state) * 0.2f - 0.1f);
 #else
         buffer[index] = __float2bfloat16(round(hiprand_uniform(&local_state) * 2) - 1);
-        // buffer[index] = __float2bfloat16(1.f);
+        buffer[index] = __float2bfloat16(1.f);
 #endif
     }
 }
@@ -124,7 +124,7 @@ __global__ void cuda_random_uniform_kernel<int8_t>(int8_t* buffer, const size_t 
     hiprand_init((float)1337.f, idx + seq_offset, 0, &local_state);
     for (size_t index = idx; index < size; index += blockDim.x * gridDim.x) {
         buffer[index] = hiprand(&local_state) % 0xFF;
-        // buffer[index] = 1; 
+        buffer[index] = 1; 
     }
 }
 
