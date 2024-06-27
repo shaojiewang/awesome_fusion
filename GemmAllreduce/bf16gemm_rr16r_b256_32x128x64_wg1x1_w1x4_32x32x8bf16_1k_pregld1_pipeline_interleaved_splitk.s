@@ -215,7 +215,8 @@ L_endhere:
 .set v_barrier_flag, 10
 .set v_c_buffer_offset, 11
 .set v_peer, 12
-.set v_inc_num, 28
+.set v_acc_all_reduce, 28
+.set v_inc_num, 60
 
 .text
 .global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
@@ -851,6 +852,12 @@ l_begin_barrier_check:
     s_lshl_b32 s[s_block_offset], s[s_block_offset], 10 
     v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
 
+    .i_acc_ar = 0
+    .rept 8
+        v_mov_b32 v[v_acc_all_reduce + .i_acc_ar], 0
+        .i_acc_ar = .i_acc_ar+1
+    .endr
+
 l_loop_multigpu_reduce_begin:
     
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
@@ -863,18 +870,38 @@ l_loop_multigpu_reduce_begin:
     s_lshl_b32 s[s_loop_step], s[s_n], 1
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_loop_step]
     
+    s_waitcnt vmcnt(3)
+    v_lshlrev_b32 v[v_tmp], 16, v[v_peer]
+    v_and_b32 v[v_tmp + 1], v[v_peer], 0xffff0000
+    v_add_f32 v[v_acc_all_reduce], v[v_tmp], v[v_acc_all_reduce]
+    v_add_f32 v[v_acc_all_reduce + 1], v[v_tmp + 1], v[v_acc_all_reduce + 1]
+    
     s_waitcnt vmcnt(2)
+    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 1]
+    v_and_b32 v[v_tmp + 1], v[v_peer + 1], 0xffff0000
+    v_add_f32 v[v_acc_all_reduce + 2], v[v_tmp], v[v_acc_all_reduce + 2]
+    v_add_f32 v[v_acc_all_reduce + 3], v[v_tmp + 1], v[v_acc_all_reduce + 3]
     
     s_waitcnt vmcnt(1)
-
+    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 2]
+    v_and_b32 v[v_tmp + 1], v[v_peer + 2], 0xffff0000
+    v_add_f32 v[v_acc_all_reduce + 4], v[v_tmp], v[v_acc_all_reduce + 4]
+    v_add_f32 v[v_acc_all_reduce + 5], v[v_tmp + 1], v[v_acc_all_reduce + 5]
+   
     s_waitcnt vmcnt(0)
-    
+    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 3]
+    v_and_b32 v[v_tmp + 1], v[v_peer + 3], 0xffff0000
+    v_add_f32 v[v_acc_all_reduce + 6], v[v_tmp], v[v_acc_all_reduce + 6]
+    v_add_f32 v[v_acc_all_reduce + 7], v[v_tmp + 1], v[v_acc_all_reduce + 7]
+ 
     s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
     v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_loop_multigpu_reduce_begin
     
     s_mov_b64 exec -1
+    
+
 l_end_barrier_check:
     v_mov_b32 v[v_imm], 4
     v_cmpx_gt_u32 v[v_imm], v[v_tid]
