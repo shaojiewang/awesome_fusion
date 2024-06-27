@@ -336,7 +336,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         reinterpret_cast<float*>(scale_device_buf.GetBuffer())[3]);
 #endif
 
-#ifdef ASM_PRINT
+#if ASM_PRINT
     //debug pointer
     float *host_print, *print;
     uint32_t print_sk_blocks = 1;
@@ -363,7 +363,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            ldb,
                                            ldc,
                                            k_per_card,
-#ifdef ASM_PRINT
+#if ASM_PRINT
                                            print,
                                            print_sk_blocks
 #else
@@ -469,7 +469,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         ((int*)(bfa_intb_gemm_runner.args.ptr_world_barrier[0]))[0]);
 #endif
 
-#ifdef ASM_PRINT
+#if ASM_PRINT
     if (rank == 1)
     {
         int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;

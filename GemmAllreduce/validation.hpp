@@ -26,6 +26,9 @@ static inline bool valid_vector(const T* ref, const T* pred, int n, float nrms =
         float rr = 2.0 * ri * ri;
         s0 += dd;
         s1 += rr;
+
+        // float atol = 1e-4;
+        // float rtol = 1e-2;
         
 #ifdef PER_PIXEL_CHECK
         float delta = std::abs(ri - pi) / std::abs(ri);
