@@ -25,8 +25,8 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 256 * 1024;
 
-#define TOTAL_NUM 00
-#define WARM_UP_NUM 1
+#define TOTAL_NUM 100
+#define WARM_UP_NUM 10
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
@@ -173,6 +173,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcGetMemHandle(&(handle[5]), init_scale_buf_ref_ptrs[i]));
             multigpu_barrier_flag_ptrs[i] = reinterpret_cast<void*>(multigpu_barrier_flags.GetBuffer());
             check_cuda_error(hipIpcGetMemHandle(&(handle[6]), multigpu_barrier_flag_ptrs[i]));
+            out_c_buf_ptrs[i] = reinterpret_cast<void*>(c_device_buf.GetBuffer());
+            check_cuda_error(hipIpcGetMemHandle(&(handle[7]), out_c_buf_ptrs[i]));
         }
         MPI_Bcast(&(handle[0]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[1]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
@@ -181,6 +183,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         MPI_Bcast(&(handle[4]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[5]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         MPI_Bcast(&(handle[6]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
+        MPI_Bcast(&(handle[7]), sizeof(hipIpcMemHandle_t), MPI_CHAR, i, MPI_COMM_WORLD);
         if (rank != i)
         {
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_a_buf_ptrs[i]), handle[0], hipIpcMemLazyEnablePeerAccess));
@@ -190,6 +193,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ptrs[i]), handle[4], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(init_scale_buf_ref_ptrs[i]), handle[5], hipIpcMemLazyEnablePeerAccess));
             check_cuda_error(hipIpcOpenMemHandle((void **)&(multigpu_barrier_flag_ptrs[i]), handle[6], hipIpcMemLazyEnablePeerAccess));
+            check_cuda_error(hipIpcOpenMemHandle((void **)&(out_c_buf_ptrs[i]), handle[7], hipIpcMemLazyEnablePeerAccess));
         }
         
     }
@@ -255,6 +259,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             *(int*)((char*)(init_b_buf_ref_ptrs[0]) + 3 * sizeof(BDataType) * n * k_per_card));
         printf("scale buf ref is [0x%x]\n", 
             *(int*)(init_scale_buf_ref_ptrs[0]));
+        printf("out c ptrs is [%p, %p, %p, %p]\n",
+            out_c_buf_ptrs[0], out_c_buf_ptrs[1], out_c_buf_ptrs[2], out_c_buf_ptrs[3]);
     }
     MPI_Barrier(MPI_COMM_WORLD);
     for (int i = 0; i < world_size; i++)
@@ -330,7 +336,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         reinterpret_cast<float*>(scale_device_buf.GetBuffer())[3]);
 #endif
 
-#ifdef ASM_PRINT
+#if ASM_PRINT
     //debug pointer
     float *host_print, *print;
     uint32_t print_sk_blocks = 1;
@@ -357,7 +363,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            ldb,
                                            ldc,
                                            k_per_card,
-#ifdef ASM_PRINT
+#if ASM_PRINT
                                            print,
                                            print_sk_blocks
 #else
@@ -368,10 +374,12 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            barrier_flag,
                                            local_compute_flags.GetBuffer(),
                                            multigpu_barrier_flag_ptrs,
-                                           nullptr,
-                                           nullptr,
+                                           c_device_buf_out.GetBuffer(),
+                                           out_c_buf_ptrs,
                                            (size_t)rank
                                            );
+
+#if PRINT_BUFFER
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
     printf("rank: %d, multigpu_barrier_flag=[%p, %p, %p, %p]\n",
         rank, 
@@ -379,6 +387,14 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         bfa_intb_gemm_runner.args.ptr_world_barrier[1],
         bfa_intb_gemm_runner.args.ptr_world_barrier[2],
         bfa_intb_gemm_runner.args.ptr_world_barrier[3]);
+    printf("rank: %d, peer_comm_ptrs=[%p, %p, %p, %p]\n",
+        rank,
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[0],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[1],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[2],
+        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[3]);
+#endif    
+    
     // ar init
     if(custom_ar == 1)
     {
@@ -413,7 +429,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -426,7 +442,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
@@ -453,7 +469,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         ((int*)(bfa_intb_gemm_runner.args.ptr_world_barrier[0]))[0]);
 #endif
 
-#ifdef ASM_PRINT
+#if ASM_PRINT
     if (rank == 1)
     {
         int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;

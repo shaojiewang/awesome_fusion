@@ -5,7 +5,7 @@
 
 #include "kernel_list.hpp"
 
-#define MAX_BARRIER 8
+#define MAX_PEER 8
 
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
@@ -22,9 +22,9 @@ struct __attribute__((packed)) kargs{
     void*  ptr_workspace; // also use this one to be debug pointer
     unsigned int multigpu_barrier_flag;
     void* ptr_local_compute_flags; // flag to indicate whether cta compute is ready
-    void* ptr_world_barrier[MAX_BARRIER];
+    void* ptr_world_barrier[MAX_PEER];
     void* ptr_local_out;
-    void* ptr_peer_comm_buffers;
+    void* ptr_peer_comm_buffers[MAX_PEER];
     size_t local_rank;
 };
 
@@ -47,7 +47,7 @@ public:
         args.ptr_local_compute_flags = nullptr;
         // args.ptr_world_barrier = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
         args.ptr_local_out = nullptr;
-        args.ptr_peer_comm_buffers = nullptr;
+        // args.ptr_peer_comm_buffers = nullptr;
         args.local_rank = 0;
         max_sk_blocks = 4;
     }
@@ -71,7 +71,7 @@ public:
                       void* ptr_local_compute_flags_ = nullptr,
                       void** ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
-                      void* ptr_peer_comm_buffers_ = nullptr,
+                      void** ptr_peer_comm_buffers_ = nullptr,
                       size_t local_rank_ = (size_t)0)
     {
         k_ptr = k_vec_.data();
@@ -89,12 +89,12 @@ public:
         args.ptr_workspace = ptr_workspace_;
         args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        for (int i = 0; i < MAX_BARRIER; i++)
+        for (int i = 0; i < MAX_PEER; i++)
         {
             args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+            args.ptr_peer_comm_buffers[i] = ptr_peer_comm_buffers_[i];
         }
         args.ptr_local_out = ptr_local_out_;
-        args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
         args.local_rank = local_rank_;
 
         check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
@@ -145,7 +145,7 @@ public:
                 void* ptr_local_compute_flags_,
                 void** ptr_world_barrier_,
                 void* ptr_local_out_,
-                void* ptr_peer_comm_buffers_,
+                void** ptr_peer_comm_buffers_,
                 size_t local_rank_) {
         args.ptr_c = ptr_c_;
         args.ptr_a = ptr_a_;
@@ -161,12 +161,12 @@ public:
         args.ptr_workspace = ptr_workspace_;
         args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        for (int i = 0; i < MAX_BARRIER; i++)
+        for (int i = 0; i < MAX_PEER; i++)
         {
             args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+            args.ptr_peer_comm_buffers[i] = ptr_peer_comm_buffers_[i];
         }
         args.ptr_local_out = ptr_local_out_;
-        args.ptr_peer_comm_buffers = ptr_peer_comm_buffers_;
         args.local_rank = local_rank_;
     }
  
