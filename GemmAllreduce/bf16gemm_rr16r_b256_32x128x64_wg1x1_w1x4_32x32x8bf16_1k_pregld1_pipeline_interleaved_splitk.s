@@ -867,9 +867,6 @@ l_loop_multigpu_reduce_begin:
     global_load_dword v[v_peer + 2], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
     global_load_dword v[v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0    
 
-    s_lshl_b32 s[s_loop_step], s[s_n], 1
-    v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_loop_step]
-    
     s_waitcnt vmcnt(3)
     v_lshlrev_b32 v[v_tmp], 16, v[v_peer]
     v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer]
@@ -898,6 +895,9 @@ l_loop_multigpu_reduce_begin:
     v_pack_b32_f16 v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 1], op_sel: [1, 1] 
     global_store_dword v[v_c_buffer_offset], v[v_acc_all_reduce + 0], s[s_local_out : s_local_out + 1] offset: 0
 
+    s_lshl_b32 s[s_loop_step], s[s_n], 1
+    v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_loop_step]   
+ 
     s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
     v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
     s_andn2_b64 exec, exec, vcc
