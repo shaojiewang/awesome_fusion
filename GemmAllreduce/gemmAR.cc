@@ -25,8 +25,8 @@ const int custom_ar = 1;
 // num of elements to do all reduce
 const int AR_NUM = 256 * 1024;
 
-#define TOTAL_NUM 00
-#define WARM_UP_NUM 1
+#define TOTAL_NUM 100
+#define WARM_UP_NUM 10
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8

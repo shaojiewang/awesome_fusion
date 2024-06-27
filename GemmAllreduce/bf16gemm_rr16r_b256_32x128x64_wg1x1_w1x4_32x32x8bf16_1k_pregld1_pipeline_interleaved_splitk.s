@@ -3,7 +3,7 @@
     ;s_mov_b64 exec, -1
     s_nop 64
     s_cmp_eq_u32 s[\s_bx], 0
-    s_cbranch_scc0 L_endhere
+    ;s_cbranch_scc0 L_endhere
     ;v_cmpx_eq_u32 0, v0
     v_lshlrev_b32 v[\v_offset], 3, v[\v_tid]
     s_waitcnt lgkmcnt(0)
@@ -799,27 +799,20 @@ l_local_compute_signal:
     s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 2
     v_mov_b32 v[v_offset_flag], s[s_offset_local_flag]
     v_cmpx_gt_u32 v[v_imm], v[v_tid]
-    ;v_mov_b32 v[v_inc_num], 1
-    ;s_mov_b64 exec, -1
     global_atomic_add v[v_flag], v[v_offset_flag], v[v_imm], s[s_local_flag : s_local_flag + 1] glc
     s_add_u32 s[s_flag_checker], s[s_m], 31
     s_lshr_b32 s[s_flag_checker], s[s_flag_checker], 5
     s_lshl_b32 s[s_flag_checker], s[s_flag_checker], 2
     s_sub_u32 s[s_flag_checker], s[s_flag_checker], 1
     s_waitcnt vmcnt(0)
-    v_mov_b32 v[v_inc_num], 1
+    ds_write_b32 v[v_inc_num], v[v_flag]
+    s_waitcnt lgkmcnt(0)
+    s_barrier
     s_mov_b64 exec, -1
-    v_or_b32_dpp v[v_inc_num], v[v_inc_num], v[v_inc_num] row_shl:1 row_mask:0xf bank_mask:0xf bound_ctrl:1
-    s_nop 1
-    v_or_b32_dpp v[v_inc_num], v[v_inc_num], v[v_inc_num] row_shl:2 row_mask:0xf bank_mask:0xf bound_ctrl:1
-    s_nop 1
-    v_or_b32_dpp v[v_inc_num], v[v_inc_num], v[v_inc_num] row_shl:4 row_mask:0xf bank_mask:0xf bound_ctrl:1
-    s_nop 1
-    v_or_b32_dpp v[v_inc_num], v[v_inc_num], v[v_inc_num] wave_rol:1 row_mask:0xf bank_mask:0xf bound_ctrl:1
-    s_nop 1
-    .print v_inc_num, s_print, s_bx, v_tid, v_tmp + 7
+    ds_read_b32 v[v_flag], v[v_inc_num]
+    s_waitcnt lgkmcnt(0)
+    s_barrier
     v_cmpx_eq_u32 vcc, v[v_flag], s[s_flag_checker]
-    ;s_and_b64 exec, exec, -1
     s_cbranch_execz l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
 
     ; system fence
@@ -853,7 +846,9 @@ l_begin_barrier_check:
     ; do multi card all reduce
     s_barrier 
     s_mov_b64 exec -1
-    s_lshl_b32 s[s_block_offset], s[s_bx], 8 ; s_bx / 4 * 4 * 128 * sizeof(bf16)
+    ; s_bx / 4 * 4 * 128 * sizeof(bf16)
+    s_lshr_b32 s[s_block_offset], s[s_bx], 2
+    s_lshl_b32 s[s_block_offset], s[s_block_offset], 10 
     v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
 
 l_loop_multigpu_reduce_begin:
@@ -874,7 +869,6 @@ l_loop_multigpu_reduce_begin:
 
     s_waitcnt vmcnt(0)
     
-
     s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
     v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
     s_andn2_b64 exec, exec, vcc
