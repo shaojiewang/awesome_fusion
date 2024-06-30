@@ -285,7 +285,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     // add matrix transpose code
     // 1. transpose A matrix
-    invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), m, k_per_card, compute_stream);
+    invokeMatrixTranspose(reinterpret_cast<hip_bfloat16*>(a_device_buf_compute.GetBuffer()), reinterpret_cast<hip_bfloat16*>(a_device_buf.GetBuffer()), k_per_card, m, compute_stream);
     // 2. transpose and interleave B matrix
     invokeMatrixBatchedTranspose<uint8_t>(reinterpret_cast<uint8_t*>(b_device_buf_compute.GetBuffer()), reinterpret_cast<uint8_t*>(b_device_buf.GetBuffer()), 16, n, k_per_card / 16, compute_stream);
     
@@ -456,7 +456,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // check bf16 gemm res
     printf("rank %d, res=%f\n", 
         rank, 
-        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[29]));
+        type_convert<float, hip_bfloat16>(reinterpret_cast<hip_bfloat16*>(c_device_buf.GetBuffer())[1]));
     MPI_Barrier(MPI_COMM_WORLD);
     // check local flags
     printf("rank %d, local flags=0x%x\n", 
