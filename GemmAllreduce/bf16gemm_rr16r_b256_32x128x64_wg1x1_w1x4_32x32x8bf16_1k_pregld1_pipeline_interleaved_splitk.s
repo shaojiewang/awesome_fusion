@@ -904,7 +904,7 @@ l_loop_multigpu_reduce_begin:
     s_cbranch_execnz l_loop_multigpu_reduce_begin
     
 
-     
+    s_mov_b64 exec, -1 
 
 l_end_barrier_check:
     v_mov_b32 v[v_imm], 4
@@ -913,7 +913,6 @@ l_end_barrier_check:
     global_store_dword v[v_imm], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     
-    .print v_imm, s_print, s_bx, v_tid, v_tmp + 7
 
 l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
     ; .print v_offset_a, s_print, s_bx, v_tid, v_tmp + 7
