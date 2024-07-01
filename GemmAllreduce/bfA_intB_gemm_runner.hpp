@@ -6,6 +6,7 @@
 #include "kernel_list.hpp"
 
 #define MAX_PEER 8
+#define FLAG(a) ((uint32_t)((a)%0x146))
 
 struct __attribute__((packed)) kargs{
     void*  ptr_c;
@@ -190,6 +191,8 @@ public:
         {
             args.ptr_c = args.ptr_workspace;
         }
+        
+        args.multigpu_barrier_flag = FLAG(args.multigpu_barrier_flag + 1);
 
         int k_per_cta = ((args.k + sk_blocks - 1) / sk_blocks + ker.wg_tile_k - 1) / ker.wg_tile_k * ker.wg_tile_k;
         args.k_per_cta = k_per_cta;

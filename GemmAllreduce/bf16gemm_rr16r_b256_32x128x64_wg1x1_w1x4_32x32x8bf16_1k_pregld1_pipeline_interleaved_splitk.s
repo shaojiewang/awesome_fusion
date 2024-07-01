@@ -830,6 +830,10 @@ l_local_compute_signal:
     v_lshlrev_b32 v[v_local_barrier_offset], 2, v[v_tid]
     global_load_dwordx2 v[v_barrier_addr : v_barrier_addr + 1], v[v_barrier_offset], s[s_ka : s_ka + 1] offset:0+k_world_barrier 
     s_lshl_b64 s[s_local_rank : s_local_rank + 1], s[s_local_rank : s_local_rank + 1], 2
+    s_lshr_b32 s[s_offset_local_flag], s[s_bx], 2
+    s_lshl_b32 s[s_offset_local_flag], s[s_offset_local_flag], 4
+    s_add_u32 s[s_local_rank], s[s_local_rank], s[s_offset_local_flag]
+    v_add_u32 v[v_local_barrier_offset], v[v_local_barrier_offset], s[s_offset_local_flag]
     v_mov_b32 v[v_local_rank], s[s_local_rank + 1]
     v_mov_b32 v[v_barrier_flag], s[s_multigpu_barrier_flag]
     s_waitcnt vmcnt(0)
@@ -849,68 +853,86 @@ l_begin_barrier_check:
     s_mov_b64 exec -1
     ; s_bx / 4 * 4 * 128 * sizeof(bf16)
     s_lshr_b32 s[s_block_offset], s[s_bx], 2
-    s_lshl_b32 s[s_block_offset], s[s_block_offset], 10 
-    v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
+    s_lshl_b32 s[s_block_offset], s[s_block_offset], 10
+    s_lshl_b32 s[s_loop_step], s[s_n], 1
+    s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
 
-    .i_acc_ar = 0
-    .rept 8
-        v_mov_b32 v[v_acc_all_reduce + .i_acc_ar], 0
-        .i_acc_ar = .i_acc_ar+1
-    .endr
-
+    v_and_b32 v[v_tmp], v[v_tid], 63
+    v_lshlrev_b32 v[v_c_buffer_offset], 4, v[v_tmp]
+    v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
+    v_mad_u32_u24 v[v_c_buffer_offset], v[v_tmp], s[s_loop_step], v[v_c_buffer_offset]
+    
+    ; .print v_c_buffer_offset, s_print, s_bx, v_tid, v_tmp + 7   
+ 
+    v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
+    s_andn2_b64 exec, exec, vcc
+    s_lshl_b32 s[s_loop_step], s[s_n], 3
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
     
 l_loop_multigpu_reduce_begin:
     
-    global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
-    global_load_dword v[v_peer + 1], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] offset: 0
-    global_load_dword v[v_peer + 2], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
-    global_load_dword v[v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0    
+    global_load_dwordx4 v[v_peer + 0 : v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
+    global_load_dwordx4 v[v_peer + 4 : v_peer + 7], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] offset: 0
+    global_load_dwordx4 v[v_peer + 8 : v_peer + 11], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
+    global_load_dwordx4 v[v_peer + 12 : v_peer + 15], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0    
 
     s_waitcnt vmcnt(3)
-    v_lshlrev_b32 v[v_tmp], 16, v[v_peer]
-    v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer]
-    v_add_f32 v[v_acc_all_reduce + 0], v[v_tmp + 0], v[v_acc_all_reduce + 0]
-    v_add_f32 v[v_acc_all_reduce + 1], v[v_tmp + 1], v[v_acc_all_reduce + 1]
-    
-    s_waitcnt vmcnt(2)
-    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 1]
-    v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 1], 
-    v_add_f32 v[v_acc_all_reduce + 0], v[v_tmp + 0], v[v_acc_all_reduce + 0]
-    v_add_f32 v[v_acc_all_reduce + 1], v[v_tmp + 1], v[v_acc_all_reduce + 1]
-    
-    s_waitcnt vmcnt(1)
-    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 2]
-    v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 2]
-    v_add_f32 v[v_acc_all_reduce + 0], v[v_tmp + 0], v[v_acc_all_reduce + 0]
-    v_add_f32 v[v_acc_all_reduce + 1], v[v_tmp + 1], v[v_acc_all_reduce + 1]
-   
-    s_waitcnt vmcnt(0)
-    v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 3]
-    v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 3]
-    v_add_f32 v[v_acc_all_reduce + 0], v[v_tmp + 0], v[v_acc_all_reduce + 0]
-    v_add_f32 v[v_acc_all_reduce + 1], v[v_tmp + 1], v[v_acc_all_reduce + 1]
- 
-    s_mov_b64 exec -1
-    v_pack_b32_f16 v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 1], op_sel: [1, 1] 
-    global_store_dword v[v_c_buffer_offset], v[v_acc_all_reduce + 0], s[s_local_out : s_local_out + 1] offset: 0
+    .i_acc_ar = 0
+    .rept 4
+        v_lshlrev_b32 v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], 16, v[v_peer + .i_acc_ar]
+        v_and_b32 v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], 0xffff0000, v[v_peer + .i_acc_ar]
+        .i_acc_ar = .i_acc_ar + 1
+    .endr
 
-    s_lshl_b32 s[s_loop_step], s[s_n], 1
+    s_waitcnt vmcnt(2)
+    .i_acc_ar = 0
+    .rept 4
+        v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 4 + .i_acc_ar]
+        v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 4 + .i_acc_ar]
+        v_add_f32 v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_tmp]
+        v_add_f32 v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_tmp + 1]
+        .i_acc_ar = .i_acc_ar + 1
+    .endr
+
+    s_waitcnt vmcnt(1)
+    .i_acc_ar = 0
+    .rept 4
+        v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 8 + .i_acc_ar]
+        v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 8 + .i_acc_ar]
+        v_add_f32 v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_tmp]
+        v_add_f32 v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_tmp + 1]
+        .i_acc_ar = .i_acc_ar + 1
+    .endr
+
+    s_waitcnt vmcnt(0)
+    .i_acc_ar = 0
+    .rept 4
+        v_lshlrev_b32 v[v_tmp], 16, v[v_peer + 12 + .i_acc_ar]
+        v_and_b32 v[v_tmp + 1], 0xffff0000, v[v_peer + 12 + .i_acc_ar]
+        v_add_f32 v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_acc_all_reduce + 0 + 2 * .i_acc_ar], v[v_tmp]
+        v_add_f32 v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_acc_all_reduce + 1 + 2 * .i_acc_ar], v[v_tmp + 1]
+        .i_acc_ar = .i_acc_ar + 1
+    .endr
+
+    v_pack_b32_f16 v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 1], op_sel: [1, 1] 
+    v_pack_b32_f16 v[v_acc_all_reduce + 1], v[v_acc_all_reduce + 2], v[v_acc_all_reduce + 3], op_sel: [1, 1] 
+    v_pack_b32_f16 v[v_acc_all_reduce + 2], v[v_acc_all_reduce + 4], v[v_acc_all_reduce + 5], op_sel: [1, 1] 
+    v_pack_b32_f16 v[v_acc_all_reduce + 3], v[v_acc_all_reduce + 6], v[v_acc_all_reduce + 7], op_sel: [1, 1] 
+    global_store_dwordx4 v[v_c_buffer_offset], v[v_acc_all_reduce + 0 : v_acc_all_reduce + 3], s[s_local_out : s_local_out + 1] offset: 0
+
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_loop_step]   
  
-    s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
     v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_loop_multigpu_reduce_begin
     
-
-     
+    s_mov_b64 exec, -1
 
 l_end_barrier_check:
     v_mov_b32 v[v_imm], 4
     v_cmpx_gt_u32 v[v_imm], v[v_tid]
     v_mov_b32 v[v_imm], 0
-    global_store_dword v[v_imm], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
+    ; global_store_dword v[v_imm], v[v_local_barrier_offset], s[s_local_barrier : s_local_barrier + 1] glc
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     
 
