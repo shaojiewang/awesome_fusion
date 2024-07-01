@@ -849,20 +849,29 @@ l_begin_barrier_check:
     s_mov_b64 exec -1
     ; s_bx / 4 * 4 * 128 * sizeof(bf16)
     s_lshr_b32 s[s_block_offset], s[s_bx], 2
-    s_lshl_b32 s[s_block_offset], s[s_block_offset], 10 
-    v_lshlrev_b32 v[v_c_buffer_offset], 2, v[v_tid]
+    s_lshl_b32 s[s_block_offset], s[s_block_offset], 10
+    s_lshl_b32 s[s_loop_step], s[s_n], 1
+    s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
 
+    v_and_b32 v[v_tmp], v[v_tid], 63
+    v_lshlrev_b32 v[v_c_buffer_offset], 4, v[v_tmp]
+    v_lshrrev_b32 v[v_tmp], 6, v[v_tid]
+    v_mad_u32_u24 v[v_c_buffer_offset], v[v_tmp], s[s_loop_step], v[v_c_buffer_offset]
+    
+    ; .print v_c_buffer_offset, s_print, s_bx, v_tid, v_tmp + 7   
+ 
+    s_lshl_b32 s[s_loop_step], s[s_n], 3
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_block_offset]
     
 l_loop_multigpu_reduce_begin:
     
-    global_load_dword v[v_peer], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
-    global_load_dword v[v_peer + 1], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] offset: 0
-    global_load_dword v[v_peer + 2], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
-    global_load_dword v[v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0    
+    global_load_dwordx4 v[v_peer + 0 : v_peer + 3], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr : s_peer_comm_buff_ptr + 1] glc
+    global_load_dwordx4 v[v_peer + 4 : v_peer + 7], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 2 : s_peer_comm_buff_ptr + 3] offset: 0
+    global_load_dwordx4 v[v_peer + 8 : v_peer + 11], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 4 : s_peer_comm_buff_ptr + 5] offset: 0
+    global_load_dwordx4 v[v_peer + 12 : v_peer + 15], v[v_c_buffer_offset], s[s_peer_comm_buff_ptr + 6 : s_peer_comm_buff_ptr + 7] offset: 0    
 
     .i_acc_ar = 0
-    .rept 2
+    .rept 8
         v_mov_b32 v[v_acc_all_reduce + .i_acc_ar], 0
         .i_acc_ar = .i_acc_ar+1
     .endr
@@ -893,12 +902,10 @@ l_loop_multigpu_reduce_begin:
  
     s_mov_b64 exec -1
     v_pack_b32_f16 v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 0], v[v_acc_all_reduce + 1], op_sel: [1, 1] 
-    global_store_dword v[v_c_buffer_offset], v[v_acc_all_reduce + 0], s[s_local_out : s_local_out + 1] offset: 0
+    ; global_store_dword v[v_c_buffer_offset], v[v_acc_all_reduce + 0], s[s_local_out : s_local_out + 1] offset: 0
 
-    s_lshl_b32 s[s_loop_step], s[s_n], 1
     v_add_u32 v[v_c_buffer_offset], v[v_c_buffer_offset], s[s_loop_step]   
  
-    s_mul_i32 s[s_reduce_range], s[s_m], s[s_loop_step]
     v_cmp_le_u32 vcc, s[s_reduce_range], v[v_c_buffer_offset]
     s_andn2_b64 exec, exec, vcc
     s_cbranch_execnz l_loop_multigpu_reduce_begin
