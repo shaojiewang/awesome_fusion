@@ -424,6 +424,52 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
+    uint32_t sol_idx_no_fuse = 0, sk_blocks_no_fuse = 1;
+    
+    for(int i = 0; i < WARM_UP_NUM; i++)
+    {
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx_no_fuse], bfa_intb_gemm_runner.kernel_func_vec[sol_idx_no_fuse], nullptr, sk_blocks_no_fuse);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
+    }
+
+    hipEvent_t evt_no_fuse_start, evt_no_fuse_end;
+    float elapsed_ms_no_fuse;
+    check_cuda_error(hipEventCreate(&evt_no_fuse_start));
+    check_cuda_error(hipEventCreate(&evt_no_fuse_end));
+    check_cuda_error(hipDeviceSynchronize());
+    check_cuda_error(hipEventRecord(evt_no_fuse_start, compute_stream));
+
+    for(int i = 0; i < TOTAL_NUM; i++)
+    {
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx_no_fuse], bfa_intb_gemm_runner.kernel_func_vec[sol_idx_no_fuse], compute_stream, sk_blocks_no_fuse);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+    }
+
+    check_cuda_error(hipEventRecord(evt_no_fuse_end, compute_stream));
+    check_cuda_error(hipEventSynchronize(evt_no_fuse_end));
+    check_cuda_error(hipDeviceSynchronize());
+    check_cuda_error(hipEventElapsedTime(&elapsed_ms_no_fuse, evt_no_fuse_start, evt_no_fuse_end));
+    check_cuda_error(hipEventDestroy(evt_no_fuse_start));
+    check_cuda_error(hipEventDestroy(evt_no_fuse_end));
+
+    {
+        float time_per_loop = elapsed_ms_no_fuse / TOTAL_NUM;
+        float tflops = (float)2 * m * n * k_per_card / time_per_loop / (1024 * 1024 * 1024);
+        float bw_gbs = (float)(2 * (m * k_per_card + m * n) + n * k_per_card) / time_per_loop / (1024 * 1024);
+    
+        printf("best [sol, sk_blocks]: [%d, %d], m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+            sol_idx, sk_blocks,
+            m,
+            n,
+            k_per_card,
+            time_per_loop,
+            tflops,
+            bw_gbs);
+        printf("\n");
+    }
+
+    check_cuda_error(hipDeviceSynchronize());
+    MPI_Barrier(MPI_COMM_WORLD);
     uint32_t sol_idx = 0, sk_blocks = 1;
     
     for(int i = 0; i < WARM_UP_NUM; i++)
