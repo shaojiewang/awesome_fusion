@@ -345,12 +345,40 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
 
     // gemm + ar reference
-    // get kernel list
-    std::vector<kernel_tunable> k_list = get_kernel_list();
+    // gemm runner
+    std::vector<kernel_tunable> k_list = get_kernel_list_gemm_comm();
     std::string hsaco_path = "./build/";
     uint32_t max_sk_blocks = 1;
     uint32_t barrier_flag = BARRIER_FLAG;
     bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
+                                           hsaco_path,  
+                                           c_device_buf.GetBuffer(),
+                                           a_device_buf_compute.GetBuffer(),
+                                           b_device_buf_compute.GetBuffer(),
+                                           scale_device_buf.GetBuffer(),
+                                           m,
+                                           n,
+                                           k_per_card,
+                                           lda,
+                                           ldb,
+                                           ldc,
+                                           k_per_card,
+#if ASM_PRINT
+                                           print,
+                                           print_sk_blocks
+#else
+                                           nullptr,
+                                           max_sk_blocks
+#endif
+                                           );
+
+
+    // gemm_ar runner
+    std::vector<kernel_tunable> k_list = get_kernel_list_gemm();
+    std::string hsaco_path = "./build/";
+    uint32_t max_sk_blocks = 1;
+    uint32_t barrier_flag = BARRIER_FLAG;
+    bfAintBGemmRunner bfa_intb_gemm_ar_runner(k_list,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
                                            a_device_buf_compute.GetBuffer(),
@@ -383,16 +411,16 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
     printf("rank: %d, multigpu_barrier_flag=[%p, %p, %p, %p]\n",
         rank, 
-        bfa_intb_gemm_runner.args.ptr_world_barrier[0], 
-        bfa_intb_gemm_runner.args.ptr_world_barrier[1],
-        bfa_intb_gemm_runner.args.ptr_world_barrier[2],
-        bfa_intb_gemm_runner.args.ptr_world_barrier[3]);
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[0], 
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[1],
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[2],
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[3]);
     printf("rank: %d, peer_comm_ptrs=[%p, %p, %p, %p]\n",
         rank,
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[0],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[1],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[2],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[3]);
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[0],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[1],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[2],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[3]);
 #endif    
     
     // ar init
@@ -474,9 +502,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
+        bfa_intb_gemm_ar_runner.run(bfa_intb_gemm_ar_runner.k_ptr[sol_idx], bfa_intb_gemm_ar_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -488,9 +514,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     for(int i = 0; i < TOTAL_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+        bfa_intb_gemm_ar_runner.run(bfa_intb_gemm_ar_runner.k_ptr[sol_idx], bfa_intb_gemm_ar_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
@@ -509,18 +533,18 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // check local flags
     printf("rank %d, local flags=0x%x\n", 
         rank, 
-        ((int*)(bfa_intb_gemm_runner.args.ptr_local_compute_flags))[0]);
+        ((int*)(bfa_intb_gemm_ar_runner.args.ptr_local_compute_flags))[0]);
     MPI_Barrier(MPI_COMM_WORLD);
     // check global barrier
     printf("rank %d, global barrier=0x%x\n",
         rank,
-        ((int*)(bfa_intb_gemm_runner.args.ptr_world_barrier[0]))[0]);
+        ((int*)(bfa_intb_gemm_ar_runner.args.ptr_world_barrier[0]))[0]);
 #endif
 
 #if ASM_PRINT
     if (rank == 1)
     {
-        int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
+        int max_i = bfa_intb_gemm_ar_runner.k_ptr[sol_idx].wg_size;
         check_cuda_error(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
         for(int i = 0; i < max_i; i++){
             // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)
