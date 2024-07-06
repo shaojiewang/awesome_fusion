@@ -68,7 +68,7 @@ public:
                       uint32_t& k_per_cta_,
                       void* ptr_workspace_,
                       uint32_t& max_sk_blocks_,
-                      uint32_t& multigpu_barrier_flag_ = 0,
+                      uint32_t multigpu_barrier_flag_ = 0,
                       void* ptr_local_compute_flags_ = nullptr,
                       void** ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,

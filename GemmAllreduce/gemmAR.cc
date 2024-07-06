@@ -345,12 +345,11 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
 
     // gemm + ar reference
-    // gemm runner
-    std::vector<kernel_tunable> k_list = get_kernel_list_gemm_comm();
     std::string hsaco_path = "./build/";
-    uint32_t max_sk_blocks = 1;
-    uint32_t barrier_flag = BARRIER_FLAG;
-    bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
+    // gemm runner
+    std::vector<kernel_tunable> k_list_gemm = get_kernel_list_gemm_comm();
+    uint32_t max_sk_blocks_gemm = 1;
+    bfAintBGemmRunner bfa_intb_gemm_runner(k_list_gemm,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
                                            a_device_buf_compute.GetBuffer(),
@@ -368,14 +367,13 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
                                            print_sk_blocks
 #else
                                            nullptr,
-                                           max_sk_blocks
+                                           max_sk_blocks_gemm
 #endif
                                            );
 
 
     // gemm_ar runner
     std::vector<kernel_tunable> k_list = get_kernel_list_gemm();
-    std::string hsaco_path = "./build/";
     uint32_t max_sk_blocks = 1;
     uint32_t barrier_flag = BARRIER_FLAG;
     bfAintBGemmRunner bfa_intb_gemm_ar_runner(k_list,
@@ -486,7 +484,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
         float bw_gbs = (float)(2 * (m * k_per_card + m * n) + n * k_per_card) / time_per_loop / (1024 * 1024);
     
         printf("best [sol, sk_blocks]: [%d, %d], m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
-            sol_idx, sk_blocks,
+            sol_idx_no_fuse, sk_blocks_no_fuse,
             m,
             n,
             k_per_card,
