@@ -219,10 +219,10 @@ L_endhere:
 .set v_inc_num, 60
 
 .text
-.global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+.global bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce
 .p2align 8
-.type bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk,@function
-bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
+.type bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce,@function
+bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce: 
     ; http://www.hsafoundation.com/html/Content/Runtime/Topics/02_Core/hsa_kernel_dispatch_packet_t.htm
 
     s_load_dwordx2 s[s_ptr_c:s_ptr_c+1], s[s_ka:s_ka+1], 0+k_ptr_c
@@ -814,7 +814,7 @@ l_local_compute_signal:
     s_waitcnt lgkmcnt(0)
     s_barrier
     v_cmpx_eq_u32 vcc, v[v_flag], s[s_flag_checker]
-    s_cbranch_execz l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+    s_cbranch_execz l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce
 
     ; system fence
     ; buffer_wbl2
@@ -936,13 +936,13 @@ l_end_barrier_check:
     global_store_dword v[v_offset_flag], v[v_offset_flag], s[s_local_flag : s_local_flag + 1] glc
     
 
-l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk: 
+l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce: 
     ; .print v_offset_a, s_print, s_bx, v_tid, v_tmp + 7
     s_mov_b64 exec -1
     s_endpgm
 .rodata
 .p2align 6
-.amdhsa_kernel bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
+.amdhsa_kernel bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce
     .amdhsa_group_segment_fixed_size 40960
     .amdhsa_user_sgpr_dispatch_ptr 0
     .amdhsa_user_sgpr_kernarg_segment_ptr 1
@@ -963,8 +963,8 @@ l_end_bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_i
 ---
 amdhsa.version: [ 1, 0 ]
 amdhsa.kernels:
-  - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk
-    .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk.kd
+  - .name: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce
+    .symbol: bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce.kd
     .sgpr_count: 96
     .vgpr_count: 116
     .kernarg_segment_align: 8

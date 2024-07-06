@@ -17,3 +17,7 @@ KOUT=bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_in
 
 /opt/rocm/llvm/bin/clang++ -x assembler -target amdgcn--amdhsa -mcpu=gfx90a $TOP/$KSRC -o $BUILD/$KOUT
 
+KSRC=bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce.s
+KOUT=bf16gemm_rr16r_b256_32x128x64_wg1x1_w1x4_32x32x8bf16_1k_pregld1_pipeline_interleaved_splitk_allreduce.hsaco
+
+/opt/rocm/llvm/bin/clang++ -x assembler -target amdgcn--amdhsa -mcpu=gfx90a $TOP/$KSRC -o $BUILD/$KOUT
