@@ -26,7 +26,7 @@ const int custom_ar = 1;
 const int AR_NUM = 256 * 1024;
 
 #define TOTAL_NUM 100
-#define WARM_UP_NUM 10
+#define WARM_UP_NUM 5
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
@@ -345,12 +345,38 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 #endif
 
     // gemm + ar reference
-    // get kernel list
-    std::vector<kernel_tunable> k_list = get_kernel_list();
     std::string hsaco_path = "./build/";
+    // gemm runner
+    std::vector<kernel_tunable> k_list_gemm = get_kernel_list_gemm();
+    uint32_t max_sk_blocks_gemm = 1;
+    bfAintBGemmRunner bfa_intb_gemm_runner(k_list_gemm,
+                                           hsaco_path,  
+                                           c_device_buf.GetBuffer(),
+                                           a_device_buf_compute.GetBuffer(),
+                                           b_device_buf_compute.GetBuffer(),
+                                           scale_device_buf.GetBuffer(),
+                                           m,
+                                           n,
+                                           k_per_card,
+                                           lda,
+                                           ldb,
+                                           ldc,
+                                           k_per_card,
+#if ASM_PRINT
+                                           print,
+                                           print_sk_blocks
+#else
+                                           nullptr,
+                                           max_sk_blocks_gemm
+#endif
+                                           );
+
+
+    // gemm_ar runner
+    std::vector<kernel_tunable> k_list = get_kernel_list_gemm_comm();
     uint32_t max_sk_blocks = 1;
     uint32_t barrier_flag = BARRIER_FLAG;
-    bfAintBGemmRunner bfa_intb_gemm_runner(k_list,
+    bfAintBGemmRunner bfa_intb_gemm_ar_runner(k_list,
                                            hsaco_path,  
                                            c_device_buf.GetBuffer(),
                                            a_device_buf_compute.GetBuffer(),
@@ -383,16 +409,16 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     printf("multigpu_barrier_flag_ptrs=%p\n", multigpu_barrier_flag_ptrs);
     printf("rank: %d, multigpu_barrier_flag=[%p, %p, %p, %p]\n",
         rank, 
-        bfa_intb_gemm_runner.args.ptr_world_barrier[0], 
-        bfa_intb_gemm_runner.args.ptr_world_barrier[1],
-        bfa_intb_gemm_runner.args.ptr_world_barrier[2],
-        bfa_intb_gemm_runner.args.ptr_world_barrier[3]);
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[0], 
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[1],
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[2],
+        bfa_intb_gemm_ar_runner.args.ptr_world_barrier[3]);
     printf("rank: %d, peer_comm_ptrs=[%p, %p, %p, %p]\n",
         rank,
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[0],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[1],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[2],
-        bfa_intb_gemm_runner.args.ptr_peer_comm_buffers[3]);
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[0],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[1],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[2],
+        bfa_intb_gemm_ar_runner.args.ptr_peer_comm_buffers[3]);
 #endif    
     
     // ar init
@@ -424,13 +450,57 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
+    uint32_t sol_idx_no_fuse = 0, sk_blocks_no_fuse = 1;
+    
+    for(int i = 0; i < WARM_UP_NUM; i++)
+    {
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx_no_fuse], bfa_intb_gemm_runner.kernel_func_vec[sol_idx_no_fuse], nullptr, sk_blocks_no_fuse);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
+    }
+
+    hipEvent_t evt_no_fuse_start, evt_no_fuse_end;
+    float elapsed_ms_no_fuse;
+    check_cuda_error(hipEventCreate(&evt_no_fuse_start));
+    check_cuda_error(hipEventCreate(&evt_no_fuse_end));
+    check_cuda_error(hipDeviceSynchronize());
+    check_cuda_error(hipEventRecord(evt_no_fuse_start, compute_stream));
+
+    for(int i = 0; i < TOTAL_NUM; i++)
+    {
+        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx_no_fuse], bfa_intb_gemm_runner.kernel_func_vec[sol_idx_no_fuse], compute_stream, sk_blocks_no_fuse);
+        custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+    }
+
+    check_cuda_error(hipEventRecord(evt_no_fuse_end, compute_stream));
+    check_cuda_error(hipEventSynchronize(evt_no_fuse_end));
+    check_cuda_error(hipDeviceSynchronize());
+    check_cuda_error(hipEventElapsedTime(&elapsed_ms_no_fuse, evt_no_fuse_start, evt_no_fuse_end));
+    check_cuda_error(hipEventDestroy(evt_no_fuse_start));
+    check_cuda_error(hipEventDestroy(evt_no_fuse_end));
+
+    {
+        float time_per_loop = elapsed_ms_no_fuse / TOTAL_NUM;
+        float tflops = (float)2 * m * n * k_per_card / time_per_loop / (1024 * 1024 * 1024);
+        float bw_gbs = (float)(2 * (m * k_per_card + m * n) + n * k_per_card) / time_per_loop / (1024 * 1024);
+    
+        printf("origin impl best [sol, sk_blocks]: [%d, %d], m: %d, n: %d, k: %d, time: %.3f ms, tflops: %.3f, bw: %.3f GB/s\n",
+            sol_idx_no_fuse, sk_blocks_no_fuse,
+            m,
+            n,
+            k_per_card,
+            time_per_loop,
+            tflops,
+            bw_gbs);
+        printf("\n");
+    }
+
+    check_cuda_error(hipDeviceSynchronize());
+    MPI_Barrier(MPI_COMM_WORLD);
     uint32_t sol_idx = 0, sk_blocks = 1;
     
     for(int i = 0; i < WARM_UP_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
-
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n, nullptr);
+        bfa_intb_gemm_ar_runner.run(bfa_intb_gemm_ar_runner.k_ptr[sol_idx], bfa_intb_gemm_ar_runner.kernel_func_vec[sol_idx], nullptr, sk_blocks);
     }
 
     hipEvent_t evt_00, evt_11;
@@ -442,9 +512,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
 
     for(int i = 0; i < TOTAL_NUM; i++)
     {
-        bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx], bfa_intb_gemm_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
-
-        // custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+        bfa_intb_gemm_ar_runner.run(bfa_intb_gemm_ar_runner.k_ptr[sol_idx], bfa_intb_gemm_ar_runner.kernel_func_vec[sol_idx], compute_stream, sk_blocks);
     }
 
     check_cuda_error(hipEventRecord(evt_11, compute_stream));
@@ -463,18 +531,18 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     // check local flags
     printf("rank %d, local flags=0x%x\n", 
         rank, 
-        ((int*)(bfa_intb_gemm_runner.args.ptr_local_compute_flags))[0]);
+        ((int*)(bfa_intb_gemm_ar_runner.args.ptr_local_compute_flags))[0]);
     MPI_Barrier(MPI_COMM_WORLD);
     // check global barrier
     printf("rank %d, global barrier=0x%x\n",
         rank,
-        ((int*)(bfa_intb_gemm_runner.args.ptr_world_barrier[0]))[0]);
+        ((int*)(bfa_intb_gemm_ar_runner.args.ptr_world_barrier[0]))[0]);
 #endif
 
 #if ASM_PRINT
     if (rank == 1)
     {
-        int max_i = bfa_intb_gemm_runner.k_ptr[sol_idx].wg_size;
+        int max_i = bfa_intb_gemm_ar_runner.k_ptr[sol_idx].wg_size;
         check_cuda_error(hipMemcpy(host_print, print, 8*max_i, hipMemcpyDeviceToHost));
         for(int i = 0; i < max_i; i++){
             // if(((uint32_t*)host_print)[2*i+1]!=0x5c005c00)

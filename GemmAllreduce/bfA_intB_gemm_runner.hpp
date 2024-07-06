@@ -68,7 +68,7 @@ public:
                       uint32_t& k_per_cta_,
                       void* ptr_workspace_,
                       uint32_t& max_sk_blocks_,
-                      uint32_t& multigpu_barrier_flag_,
+                      uint32_t multigpu_barrier_flag_ = 0,
                       void* ptr_local_compute_flags_ = nullptr,
                       void** ptr_world_barrier_ = nullptr,
                       void* ptr_local_out_ = nullptr,
@@ -90,16 +90,22 @@ public:
         args.ptr_workspace = ptr_workspace_;
         args.multigpu_barrier_flag = multigpu_barrier_flag_;
         args.ptr_local_compute_flags = ptr_local_compute_flags_;
-        for (int i = 0; i < MAX_PEER; i++)
+        if (ptr_world_barrier_ != nullptr)
         {
-            args.ptr_world_barrier[i] = ptr_world_barrier_[i];
-            args.ptr_peer_comm_buffers[i] = ptr_peer_comm_buffers_[i];
+            for (int i = 0; i < MAX_PEER; i++)
+            {
+                args.ptr_world_barrier[i] = ptr_world_barrier_[i];
+                args.ptr_peer_comm_buffers[i] = ptr_peer_comm_buffers_[i];
+            }
         }
         args.ptr_local_out = ptr_local_out_;
         args.local_rank = local_rank_;
-
-        check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
-
+        
+        if (ptr_local_compute_flags_ != nullptr)
+        {
+            check_cuda_error(hipMemsetAsync(ptr_local_compute_flags_, 0, sizeof(int) * ((n_ + 511) / 512)));
+        }
+    
         k_ptr_len = k_vec_.size();
         max_sk_blocks = max_sk_blocks_;
 
