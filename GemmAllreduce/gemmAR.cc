@@ -26,7 +26,7 @@ const int custom_ar = 1;
 const int AR_NUM = 256 * 1024;
 
 #define TOTAL_NUM 100
-#define WARM_UP_NUM 5
+#define WARM_UP_NUM 10
 
 #define MAX_WORLD_SIZE 8
 #define MAX_HANDLE_NUM 8
@@ -468,7 +468,7 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
     for(int i = 0; i < TOTAL_NUM; i++)
     {
         bfa_intb_gemm_runner.run(bfa_intb_gemm_runner.k_ptr[sol_idx_no_fuse], bfa_intb_gemm_runner.kernel_func_vec[sol_idx_no_fuse], compute_stream, sk_blocks_no_fuse);
-        custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
+        // custom_all_reduce_comms[rank]->customAllReduce(m * n, compute_stream);
     }
 
     check_cuda_error(hipEventRecord(evt_no_fuse_end, compute_stream));
@@ -493,6 +493,8 @@ int gemm_ar(const test_args_t& args, const int& rank, const int& world_size)
             bw_gbs);
         printf("\n");
     }
+
+    return 0;
 
     check_cuda_error(hipDeviceSynchronize());
     MPI_Barrier(MPI_COMM_WORLD);
