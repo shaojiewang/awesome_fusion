@@ -303,6 +303,10 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
     s_mul_i32 s[s_n_idx], s[s_bx], {}
     s_mul_i32 s[s_k_idx], s[s_bz], s[s_k_per_cta]
 
+    ; update k_per_cta
+    s_sub_i32 s[s_tmp], s[s_k], s[s_k_idx]
+    s_min_i32 s[s_k_per_cta], s[s_k_per_cta], s[s_tmp]
+
 """
         cta_map_str = CTA_MAP.format(self.tile.cta_m, self.tile.cta_n)
         return cta_map_str
