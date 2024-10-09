@@ -931,7 +931,7 @@ class GemmKernelRR16R(gemm_kernel_traits.GemmKernelTraits):
             compile_cmd.append('assembler')
             compile_cmd.append('-target')
             compile_cmd.append('amdgcn--amdhsa')
-            compile_cmd.append('-mcpu=gfx90a')
+            compile_cmd.append('-mcpu=gfx942')
             compile_cmd.append(asm_path)
             compile_cmd.append('-o')
             compile_cmd.append(hsaco_path)
