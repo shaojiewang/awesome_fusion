@@ -25,11 +25,11 @@ def host_compile(host_code_path, exe_path, tmp_path, arch):
     host_side_obj.compile_host()
 
 
-def write_and_compile_kernels(k_list, output_dir):
+def write_and_compile_kernels(k_list, output_dir, arch):
     #print(k.a_layout)
     for k in k_list:
         k.write_kernel(output_dir)
-        k.compile_kernel(output_dir)
+        k.compile_kernel(output_dir, arch)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     gen_list_blobs(kernel_list, args.list_blobs)
 
     # kernel code writer and compile
-    write_and_compile_kernels(kernel_list, args.output_dir)
+    write_and_compile_kernels(kernel_list, args.output_dir, args.arch)
 
     # host code compile
     host_code = 'bfAintBGemm.cc'
